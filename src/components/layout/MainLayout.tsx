@@ -13,8 +13,12 @@ import {
   Sidebar, // shadcn/ui Sidebar for desktop
   SidebarInset, // For desktop content margin
   useSidebar, // To get isMobile, openMobile, setOpenMobile
+  SidebarTrigger, // Import SidebarTrigger
 } from '@/components/ui/sidebar';
 import { Sheet, SheetContent } from '@/components/ui/sheet'; // shadcn/ui Sheet for mobile
+import { Button } from '@/components/ui/button'; // For the trigger button
+import { PanelLeft } from 'lucide-react'; // For the trigger icon
+import { Logo } from '@/components/shared/Logo'; // For mobile header
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -23,7 +27,7 @@ interface MainLayoutProps {
 function LayoutContent({ children }: MainLayoutProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, openMobile, setOpenMobile, toggleSidebar } = useSidebar();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -47,23 +51,33 @@ function LayoutContent({ children }: MainLayoutProps) {
     <div className="flex min-h-screen bg-background">
       {isMobile ? (
         <>
-          {/* Mobile: Persistent Icon Strip */}
-          <div className="fixed inset-y-0 left-0 z-20 flex h-full w-[var(--sidebar-width-icon)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-            <AppSidebar isForMobileIconStrip={true} />
-          </div>
           {/* Mobile: Sheet for full sidebar, triggered from AppSidebar in icon strip mode */}
           <Sheet open={openMobile} onOpenChange={setOpenMobile}>
             <SheetContent side="left" className="w-[var(--sidebar-width-mobile)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
               <AppSidebar isForMobileSheet={true} />
             </SheetContent>
           </Sheet>
-          {/* Mobile: Main Content Area, offset by the icon strip */}
-          <main className="flex-1 overflow-y-auto" style={{ marginLeft: 'var(--sidebar-width-icon)' }}>
-            {/* Removed max-w-md and mx-auto from inner div, ensure children can take full available width with padding */}
-            <div className="p-4">
-              {children}
-            </div>
-          </main>
+          
+          {/* Mobile: Main Content Area */}
+          <div className="flex flex-1 flex-col">
+            {/* Mobile Header */}
+            <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sm:px-6 md:hidden">
+              <SidebarTrigger asChild>
+                <Button variant="outline" size="icon" className="h-8 w-8">
+                  <PanelLeft className="h-5 w-5" />
+                  <span className="sr-only">Toggle Menu</span>
+                </Button>
+              </SidebarTrigger>
+              <div className="ml-auto">
+                <Logo iconSize={24} textSize="text-lg" />
+              </div>
+            </header>
+            <main className="flex-1 overflow-y-auto">
+              <div className="p-4">
+                {children}
+              </div>
+            </main>
+          </div>
         </>
       ) : (
         <>
@@ -98,3 +112,4 @@ export function MainLayout({ children }: MainLayoutProps) {
     </SidebarProvider>
   )
 }
+
