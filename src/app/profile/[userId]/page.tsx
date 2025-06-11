@@ -1,3 +1,4 @@
+
 // src/app/profile/[userId]/page.tsx
 'use client';
 
@@ -63,27 +64,31 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       });
 
       setLoadingPosts(true);
-      // Query to fetch regular posts (not stories) for the user's profile
+      // Simplified query: Fetch all posts by userId, order by createdAt.
+      // Filtering for 'isStory != true' will happen client-side.
       const postsQuery = query(
         collection(db, 'posts'),
         where('userId', '==', userId),
-        where('isStory', '!=', true), // Filter out documents where isStory is true
         orderBy('createdAt', 'desc')
       );
+
       getDocs(postsQuery).then(querySnapshot => {
-        const userPosts = querySnapshot.docs.map(doc => ({
+        const userContent = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           createdAt: (doc.data().createdAt as Timestamp).toDate ? (doc.data().createdAt as Timestamp).toDate() : new Date()
         } as Post));
-        setPosts(userPosts);
+        
+        // Filter out stories on the client-side
+        const regularPosts = userContent.filter(post => post.isStory !== true);
+        setPosts(regularPosts);
+
       }).catch(error => {
         console.error("Error fetching posts:", error);
-        // Check if the error is due to a missing index
         if (error.code === 'failed-precondition') {
              toast({ 
                 title: "Error Fetching Posts", 
-                description: "A database index is required for this query. Please check Firebase console logs for a link to create it.", 
+                description: "A database index might be required for this query (typically on userId and createdAt). Please check Firebase console logs for a link to create it.", 
                 variant: "destructive",
                 duration: 10000
             });
