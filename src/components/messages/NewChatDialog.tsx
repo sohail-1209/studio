@@ -18,8 +18,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { db } from '@/lib/firebase';
 import { collection, query, getDocs, where, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { useAuth } from '@/hooks/useAuth'; // Corrected import for useAuth
-import type { UserProfile } from '@/contexts/AuthContext'; // Corrected import for UserProfile
+import { useAuth } from '@/hooks/useAuth';
+import type { UserProfile } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Spinner } from '@/components/shared/Spinner';
@@ -45,7 +45,6 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
     if (open && currentUser) {
       setLoadingUsers(true);
       const profilesCollection = collection(db, 'profiles');
-      // Query all profiles except the current user's
       const q = query(profilesCollection, where('uid', '!=', currentUser.uid));
       
       getDocs(q)
@@ -61,7 +60,6 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           setLoadingUsers(false);
         });
     } else {
-      // Reset when dialog is closed or user is not available
       setAllUsers([]);
       setSearchTerm('');
     }
@@ -77,7 +75,7 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
   }, [allUsers, searchTerm]);
 
   const handleSelectUser = async (selectedUser: UserProfile) => {
-    if (!currentUser || !selectedUser.uid) { // Ensure selectedUser.uid is accessed
+    if (!currentUser || !selectedUser.uid) {
         toast({ title: "Error", description: "Selected user data is incomplete.", variant: "destructive" });
         return;
     }
@@ -89,10 +87,9 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
     try {
       const chatSnap = await getDoc(chatDocRef);
       if (chatSnap.exists()) {
-        // Chat already exists, navigate to it
         router.push(`/messages/${chatId}`);
+        onOpenChange(false); 
       } else {
-        // Create new chat
         const newChatData = {
           userIds: [currentUser.uid, selectedUser.uid],
           userDetails: {
@@ -111,10 +108,16 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         };
+
+        console.log('Attempting to create chat with data:', JSON.stringify(newChatData, null, 2));
+        console.log('Current User UID:', currentUser.uid);
+        console.log('Selected User UID:', selectedUser.uid);
+        console.log('Generated Chat ID:', chatId);
+        
         await setDoc(chatDocRef, newChatData);
         router.push(`/messages/${chatId}`);
+        onOpenChange(false);
       }
-      onOpenChange(false); // Close dialog
     } catch (error) {
       console.error("Error creating or finding chat:", error);
       toast({ title: "Chat Error", description: "Could not start chat. Please try again.", variant: "destructive" });
@@ -125,7 +128,7 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
   
   const handleDialogClose = (isOpen: boolean) => {
     if (!isOpen) {
-      setSearchTerm(''); // Reset search term when dialog closes
+      setSearchTerm('');
     }
     onOpenChange(isOpen);
   };
@@ -150,7 +153,7 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           />
         </div>
 
-        <ScrollArea className="flex-1 -mx-6 px-6"> {/* Negative margin to allow scrollbar to be edge-to-edge of content */}
+        <ScrollArea className="flex-1 -mx-6 px-6">
           {loadingUsers && (
             <div className="flex justify-center items-center h-full">
               <Spinner size={32} />
