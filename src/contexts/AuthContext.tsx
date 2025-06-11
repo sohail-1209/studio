@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (fbUser) {
           setFirebaseUser(fbUser);
           // Fetch user profile from Firestore
-          const userRef = doc(db, 'users', fbUser.uid);
+          const userRef = doc(db, 'profiles', fbUser.uid); // Changed 'users' to 'profiles'
           const userSnap = await getDoc(userRef);
           if (userSnap.exists()) {
             setUser(userSnap.data() as UserProfile);
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(null);
         }
       } catch (error) {
-        console.error("Error in onAuthStateChanged handler:", error);
+        console.error("Error in onAuthStateChanged handler (AuthContext):", error);
         // If an error occurs (e.g., Firestore issue), ensure user is logged out
         setFirebaseUser(null);
         setUser(null);
@@ -80,13 +80,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
-      // onAuthStateChanged will handle setting user/firebaseUser to null and loading to false.
+      // onAuthStateChanged will handle setting user/firebaseUser to null.
+      // setLoading(true) might be appropriate here if there's a noticeable delay before onAuthStateChanged fires
+      // However, for simplicity and reliance on onAuthStateChanged, we can omit direct state changes here.
       router.push('/login'); // Ensure redirection to login page
     } catch (error) {
       console.error('Error during logout:', error);
-      // Fallback if firebaseSignOut itself fails, though onAuthStateChanged should ideally handle state.
-      // To be absolutely safe, one might clear local state here, but it could conflict with onAuthStateChanged.
-      // For now, we rely on onAuthStateChanged triggered by a successful signOut.
+      // Fallback: ensure local state is cleared if signOut itself or subsequent onAuthStateChanged fails.
+      setFirebaseUser(null);
+      setUser(null);
+      setLoading(false); // Ensure loading state is false
+      router.push('/login');
     }
   };
   

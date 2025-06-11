@@ -61,7 +61,7 @@ export function SignupForm() {
         username: data.username,
         bio: '',
       };
-      await setDoc(doc(db, 'users', firebaseUser.uid), newUserProfile);
+      await setDoc(doc(db, 'profiles', firebaseUser.uid), newUserProfile); // Changed 'users' to 'profiles'
 
       toast({ title: 'Signup Successful', description: 'Welcome to NExCHAT!' });
       router.push('/'); // Redirect to feed or dashboard
