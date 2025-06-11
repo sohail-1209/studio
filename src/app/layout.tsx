@@ -5,7 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'NExCHAT',
+  title: 'Synora',
   description: 'Connect, Share, and Chat.',
 };
 
@@ -56,3 +56,4 @@ export default function RootLayout({
     </html>
   );
 }
+

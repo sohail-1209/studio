@@ -215,8 +215,8 @@ export default function FeedPage() {
       return;
     }
     const shareData = {
-      title: `Check out this post on NExCHAT by ${post.userDisplayName || 'a user'}!`,
-      text: post.caption || 'An interesting post from NExCHAT.',
+      title: `Check out this post on Synora by ${post.userDisplayName || 'a user'}!`,
+      text: post.caption || 'An interesting post from Synora.',
       url: window.location.origin + `/post/${post.id}`, 
     };
 
@@ -613,3 +613,4 @@ export default function FeedPage() {
     </MainLayout>
   );
 }
+

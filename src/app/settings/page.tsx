@@ -307,7 +307,7 @@ export default function SettingsPage() {
                     <LogOut className="mr-2 h-4 w-4" /> Log Out
                   </Button>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Securely log out of your NExCHAT account.
+                    Securely log out of your Synora account.
                   </p>
                 </div>
               </div>
@@ -356,3 +356,4 @@ export default function SettingsPage() {
     </MainLayout>
   );
 }
+

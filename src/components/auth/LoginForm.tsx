@@ -1,3 +1,4 @@
+
 // src/components/auth/LoginForm.tsx
 'use client';
 
@@ -102,3 +103,4 @@ export function LoginForm() {
     </form>
   );
 }
+

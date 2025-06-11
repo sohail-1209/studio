@@ -1,3 +1,4 @@
+
 // src/components/auth/SignupForm.tsx
 'use client';
 
@@ -63,7 +64,7 @@ export function SignupForm() {
       };
       await setDoc(doc(db, 'profiles', firebaseUser.uid), newUserProfile); // Changed 'users' to 'profiles'
 
-      toast({ title: 'Signup Successful', description: 'Welcome to NExCHAT!' });
+      toast({ title: 'Signup Successful', description: 'Welcome to Synora!' });
       router.push('/'); // Redirect to feed or dashboard
     } catch (error: any) {
       toast({
@@ -136,3 +137,4 @@ export function SignupForm() {
     </form>
   );
 }
+
