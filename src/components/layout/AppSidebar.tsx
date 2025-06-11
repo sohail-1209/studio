@@ -1,3 +1,4 @@
+
 // src/components/layout/AppSidebar.tsx
 'use client';
 
@@ -18,7 +19,7 @@ import {
   SidebarMenuButton,
   SidebarSeparator as UISidebarSeparator,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button'; // For the desktop toggle
+import { Button } from '@/components/ui/button';
 
 const navItems = [
   { href: '/', label: 'Feed', icon: Home, tooltip: 'Feed' },
@@ -28,23 +29,37 @@ const navItems = [
   { href: '/create', label: 'Create Post', icon: PlusSquare, tooltip: 'Create Post' },
 ];
 
-export function AppSidebar() {
+
+interface AppSidebarProps {
+  /** True if this instance of AppSidebar is being rendered inside the mobile Sheet */
+  isForMobileSheet?: boolean;
+  /** True if this instance is for the mobile fixed icon strip */
+  isForMobileIconStrip?: boolean;
+}
+
+export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = false }: AppSidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { state, isMobile, toggleSidebar } = useSidebar();
+  const {
+    open: isDesktopExpanded, // Renamed from 'state' for clarity, true if desktop sidebar is expanded
+    isMobile,
+    openMobile: isMobileSheetOpen, // state of the mobile sheet
+    toggleSidebar // Toggles desktop OR mobile sheet based on context
+  } = useSidebar();
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === href;
     if (href.includes('/profile/')) return pathname === href || pathname.startsWith(`${href}/`);
     return pathname.startsWith(href);
   };
-
-  const showLabels = state === 'expanded' || isMobile;
+  
+  const showLabels = (!isMobile && isDesktopExpanded) || (isMobile && isForMobileSheet);
+  const showTooltips = (!isMobile && !isDesktopExpanded) || (isMobile && isForMobileIconStrip);
 
   return (
     <>
-      <SidebarHeader className="p-3"> {/* Adjusted padding */}
-        <div className="flex h-10 items-center justify-between"> {/* Fixed height for header content */}
+      <SidebarHeader className="p-3">
+        <div className="flex h-10 items-center justify-between">
           {showLabels ? (
             <Logo iconSize={30} textSize="text-2xl" className="gap-2 ml-1" />
           ) : (
@@ -59,37 +74,52 @@ export function AppSidebar() {
               />
             </Link>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hidden md:flex group-data-[collapsible=icon]:hidden" // Only show on desktop if sidebar is not in permanent icon-only mode by prop
-            onClick={toggleSidebar}
-          >
-            <PanelLeft />
-            <span className="sr-only">Toggle Sidebar</span>
-          </Button>
+          {/* Toggle Button: Shown on desktop or if it's the mobile icon strip. Not inside the mobile sheet. */}
+          {(!isMobile || isForMobileIconStrip) && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={toggleSidebar} // This smart toggle handles desktop expand/collapse OR mobile sheet open/close
+            >
+              <PanelLeft />
+              <span className="sr-only">Toggle Sidebar</span>
+            </Button>
+          )}
         </div>
       </SidebarHeader>
       <UISidebarSeparator className="my-0 bg-sidebar-border/50" />
 
-      <SidebarContent className="p-2"> {/* Adjusted padding */}
+      <SidebarContent className="p-2">
         <SidebarMenu>
-          {navItems.map((item) => (
-            <SidebarMenuItem key={item.label}>
-              <SidebarMenuButton
-                asChild
-                size="default"
-                isActive={isActive(item.href)}
-                tooltip={{content: item.tooltip, side: "right", align:"center", className: "ml-1"}}
-                className="justify-start h-9 px-2.5 text-sm" // Consistent item size
-              >
-                <Link href={item.href}>
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  {showLabels && <span className="truncate">{item.label}</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {navItems.map((item) => {
+            // An item in the mobile icon strip is a pure trigger for the sheet, not a link itself.
+            const isButtonPureTrigger = isMobile && isForMobileIconStrip;
+            return (
+              <SidebarMenuItem key={item.label}>
+                <SidebarMenuButton
+                  asChild={!isButtonPureTrigger}
+                  size="default"
+                  isActive={!isButtonPureTrigger && isActive(item.href)} // Active state only for actual links
+                  tooltip={showTooltips ? { content: item.tooltip, side: "right", align: "center", className: "ml-1" } : undefined}
+                  className="justify-start h-9 px-2.5 text-sm"
+                  onClick={isButtonPureTrigger ? () => { if (!isMobileSheetOpen) toggleSidebar(); } : undefined}
+                >
+                  {isButtonPureTrigger ? (
+                    <>
+                      <item.icon className="h-5 w-5 shrink-0" />
+                      {/* No label in icon strip, showLabels will be false here anyway */}
+                    </>
+                  ) : (
+                    <Link href={item.href}>
+                      <item.icon className="h-5 w-5 shrink-0" />
+                      {showLabels && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
 
@@ -97,46 +127,65 @@ export function AppSidebar() {
       <SidebarFooter className="p-2 space-y-1">
         {user && (
           <SidebarMenu>
+            {/* Profile Link */}
             <SidebarMenuItem>
               <SidebarMenuButton
-                asChild
+                asChild={!(isMobile && isForMobileIconStrip)}
                 size="default"
-                isActive={isActive(`/profile/${user.uid}`)}
-                tooltip={{content: "My Profile", side: "right", align:"center", className: "ml-1"}}
-                className="justify-start h-9 px-2.5 text-sm" // Consistent item size
+                isActive={!(isMobile && isForMobileIconStrip) && isActive(`/profile/${user.uid}`)}
+                tooltip={showTooltips ? { content: "My Profile", side: "right", align: "center", className: "ml-1" } : undefined}
+                className="justify-start h-9 px-2.5 text-sm"
+                onClick={(isMobile && isForMobileIconStrip) ? () => { if (!isMobileSheetOpen) toggleSidebar(); } : undefined}
               >
-                <Link href={`/profile/${user.uid}`}>
-                  <Avatar className="h-6 w-6 shrink-0">
-                    {user.photoURL ? (
-                      <Image src={user.photoURL} alt={user.displayName || 'User'} width={24} height={24} className="rounded-full" data-ai-hint="user avatar"/>
-                    ) : (
-                      <AvatarFallback className="text-xs">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                    )}
-                  </Avatar>
-                  {showLabels && <span className="truncate">My Profile</span>}
-                </Link>
+                 {(isMobile && isForMobileIconStrip) ? (
+                    <Avatar className="h-6 w-6 shrink-0">
+                      {user.photoURL ? <Image src={user.photoURL} alt={user.displayName || 'User'} width={24} height={24} className="rounded-full" data-ai-hint="user avatar"/> : <AvatarFallback className="text-xs">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>}
+                    </Avatar>
+                 ) : (
+                    <Link href={`/profile/${user.uid}`}>
+                      <Avatar className="h-6 w-6 shrink-0">
+                         {user.photoURL ? <Image src={user.photoURL} alt={user.displayName || 'User'} width={24} height={24} className="rounded-full" data-ai-hint="user avatar"/> : <AvatarFallback className="text-xs">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>}
+                      </Avatar>
+                      {showLabels && <span className="truncate">My Profile</span>}
+                    </Link>
+                 )}
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {/* Settings Link */}
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild={!(isMobile && isForMobileIconStrip)}
+                size="default"
+                isActive={!(isMobile && isForMobileIconStrip) && isActive('/settings')}
+                tooltip={showTooltips ? { content: "Settings", side: "right", align: "center", className: "ml-1" } : undefined}
+                className="justify-start h-9 px-2.5 text-sm"
+                onClick={(isMobile && isForMobileIconStrip) ? () => { if (!isMobileSheetOpen) toggleSidebar(); } : undefined}
+              >
+                {(isMobile && isForMobileIconStrip) ? (
+                    <Settings className="h-5 w-5 shrink-0" />
+                ) : (
+                  <Link href="/settings">
+                    <Settings className="h-5 w-5 shrink-0" />
+                    {showLabels && <span className="truncate">Settings</span>}
+                  </Link>
+                )}
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            {/* Logout Button */}
             <SidebarMenuItem>
               <SidebarMenuButton
-                asChild
+                asChild={false} // Logout is always a button
                 size="default"
-                isActive={isActive('/settings')}
-                tooltip={{content: "Settings", side: "right", align:"center", className: "ml-1"}}
-                className="justify-start h-9 px-2.5 text-sm" // Consistent item size
-              >
-                <Link href="/settings">
-                  <Settings className="h-5 w-5 shrink-0" />
-                  {showLabels && <span className="truncate">Settings</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                size="default"
-                onClick={logout} 
-                tooltip={{content: "Logout", side: "right", align:"center", className: "ml-1"}}
-                className="justify-start h-9 px-2.5 text-sm w-full" // Consistent item size
+                onClick={() => {
+                  // If on mobile icon strip, clicking logout should open the sheet to confirm/use full menu logout
+                  if (isMobile && isForMobileIconStrip) {
+                    if (!isMobileSheetOpen) toggleSidebar();
+                  } else {
+                    logout(); // Actual logout for desktop or from mobile sheet
+                  }
+                }}
+                tooltip={showTooltips ? { content: "Logout", side: "right", align: "center", className: "ml-1" } : undefined}
+                className="justify-start h-9 px-2.5 text-sm w-full"
               >
                 <LogOut className="h-5 w-5 shrink-0" />
                 {showLabels && <span className="truncate">Logout</span>}

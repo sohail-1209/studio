@@ -55,6 +55,11 @@ body {
     --chart-5: 45 15% 70%; /* Light Warm Gray for charts */
 
     --logo-text-color: 120 25% 30%; /* Dark Sage Green for logo text */
+
+    /* Sidebar specific widths */
+    --sidebar-width: 16rem; /* Default expanded width for desktop */
+    --sidebar-width-icon: 3.75rem; /* Width for icon-only sidebar (desktop collapsed, mobile strip) - adjusted for p-3 on header/footer and p-2 on content */
+    --sidebar-width-mobile: 16rem; /* Width for the mobile sheet when it opens */
   }
 
   .dark {
