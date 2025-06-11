@@ -11,18 +11,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc } from 'firebase/firestore';
-import type { UserProfile } from '@/contexts/AuthContext';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
+import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext'; // Renamed to avoid conflict
 import type { Post } from '@/types/post';
 import { useAuth } from '@/hooks/useAuth';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// Define a local UserProfile type that extends the one from AuthContext if needed
+interface UserProfile extends AuthContextUserProfile {
+  coverPhotoURL?: string;
+  followersCount?: number;
+  followingCount?: number;
+}
+
+
 export default function UserProfilePage({ params: paramsPromise }: { params: { userId: string } }) {
-  const params = use(paramsPromise); // Using the use hook for promise resolution
+  const params = use(paramsPromise); 
   const { userId } = params;
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, reloadUser } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -44,9 +52,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           setProfile(docSnap.data() as UserProfile);
         } else {
           console.error("No such profile!");
-          // Optionally redirect to a 404 page or show an error message
           toast({ title: "Profile not found", variant: "destructive" });
-          setProfile(null); // Ensure profile is null if not found
+          setProfile(null); 
         }
       }).catch(error => {
         console.error("Error fetching profile:", error);
@@ -59,13 +66,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       const postsQuery = query(
         collection(db, 'posts'),
         where('userId', '==', userId),
+        where('isStory', '!=', true), // Filter out stories
         orderBy('createdAt', 'desc')
       );
       getDocs(postsQuery).then(querySnapshot => {
         const userPosts = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          createdAt: (doc.data().createdAt as any).toDate ? (doc.data().createdAt as any).toDate() : new Date()
+          createdAt: (doc.data().createdAt as Timestamp).toDate ? (doc.data().createdAt as Timestamp).toDate() : new Date()
         } as Post));
         setPosts(userPosts);
       }).catch(error => {
@@ -187,6 +195,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     );
   }
 
+  const handleProfileUpdate = (updatedProfile: UserProfile) => {
+    setProfile(updatedProfile);
+    // Optionally, trigger a reload of the auth user if fundamental details changed
+    // This is more for immediate reflection if AuthContext doesn't pick it up fast enough.
+    // reloadUser(); 
+  };
+
+
   return (
     <MainLayout>
       <div className="container mx-auto max-w-4xl py-8">
@@ -194,7 +210,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           <CardHeader className="bg-muted/30 p-0">
             <div className="relative h-48 w-full">
               <Image
-                src={profile.coverPhotoURL || "https://placehold.co/1200x300.png/E1D9F3/332E40"} // Placeholder cover
+                src={profile.coverPhotoURL || "https://placehold.co/1200x300.png/E1D9F3/332E40"} 
                 alt={`${profile.displayName || 'User'}'s cover photo`}
                 fill
                 style={{objectFit: 'cover'}}
@@ -233,7 +249,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             <p className="text-foreground mb-6 whitespace-pre-wrap">{profile.bio || "No bio yet."}</p>
             <div className="flex space-x-6 text-sm text-muted-foreground mb-8">
               <span><strong className="text-foreground">{posts.length}</strong> Posts</span>
-              {/* Placeholder counts */}
               <span><strong className="text-foreground">{profile.followersCount || 0}</strong> Followers</span>
               <span><strong className="text-foreground">{profile.followingCount || 0}</strong> Following</span>
             </div>
@@ -272,7 +287,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                           className="transition-transform duration-300 group-hover:scale-105"
                         />
                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-2">
-                           {/* Could show like/comment counts here on hover */}
                          </div>
                       </div>
                     ))}
@@ -306,16 +320,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           userProfile={profile}
-          onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}
+          onProfileUpdate={handleProfileUpdate}
         />
       )}
     </MainLayout>
   );
-}
-
-// Extend UserProfile to include fields that might be on the profile but not in AuthContext by default
-interface UserProfile extends UserProfile {
-  coverPhotoURL?: string;
-  followersCount?: number;
-  followingCount?: number;
 }
