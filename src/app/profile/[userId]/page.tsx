@@ -79,12 +79,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       setIsProcessingFollow(false);
       return;
     }
+    
     setIsProcessingFollow(true);
     setFollowStatus('not_following'); 
     setExistingRequestId(null);
 
     try {
-      // Check for existing request from current user to profile user
       const qSent = query(
         collection(db, 'followRequests'),
         where('requesterId', '==', currentUser.uid),
@@ -97,35 +97,34 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         const request = sentSnapshot.docs[0].data() as FollowRequestDocument;
         const requestId = sentSnapshot.docs[0].id;
         if (request.status === 'pending') {
-          setFollowStatus('pending_them');
+          setFollowStatus('pending_them'); // Current user sent a pending request to profile user
           setExistingRequestId(requestId); 
         } else if (request.status === 'accepted') {
-          setFollowStatus('following');
+          setFollowStatus('following'); // Current user is following profile user
           setExistingRequestId(requestId);
-        } else { 
+        } else { // 'declined' or other states, treat as not_following for button logic
           setFollowStatus('not_following');
         }
         setIsProcessingFollow(false);
         return;
       }
 
-      // If no request sent by current user, check for request from profile user to current user
       const qReceived = query(
         collection(db, 'followRequests'),
-        where('requesterId', '==', userId),
-        where('recipientId', '==', currentUser.uid),
+        where('requesterId', '==', userId), // Profile user is requester
+        where('recipientId', '==', currentUser.uid), // Current user is recipient
         limit(1)
       );
       const receivedSnapshot = await getDocs(qReceived);
       if (!receivedSnapshot.empty) {
         const request = receivedSnapshot.docs[0].data() as FollowRequestDocument;
-        const requestId = receivedSnapshot.docs[0].id;
+        // const requestId = receivedSnapshot.docs[0].id; // ID of request sent by profile user
         if (request.status === 'pending') {
-          setFollowStatus('pending_me'); 
-          setExistingRequestId(requestId); 
+          setFollowStatus('pending_me'); // Profile user sent a pending request to current user
+          // setExistingRequestId(requestId); // Not needed for 'pending_me' from current user's perspective for *their* actions
         } else if (request.status === 'accepted') {
-          setFollowStatus('follow_back'); // They follow current user
-          setExistingRequestId(requestId); // Store ID of the request they sent which is now accepted
+          setFollowStatus('follow_back'); // Profile user follows current user (and current user might not be following them back yet)
+          // setExistingRequestId(requestId); // Not generally needed for "Follow Back" action which creates a new request
         } else {
           setFollowStatus('not_following');
         }
@@ -259,7 +258,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setIsProcessingFollow(true);
     try {
         const requestRef = doc(db, 'followRequests', existingRequestId);
-        await deleteDoc(requestRef);
+        await deleteDoc(requestRef); // This deletes the request document
+
+        // Optionally: Delete the notification sent to the recipient if desired, though rules might prevent this.
+        // For now, the notification will become "stale".
+        // Consider adding a cloud function to clean up stale notifications or handle this deletion server-side.
+
         setFollowStatus('not_following');
         setExistingRequestId(null);
         toast({ title: "Follow Request Cancelled" });
@@ -281,22 +285,28 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', existingRequestId);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); // For target's followersCount (if rules allowed)
+    const targetUserProfileRef = doc(db, 'profiles', profile.uid); 
 
     try {
-      batch.delete(followRequestRef);
+      batch.delete(followRequestRef); 
       batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-      // batch.update(targetUserProfileRef, { followersCount: increment(-1) }); // This will likely fail if rules don't allow current user to write to target's profile
+      // Attempt to update target's followersCount. THIS MAY FAIL if rules don't allow current user to write to target's profile.
+      // Secure updates to another user's profile fields should ideally be done via Cloud Functions.
+      batch.update(targetUserProfileRef, { followersCount: increment(-1) }); 
 
       await batch.commit();
 
       setFollowStatus('not_following');
       setExistingRequestId(null);
       toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName || 'this user'}.` });
-      // reloadUser(); // Optionally reload local user data
+      // reloadUser(); // Optionally reload local user data if counts are critical for immediate display from AuthContext
     } catch (error: any) {
       console.error("Error unfollowing user:", error);
-      toast({ title: "Unfollow Error", description: error.message || "Could not unfollow user.", variant: "destructive" });
+      toast({ title: "Unfollow Error", description: error.message || "Could not unfollow user. Some counts might be out of sync.", variant: "destructive" });
+      // If the batch fails, counts might be inconsistent. A more robust solution would use Cloud Functions.
+      // For now, we optimistically update the UI status.
+      // Re-check status to reflect partial success/failure if needed.
+      checkFollowStatus();
     } finally {
       setIsProcessingFollow(false);
     }
@@ -467,14 +477,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     reloadUser(); 
   };
   
-  // Refactored FollowButton component
   const FollowButtonComponent = () => {
     if (isProcessingFollow) {
       return <Button disabled><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
     }
     switch (followStatus) {
       case 'pending_them': 
-        return <Button variant="destructive" onClick={handleCancelFollowRequest}><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
+        return <Button variant="outline" onClick={handleCancelFollowRequest}><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
       case 'following': 
         return <Button variant="outline" onClick={handleUnfollowUser}><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
       case 'pending_me': 
