@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Heart, MessageCircle as MessageIcon, Share2 } from 'lucide-react';
 import Image from 'next/image';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // AvatarImage removed as it was causing issues with next/image if not used correctly, AvatarFallback is enough with Image direct child
 import { useState, useEffect } from 'react';
 import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
 import { db } from '@/lib/firebase';
@@ -28,7 +28,7 @@ export default function FeedPage() {
 
   const [isLiking, setIsLiking] = useState<{[postId: string]: boolean}>({});
   const [isCommenting, setIsCommenting] = useState<{[postId: string]: boolean}>({});
-  // No specific loading state for share as it's usually synchronous or handled by browser UI
+
 
   useEffect(() => {
     const postsCollection = collection(db, 'posts');
@@ -71,7 +71,7 @@ export default function FeedPage() {
       toast({ title: 'Authentication Error', description: 'Please log in to like posts.', variant: 'destructive' });
       return;
     }
-    if (isLiking[postId]) return; // Prevent multiple clicks
+    if (isLiking[postId]) return; 
 
     setIsLiking(prev => ({ ...prev, [postId]: true }));
 
@@ -90,7 +90,6 @@ export default function FeedPage() {
           likesCount: increment(1),
         });
       }
-      // UI will update via onSnapshot
     } catch (error: any) {
       console.error('Error liking post:', error);
       toast({
@@ -117,8 +116,6 @@ export default function FeedPage() {
       await updateDoc(postRef, {
         commentsCount: increment(1),
       });
-      // UI will update via onSnapshot
-      // For a full comment feature, you'd open a dialog or navigate to a comment view here
       toast({
         title: 'Comment Added (Count)',
         description: 'Full comment functionality coming soon!',
@@ -141,26 +138,63 @@ export default function FeedPage() {
       return;
     }
     const shareData = {
-      title: 'Check out this post on NExCHAT!',
+      title: `Check out this post on NExCHAT by ${post.userDisplayName || 'a user'}!`,
       text: post.caption || 'An interesting post from NExCHAT.',
-      url: window.location.href, // Or a direct link to the post if available
+      // Ideally, this URL would be a direct link to the post if your routing supports it.
+      // For now, using the current page URL as a placeholder.
+      url: window.location.origin + `/post/${post.id}`, // Example post URL, adjust if needed
     };
-    try {
-      if (navigator.share) {
+
+    if (navigator.share) {
+      try {
         await navigator.share(shareData);
-      } else {
-        // Fallback for browsers that don't support navigator.share
-        navigator.clipboard.writeText(shareData.url);
+      } catch (error: any) {
+        console.error('Error sharing post via navigator.share:', error);
+        // Attempt fallback to clipboard if navigator.share fails (e.g., permission denied)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(shareData.url);
+            toast({
+              title: 'Share Failed, Link Copied!',
+              description: 'Could not open share dialog. Post link copied to clipboard.',
+              variant: 'default', // 'default' or 'success'
+            });
+          } catch (copyError) {
+            console.error('Error copying link to clipboard:', copyError);
+            toast({
+              title: 'Share Failed',
+              description: 'Could not share or copy the post link. Please try manually.',
+              variant: 'destructive',
+            });
+          }
+        } else {
+          toast({
+            title: 'Share Failed',
+            description: 'Sharing is not supported or was blocked, and clipboard access is not available.',
+            variant: 'destructive',
+          });
+        }
+      }
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      // Fallback for browsers that don't support navigator.share at all
+      try {
+        await navigator.clipboard.writeText(shareData.url);
         toast({
           title: 'Link Copied!',
           description: 'Post link copied to clipboard. Share it with your friends!',
         });
+      } catch (copyError) {
+        console.error('Error copying link to clipboard:', copyError);
+        toast({
+          title: 'Share Unavailable',
+          description: 'Could not copy the post link. Please try manually.',
+          variant: 'destructive',
+        });
       }
-    } catch (error) {
-      console.error('Error sharing post:', error);
+    } else {
       toast({
-        title: 'Share Failed',
-        description: 'Could not share the post at this time.',
+        title: 'Share Unavailable',
+        description: 'Sharing is not supported on this browser.',
         variant: 'destructive',
       });
     }
@@ -214,12 +248,15 @@ export default function FeedPage() {
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex flex-col items-center space-y-1">
                 <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5">
-                  <AvatarImage
+                  <Image
                     src={`https://placehold.co/64x64.png/7E57C2/FFFFFF?text=U${i + 1}`}
                     alt={`User ${i + 1} story`}
+                    width={64}
+                    height={64}
+                    className="rounded-full"
                     data-ai-hint="portrait person"
                   />
-                  <AvatarFallback>{`U`}</AvatarFallback>
+                  {/* <AvatarFallback>{`U`}</AvatarFallback> AvatarImage was removed, check if fallback logic needs change */}
                 </Avatar>
                 <span className="text-xs text-muted-foreground">User {i + 1}</span>
               </div>
@@ -249,8 +286,11 @@ export default function FeedPage() {
                 <CardHeader className="p-4">
                   <div className="flex items-center space-x-3">
                     <Avatar>
-                      <AvatarImage src={post.userAvatarUrl || `https://placehold.co/50x50.png?text=${post.userDisplayName?.charAt(0) || 'U'}`} alt={post.userDisplayName || 'User'} data-ai-hint="user avatar" />
-                      <AvatarFallback>{(post.userDisplayName || 'User').substring(0, 2)}</AvatarFallback>
+                       {post.userAvatarUrl ? (
+                        <Image src={post.userAvatarUrl} alt={post.userDisplayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
+                      ) : (
+                        <AvatarFallback>{(post.userDisplayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                      )}
                     </Avatar>
                     <div>
                       <p className="font-semibold text-foreground">{post.userDisplayName || 'Anonymous User'}</p>
@@ -267,8 +307,9 @@ export default function FeedPage() {
                     </div>
                   )}
                   {post.videoUrl && (
+                    // Basic video placeholder - for actual video, you'd use a <video> tag
                     <div className="relative aspect-video w-full bg-black flex items-center justify-center">
-                      <Image src={post.videoUrl} alt={post.caption || "Post video placeholder"} layout="fill" objectFit="contain" data-ai-hint={post.dataAiHint || "user content"} />
+                       <Image src={post.videoUrl} alt={post.caption || "Post video placeholder"} layout="fill" objectFit="contain" data-ai-hint={post.dataAiHint || "user content video"} />
                     </div>
                   )}
                   {post.caption && <p className="p-4 text-foreground whitespace-pre-wrap">{post.caption}</p>}
