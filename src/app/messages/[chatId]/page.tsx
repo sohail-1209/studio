@@ -57,6 +57,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const { toast } = useToast();
 
   const [chatPartnerProfile, setChatPartnerProfile] = useState<ChatSessionUserDetail | null>(null);
+  const [chatPartnerId, setChatPartnerId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(true);
@@ -71,6 +72,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const [isDeleteMessageDialogOpen, setIsDeleteMessageDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<ChatMessage | null>(null);
   const [isDeletingMessage, setIsDeletingMessage] = useState(false);
+  const [isInitiatingCall, setIsInitiatingCall] = useState(false);
 
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -93,6 +95,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       if (chatSnap.exists()) {
         const chatData = chatSnap.data() as ChatSessionDocument;
         const otherUserId = chatData.userIds.find(uid => uid !== user.uid);
+        setChatPartnerId(otherUserId || null);
         if (otherUserId && chatData.userDetails && chatData.userDetails[otherUserId]) {
           setChatPartnerProfile(chatData.userDetails[otherUserId]);
         } else if (otherUserId) {
@@ -305,6 +308,48 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     }
   };
 
+  const handleInitiateCall = async (callType: 'audio' | 'video') => {
+    if (!user || !chatPartnerProfile || !chatPartnerId || isInitiatingCall) {
+      toast({
+        title: "Cannot Initiate Call",
+        description: "User or chat partner information is missing, or a call is already being initiated.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsInitiatingCall(true);
+    try {
+      const callAttemptsRef = collection(db, 'callAttempts');
+      await addDoc(callAttemptsRef, {
+        callerId: user.uid,
+        callerName: user.displayName || 'Unknown Caller',
+        calleeId: chatPartnerId,
+        calleeName: chatPartnerProfile.displayName || 'Unknown Recipient',
+        chatId: chatId,
+        callType: callType,
+        status: 'initiating', // Other statuses could be 'ringing', 'answered', 'declined', 'ended'
+        timestamp: serverTimestamp(),
+      });
+
+      toast({
+        title: `Simulated ${callType} Call Initiated`,
+        description: `Attempting to call ${chatPartnerProfile.displayName || 'your chat partner'}... (This is a simulation and will not actually connect or notify the other user yet.)`,
+        duration: 7000,
+      });
+
+    } catch (error: any) {
+      console.error(`Error initiating ${callType} call:`, error);
+      toast({
+        title: "Call Initiation Failed",
+        description: `Could not simulate ${callType} call. ${error.message || 'Please try again.'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsInitiatingCall(false);
+    }
+  };
+
+
   const MessageSkeleton = () => (
     <div className="flex items-end space-x-2 my-2">
       <Skeleton className="h-8 w-8 rounded-full" />
@@ -337,8 +382,12 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
             )}
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" title="Voice Call (coming soon)"><Phone className="h-5 w-5" /></Button>
-            <Button variant="ghost" size="icon" title="Video Call (coming soon)"><Video className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" title="Voice Call" onClick={() => handleInitiateCall('audio')} disabled={isInitiatingCall}>
+              {isInitiatingCall ? <Loader2 className="h-5 w-5 animate-spin" /> : <Phone className="h-5 w-5" />}
+            </Button>
+            <Button variant="ghost" size="icon" title="Video Call" onClick={() => handleInitiateCall('video')} disabled={isInitiatingCall}>
+              {isInitiatingCall ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" />}
+            </Button>
           </div>
         </header>
 
