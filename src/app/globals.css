@@ -9,92 +9,92 @@ body {
 
 @layer base {
   :root {
-    --background: 220 30% 97%; /* Very Light Cool Gray/Blue */
-    --foreground: 220 20% 20%; /* Dark Cool Gray/Blue */
+    --background: 220 40% 98%; /* Lighter, slightly bluer background */
+    --foreground: 220 25% 15%; /* Darker, crisper foreground */
 
-    --card: 0 0% 100%; /* White */
-    --card-foreground: 220 20% 20%; /* Dark Cool Gray/Blue */
+    --card: 0 0% 100%; /* White card for clean separation */
+    --card-foreground: 220 25% 15%; /* Matches foreground */
 
-    --popover: 0 0% 100%; /* White */
-    --popover-foreground: 220 20% 20%; /* Dark Cool Gray/Blue */
+    --popover: 0 0% 100%; /* White popover */
+    --popover-foreground: 220 25% 15%; /* Matches foreground */
 
-    --primary: 210 60% 45%; /* Professional Blue */
+    --primary: 220 65% 55%; /* New Blue - slightly more saturated, bit lighter */
     --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 210 50% 90%; /* Light Blue tint */
-    --secondary-foreground: 210 60% 30%; /* Darker Blue for text on secondary */
+    --secondary: 220 50% 92%; /* Light Blue tint */
+    --secondary-foreground: 220 60% 35%; /* Darker Blue for text on secondary */
 
-    --muted: 220 25% 94%; /* Light Gray/Blue */
-    --muted-foreground: 220 15% 45%; /* Muted text color */
+    --muted: 220 35% 95%; /* Very Light Blue/Gray */
+    --muted-foreground: 220 20% 40%; /* Muted text color */
 
-    --accent: 35 70% 55%; /* Muted Gold/Amber */
+    --accent: 170 45% 50%; /* New Accent - Soft, Desaturated Teal/Green */
     --accent-foreground: 0 0% 100%; /* White */
 
-    --destructive: 0 84.2% 60.2%; /* Standard Red - unchanged */
-    --destructive-foreground: 0 0% 98%; /* Standard Light Gray - unchanged */
+    --destructive: 0 84.2% 60.2%; /* Standard Red */
+    --destructive-foreground: 0 0% 98%; /* Standard Light Gray */
 
-    --border: 210 30% 88%; /* Light Blue/Gray border */
-    --input: 210 30% 92%; /* Slightly lighter Blue/Gray input */
-    --ring: 210 60% 45%; /* Matches primary */
+    --border: 220 30% 90%; /* Light Blue/Gray border */
+    --input: 220 30% 94%; /* Slightly lighter Blue/Gray input */
+    --ring: 220 65% 55%; /* Matches primary */
 
-    --radius: 0.5rem; /* unchanged */
+    --radius: 0.5rem;
 
     /* Custom sidebar colors */
-    --sidebar-background: 220 20% 95%; /* Very Light Cool Gray */
-    --sidebar-foreground: 220 20% 20%; /* Dark Cool Gray/Blue */
-    --sidebar-border: 210 30% 88%; /* Light Blue/Gray border */
-    --sidebar-active: 210 60% 45%; /* Matches primary */
+    --sidebar-background: 220 30% 96%;
+    --sidebar-foreground: 220 25% 20%;
+    --sidebar-border: 220 30% 88%;
+    --sidebar-active: 220 65% 55%; /* Matches primary */
     --sidebar-active-foreground: 0 0% 100%; /* White */
-    --sidebar-hover: 210 50% 88%; /* Lighter Blue for hover */
-    --sidebar-hover-foreground: 220 20% 15%; /* Darker Cool Gray/Blue on hover */
+    --sidebar-hover: 220 40% 90%; 
+    --sidebar-hover-foreground: 220 25% 15%;
 
-    --chart-1: 12 76% 61%; /* unchanged */
-    --chart-2: 173 58% 39%; /* unchanged */
-    --chart-3: 197 37% 24%; /* unchanged */
-    --chart-4: 43 74% 66%; /* unchanged */
-    --chart-5: 27 87% 67%; /* unchanged */
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
 
-    --logo-text-color: 210 60% 40%; /* Slightly darker variant of primary for logo */
+    --logo-text-color: 220 65% 45%; /* Darker primary for logo */
   }
 
   .dark {
-    --background: 220 20% 12%; /* Dark Cool Blue/Gray */
-    --foreground: 220 25% 90%; /* Light Gray/Blue text */
+    --background: 220 25% 10%; /* Very Dark Cool Blue/Gray */
+    --foreground: 220 30% 92%; /* Light Gray/Blue text */
 
-    --card: 220 20% 18%; /* Slightly Lighter Dark Blue/Gray */
-    --card-foreground: 220 25% 90%; /* Light Gray/Blue text */
+    --card: 220 25% 14%; /* Slightly Lighter Dark Blue/Gray for card */
+    --card-foreground: 220 30% 92%; 
 
-    --popover: 220 20% 18%; /* Slightly Lighter Dark Blue/Gray */
-    --popover-foreground: 220 25% 90%; /* Light Gray/Blue text */
+    --popover: 220 25% 14%; 
+    --popover-foreground: 220 30% 92%;
 
-    --primary: 210 70% 60%; /* Brighter Blue for dark mode */
-    --primary-foreground: 0 0% 100%; /* White */
+    --primary: 220 70% 65%; /* Brighter Blue for dark mode */
+    --primary-foreground: 0 0% 100%; 
 
-    --secondary: 210 40% 25%; /* Darker shade for secondary bg in blue */
-    --secondary-foreground: 210 30% 85%; /* Light blue text for secondary */
+    --secondary: 220 35% 20%; /* Darker shade for secondary bg in blue */
+    --secondary-foreground: 220 30% 88%; /* Light blue text for secondary */
 
-    --muted: 220 15% 22%; /* Darker Gray/Blue */
-    --muted-foreground: 220 20% 65%; /* Muted text color */
+    --muted: 220 20% 18%; /* Darker Gray/Blue */
+    --muted-foreground: 220 25% 60%; /* Muted text color */
 
-    --accent: 35 75% 65%; /* Slightly brighter Gold/Amber for dark mode */
-    --accent-foreground: 0 0% 100%; /* White */
+    --accent: 170 55% 60%; /* Brighter Soft Teal/Green for dark mode accent */
+    --accent-foreground: 220 20% 10%; /* Dark text on accent for dark mode */
 
-    --destructive: 0 62.8% 50.6%; /* Standard Red for dark - unchanged */
-    --destructive-foreground: 0 0% 98%; /* Standard Light Gray for dark - unchanged */
+    --destructive: 0 72.2% 50.6%; /* Slightly darker red for dark mode */
+    --destructive-foreground: 0 0% 98%; 
 
-    --border: 210 25% 35%; /* Dark Blue/Gray border */
-    --input: 210 25% 40%; /* Dark Blue/Gray input */
-    --ring: 210 70% 60%; /* Matches dark primary */
+    --border: 220 20% 30%; /* Dark Blue/Gray border */
+    --input: 220 20% 35%; /* Dark Blue/Gray input */
+    --ring: 220 70% 65%; /* Matches dark primary */
     
-    --sidebar-background: 220 25% 15%; /* Darker Cool Gray for sidebar */
-    --sidebar-foreground: 220 25% 90%; /* Light Gray/Blue text */
-    --sidebar-border: 210 25% 35%; /* Dark Blue/Gray border */
-    --sidebar-active: 210 70% 60%; /* Matches dark primary */
-    --sidebar-active-foreground: 0 0% 100%; /* White */
-    --sidebar-hover: 210 35% 28%; /* Darker Blue for hover */
-    --sidebar-hover-foreground: 220 25% 95%; /* Lightest text on hover */
+    --sidebar-background: 220 25% 12%; 
+    --sidebar-foreground: 220 30% 90%;
+    --sidebar-border: 220 20% 28%;
+    --sidebar-active: 220 70% 65%; /* Matches dark primary */
+    --sidebar-active-foreground: 0 0% 100%; 
+    --sidebar-hover: 220 30% 22%; 
+    --sidebar-hover-foreground: 220 30% 95%;
 
-    --logo-text-color: 210 70% 65%; /* Brighter variant of primary for dark mode logo */
+    --logo-text-color: 220 70% 70%; /* Lighter primary for logo */
   }
 }
 
