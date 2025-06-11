@@ -4,13 +4,14 @@
 
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Compass, Image as ImageIcon, Search as SearchIcon, User as UserIcon } from 'lucide-react';
+import { Compass, Image as ImageIcon, Search as SearchIcon, User as UserIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent, useCallback, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, Timestamp, getDocs } from 'firebase/firestore';
 import type { Post } from '@/types/post';
+import type { UserProfile } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -18,26 +19,49 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+
+// Standard debounce function
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  const debounced = (...args: Parameters<F>) => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
+    timeout = setTimeout(() => func(...args), waitFor);
+  };
+
+  return debounced as (...args: Parameters<F>) => void;
+}
 
 
 export default function ExplorePage() {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchUsername, setSearchUsername] = useState(''); // Changed from searchUid
-  const [isSearchingUser, setIsSearchingUser] = useState(false);
+  const [loadingRecentPosts, setLoadingRecentPosts] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchingUserExact, setIsSearchingUserExact] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
+  const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputFocusedRef = useRef(false);
+
+
   useEffect(() => {
     const fetchExplorePosts = async () => {
-      setLoading(true);
+      console.log("ExplorePage: Fetching recent posts.");
+      setLoadingRecentPosts(true);
       try {
         const postsColRef = collection(db, 'posts');
         const q = query(
           postsColRef,
-          where('isStory', '!=', true), // Exclude stories
+          where('isStory', '!=', true),
           orderBy('createdAt', 'desc'),
-          limit(24) // Fetch up to 24 recent non-story posts
+          limit(24)
         );
 
         const querySnapshot = await getDocs(q);
@@ -50,9 +74,10 @@ export default function ExplorePage() {
               createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
             } as Post;
           })
-          .filter(post => post.imageUrl); // Only include posts that have an image for the explore grid
+          .filter(post => post.imageUrl);
 
         setPosts(fetchedPosts);
+        console.log("ExplorePage: Fetched recent posts:", fetchedPosts.length);
       } catch (error) {
         console.error("Error fetching explore posts:", error);
         toast({
@@ -61,16 +86,17 @@ export default function ExplorePage() {
           variant: "destructive",
         });
       } finally {
-        setLoading(false);
+        setLoadingRecentPosts(false);
       }
     };
 
     fetchExplorePosts();
   }, [toast]);
 
-  const handleSearchByUsername = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const trimmedUsername = searchUsername.trim();
+  const handleExactUsernameSearch = async (e?: FormEvent<HTMLFormElement>) => {
+    e?.preventDefault();
+    const trimmedUsername = searchTerm.trim();
+    console.log("ExplorePage: handleExactUsernameSearch triggered for:", trimmedUsername);
 
     if (!trimmedUsername) {
       toast({
@@ -81,13 +107,15 @@ export default function ExplorePage() {
       return;
     }
 
-    setIsSearchingUser(true);
+    setIsSearchingUserExact(true);
+    setShowSuggestions(false); 
     try {
       const profilesRef = collection(db, 'profiles');
       const q = query(profilesRef, where('username', '==', trimmedUsername), limit(1));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
+        console.log("ExplorePage: No user found for exact username:", trimmedUsername);
         toast({
           title: "User Not Found",
           description: `No user found with the username "${trimmedUsername}".`,
@@ -95,8 +123,11 @@ export default function ExplorePage() {
         });
       } else {
         const userDoc = querySnapshot.docs[0];
-        const userId = userDoc.id; // The document ID is the UID
+        const userId = userDoc.id;
+        console.log("ExplorePage: User found for exact username, navigating to profile:", userId);
         router.push(`/profile/${userId}`);
+        setSearchTerm(''); 
+        setSuggestedUsers([]);
       }
     } catch (error: any) {
       console.error("Error searching for user by username:", error);
@@ -115,9 +146,78 @@ export default function ExplorePage() {
         });
       }
     } finally {
-      setIsSearchingUser(false);
-      setSearchUsername(''); 
+      setIsSearchingUserExact(false);
     }
+  };
+
+  const fetchUserSuggestions = useCallback(async (prefix: string) => {
+    const lowerCasePrefix = prefix.toLowerCase();
+    console.log("ExplorePage: fetchUserSuggestions called with prefix:", lowerCasePrefix);
+
+    if (lowerCasePrefix.length < 2) {
+      setSuggestedUsers([]);
+      setShowSuggestions(false);
+      setLoadingSuggestions(false);
+      console.log("ExplorePage: Prefix too short, clearing suggestions.");
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    try {
+      const profilesRef = collection(db, 'profiles');
+      const q = query(
+        profilesRef,
+        where('username', '>=', lowerCasePrefix),
+        where('username', '<=', lowerCasePrefix + '\uf8ff'),
+        limit(5) 
+      );
+      const querySnapshot = await getDocs(q);
+      const fetchedUsers = querySnapshot.docs.map(doc => doc.data() as UserProfile);
+      
+      console.log("ExplorePage: Fetched suggestions:", fetchedUsers.length, fetchedUsers);
+      setSuggestedUsers(fetchedUsers);
+
+      if (fetchedUsers.length > 0 && inputFocusedRef.current) {
+        setShowSuggestions(true);
+        console.log("ExplorePage: Setting showSuggestions to true");
+      } else {
+        setShowSuggestions(false);
+        console.log("ExplorePage: Setting showSuggestions to false (no users or not focused)");
+      }
+    } catch (error) {
+      console.error("Error fetching user suggestions:", error);
+      setSuggestedUsers([]);
+      setShowSuggestions(false);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [toast]); 
+
+  const debouncedFetchUserSuggestions = useMemo(() => {
+    console.log("ExplorePage: Creating new debouncedFetchUserSuggestions function.");
+    return debounce(fetchUserSuggestions, 300);
+  }, [fetchUserSuggestions]);
+
+  useEffect(() => {
+    const trimmedSearchTerm = searchTerm.trim();
+    console.log("ExplorePage: searchTerm useEffect, current term:", trimmedSearchTerm);
+    
+    if (trimmedSearchTerm.length >= 2) {
+      debouncedFetchUserSuggestions(trimmedSearchTerm);
+    } else {
+      setSuggestedUsers([]);
+      setShowSuggestions(false);
+      setLoadingSuggestions(false);
+      console.log("ExplorePage: searchTerm too short in useEffect, clearing suggestions.");
+    }
+  }, [searchTerm, debouncedFetchUserSuggestions]);
+
+  const handleSuggestionClick = (userId: string) => {
+    console.log("ExplorePage: Suggestion clicked, navigating to profile:", userId);
+    router.push(`/profile/${userId}`);
+    setSearchTerm(''); 
+    setSuggestedUsers([]); 
+    setShowSuggestions(false); 
   };
 
   const PostGridSkeleton = () => (
@@ -127,6 +227,8 @@ export default function ExplorePage() {
       ))}
     </div>
   );
+  
+  console.log("ExplorePage Render: showSuggestions:", showSuggestions, "suggestedUsers:", suggestedUsers.length, "searchTerm:", searchTerm.length, "inputFocusedRef.current:", inputFocusedRef.current, "loadingSuggestions:", loadingSuggestions);
 
   return (
     <MainLayout>
@@ -139,31 +241,74 @@ export default function ExplorePage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="mb-6">
+            <div className="mb-6 relative">
               <h3 className="text-lg font-semibold text-foreground mb-2">Find a User by Username</h3>
-              <form onSubmit={handleSearchByUsername} className="flex items-center space-x-2">
+              <form onSubmit={handleExactUsernameSearch} className="flex items-center space-x-2">
                 <Input
                   type="text"
                   placeholder="Enter Username..."
-                  value={searchUsername}
-                  onChange={(e) => setSearchUsername(e.target.value)}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onFocus={() => {
+                    inputFocusedRef.current = true;
+                    if (suggestedUsers.length > 0 && searchTerm.length >= 2) {
+                       setShowSuggestions(true);
+                       console.log("ExplorePage: Input focused, showing suggestions.");
+                    } else {
+                       console.log("ExplorePage: Input focused, but no suggestions or term too short.");
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                        inputFocusedRef.current = false; 
+                        setShowSuggestions(false);
+                        console.log("ExplorePage: Input blurred, hiding suggestions after delay.");
+                    }, 200); 
+                  }}
                   className="flex-grow"
-                  disabled={isSearchingUser}
+                  disabled={isSearchingUserExact}
+                  autoComplete="off"
                 />
-                <Button type="submit" disabled={isSearchingUser}>
-                  {isSearchingUser ? <UserIcon className="mr-2 h-4 w-4 animate-pulse" /> : <SearchIcon className="mr-2 h-4 w-4" />}
-                   View Profile
+                <Button type="submit" disabled={isSearchingUserExact || loadingSuggestions}>
+                  {isSearchingUserExact ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SearchIcon className="mr-2 h-4 w-4" />}
+                   Search
                 </Button>
               </form>
+              {showSuggestions && searchTerm.length >= 2 && (
+                 <div className="absolute z-10 w-[calc(100%-5rem)] mt-1 max-h-60 overflow-y-auto rounded-md border bg-background shadow-lg">
+                  {loadingSuggestions && (
+                    <div className="p-3 text-sm text-muted-foreground text-center">Loading suggestions...</div>
+                  )}
+                  {!loadingSuggestions && suggestedUsers.length === 0 && searchTerm.length >= 2 && (
+                    <div className="p-3 text-sm text-muted-foreground">No users found matching &quot;{searchTerm}&quot;.</div>
+                  )}
+                  {!loadingSuggestions && suggestedUsers.map((user) => (
+                    <div
+                      key={user.uid}
+                      className="flex items-center space-x-2 p-3 hover:bg-muted cursor-pointer"
+                      onMouseDown={() => handleSuggestionClick(user.uid)} 
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
+                        <AvatarFallback>{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{user.displayName}</p>
+                        <p className="text-xs text-muted-foreground">@{user.username}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground mt-1">
-                Tip: Usernames are typically chosen by users (e.g., cool_user_123).
+                Start typing a username to see suggestions, or press Enter for an exact match.
               </p>
             </div>
             <Separator className="my-6" />
 
             <h3 className="text-lg font-semibold text-foreground mb-4">Discover Posts</h3>
-            {loading && <PostGridSkeleton />}
-            {!loading && posts.length === 0 && (
+            {loadingRecentPosts && <PostGridSkeleton />}
+            {!loadingRecentPosts && posts.length === 0 && (
               <div className="py-12 text-center">
                 <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                 <p className="mt-4 text-lg font-semibold text-foreground">Nothing to explore yet</p>
@@ -172,7 +317,7 @@ export default function ExplorePage() {
                 </p>
               </div>
             )}
-            {!loading && posts.length > 0 && (
+            {!loadingRecentPosts && posts.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 sm:gap-2">
                 {posts.map((post) => (
                   <Link href={`/profile/${post.userId}`} key={post.id} className="group relative aspect-square block w-full overflow-hidden rounded-md">
