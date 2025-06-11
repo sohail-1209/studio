@@ -405,23 +405,23 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   const ProfileSkeleton = () => (
     <Card className="overflow-hidden shadow-lg w-full">
-      <CardHeader className="bg-muted/30 p-0">
-        <Skeleton className="h-48 w-full" />
-        <div className="absolute -bottom-16 left-8">
-          <Skeleton className="h-32 w-32 rounded-full border-4 border-card" />
-        </div>
-        <div className="pt-20 px-8 pb-6 flex justify-between items-end">
-          <div>
-            <Skeleton className="h-9 w-48 mb-2" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-          <div className="flex space-x-2">
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-28" />
-          </div>
+      <CardHeader className="bg-muted/30 p-0 relative">
+        <Skeleton className="h-48 md:h-64 w-full" />
+        <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6">
+          <Skeleton className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-card" />
         </div>
       </CardHeader>
-      <CardContent className="p-8">
+      <CardContent className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
+          <div className="mb-3 sm:mb-0">
+            <Skeleton className="h-8 w-40 mb-1.5" />
+            <Skeleton className="h-4 w-28" />
+          </div>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+            <Skeleton className="h-10 w-full sm:w-24" />
+            <Skeleton className="h-10 w-full sm:w-28" />
+          </div>
+        </div>
         <Skeleton className="h-5 w-3/4 mb-2" />
         <Skeleton className="h-5 w-1/2 mb-6" />
         <div className="flex space-x-6 text-sm text-muted-foreground mb-8">
@@ -435,8 +435,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             <TabsTrigger value="media">Media</TabsTrigger>
             <TabsTrigger value="likes">Likes</TabsTrigger>
           </TabsList>
-          <TabsContent value="posts">
-             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
+          <TabsContent value="posts" className="mt-6">
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
                 {[...Array(6)].map((_, i) => (
                   <Skeleton key={i} className="aspect-square rounded-md" />
                 ))}
@@ -461,7 +461,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
      return (
       <MainLayout>
         <div className="text-center w-full">
-          <Card className="w-full">
+          <Card className="w-full shadow-lg">
             <CardContent className="p-12">
               <h2 className="text-2xl font-semibold">Profile Not Found</h2>
               <p className="text-muted-foreground">The user profile you are looking for does not exist or could not be loaded.</p>
@@ -481,20 +481,20 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
  const FollowButtonComponent = () => {
     if (isProcessingFollow) {
-        return <Button disabled className="w-full"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
+        return <Button disabled className="w-full sm:w-auto"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
     }
     switch (followStatus) {
         case 'pending_them':
-            return <Button variant="outline" onClick={handleCancelFollowRequest} className="w-full"><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
+            return <Button variant="outline" onClick={handleCancelFollowRequest} className="w-full sm:w-auto"><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
         case 'following':
-            return <Button variant="outline" onClick={handleUnfollowUser} className="w-full"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
+            return <Button variant="outline" onClick={handleUnfollowUser} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
         case 'pending_me':
-            return <Button onClick={() => router.push('/notifications')} className="w-full"><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
+            return <Button onClick={() => router.push('/notifications')} className="w-full sm:w-auto"><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
         case 'follow_back':
-            return <Button onClick={handleFollowRequest} className="w-full"><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>;
+            return <Button onClick={handleFollowRequest} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>;
         case 'not_following':
         default:
-            return <Button onClick={handleFollowRequest} className="w-full"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
+            return <Button onClick={handleFollowRequest} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
     }
  };
 
@@ -504,35 +504,37 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     <MainLayout>
       <div className="w-full">
         <Card className="overflow-hidden shadow-lg w-full">
-          <CardHeader className="bg-muted/30 p-0">
+          <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
             <div className="relative h-48 w-full md:h-64">
               <Image
-                src={profile.coverPhotoURL || "https://placehold.co/1200x400.png/E1D9F3/332E40"}
+                src={profile.coverPhotoURL || "https://placehold.co/1200x400.png/E9E6F5/4A4458"}
                 alt={`${profile.displayName || 'User'}'s cover photo`}
                 fill
                 style={{objectFit: 'cover'}}
                 data-ai-hint="abstract background landscape"
                 priority
               />
-              <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-8">
-                <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-card shadow-md">
+              <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
+                <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-card shadow-lg">
                   <AvatarImage src={profile.photoURL || `https://placehold.co/128x128.png?text=${(profile.displayName || 'U').charAt(0)}`} alt={profile.displayName || 'User'} data-ai-hint="profile picture" />
-                  <AvatarFallback>{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback className="text-4xl sm:text-5xl">{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
               </div>
             </div>
-            <div className="pt-16 sm:pt-20 px-4 sm:px-8 pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end">
-              <div className="mb-4 sm:mb-0">
+          </CardHeader>
+          <CardContent className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
+              <div className="mb-3 sm:mb-0">
                 <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
                 <p className="text-sm text-muted-foreground">@{profile.username || profile.uid.substring(0,8)}</p>
               </div>
-              <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                 {isOwnProfile ? (
                   <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto"><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
                 ) : (
                   <>
                     <FollowButtonComponent />
-                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full">
+                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full sm:w-auto">
                       {isMessaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
                       Message
                     </Button>
@@ -540,24 +542,24 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 )}
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-8">
-            <p className="text-foreground mb-6 whitespace-pre-wrap">{profile.bio || "No bio yet."}</p>
+            
+            <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
+            
             <div className="flex space-x-4 sm:space-x-6 text-sm text-muted-foreground mb-8">
-              <span><strong className="text-foreground">{posts.length}</strong> Posts</span>
-              <span><strong className="text-foreground">{profile.followersCount || 0}</strong> Followers</span>
-              <span><strong className="text-foreground">{profile.followingCount || 0}</strong> Following</span>
+              <span><strong className="text-foreground font-medium">{posts.length}</strong> Posts</span>
+              <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
+              <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
             </div>
 
             <Tabs defaultValue="posts" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="posts">Posts</TabsTrigger>
-                <TabsTrigger value="media">Media</TabsTrigger>
-                <TabsTrigger value="likes">Likes</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 bg-muted/60">
+                <TabsTrigger value="posts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Posts</TabsTrigger>
+                <TabsTrigger value="media" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Media</TabsTrigger>
+                <TabsTrigger value="likes" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Likes</TabsTrigger>
               </TabsList>
-              <TabsContent value="posts">
+              <TabsContent value="posts" className="mt-6">
                 {loadingPosts && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mt-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                     {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md" />)}
                   </div>
                 )}
@@ -571,9 +573,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   </div>
                 )}
                 {!loadingPosts && posts.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mt-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
                     {posts.map(post => (
-                      <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer">
+                      <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
                         <Image
                           src={post.imageUrl || "https://placehold.co/300x300.png/CCC/FFF?text=Post"}
                           alt={post.caption || `Post by ${profile.displayName}`}
@@ -582,12 +584,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                           data-ai-hint={post.dataAiHint || "user content"}
                           className="transition-transform duration-300 group-hover:scale-105"
                         />
-                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-2">
+                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-start p-2">
                             {isOwnProfile && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="absolute top-1 right-1 text-white hover:bg-white/20 hover:text-white h-8 w-8">
-                                    <MoreHorizontal className="h-5 w-5" />
+                                  <Button variant="ghost" size="icon" className="absolute top-1.5 right-1.5 text-white/80 hover:bg-white/20 hover:text-white h-7 w-7 z-10">
+                                    <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
@@ -597,13 +599,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             )}
+                            {/* You can add post stats like likes/comments here if desired */}
                          </div>
                       </div>
                     ))}
                   </div>
                 )}
               </TabsContent>
-              <TabsContent value="media">
+              <TabsContent value="media" className="mt-6">
                 <div className="py-12 text-center">
                   <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                   <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
@@ -612,7 +615,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   </p>
                 </div>
               </TabsContent>
-              <TabsContent value="likes">
+              <TabsContent value="likes" className="mt-6">
                  <div className="py-12 text-center">
                     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                     <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>

@@ -378,7 +378,7 @@ export default function FeedPage() {
   );
 
   const StorySkeleton = () => (
-    <div className="flex flex-col items-center space-y-1">
+    <div className="flex flex-col items-center space-y-1.5">
       <Skeleton className="h-16 w-16 rounded-full" />
       <Skeleton className="mt-1 h-3 w-12" />
     </div>
@@ -390,7 +390,7 @@ export default function FeedPage() {
       <div className="w-full">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="font-headline text-3xl font-bold text-foreground">Feed</h1>
-          <Button onClick={() => setIsCreatePostDialogOpen(true)}>
+          <Button onClick={() => setIsCreatePostDialogOpen(true)} size="lg">
             <PlusCircle className="mr-2 h-5 w-5" />
             Create Post
           </Button>
@@ -398,16 +398,16 @@ export default function FeedPage() {
 
         <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
 
-        <Card className="mb-8 w-full">
-          <CardHeader>
+        <Card className="mb-8 w-full shadow-lg">
+          <CardHeader className="pb-3 pt-5">
             <CardTitle className="font-headline text-xl">Stories</CardTitle>
           </CardHeader>
-          <CardContent className="flex space-x-4 overflow-x-auto p-4">
+          <CardContent className="flex space-x-4 overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
             {loadingStoriesReel && (
               [...Array(5)].map((_, i) => <StorySkeleton key={`story-skel-${i}`} />)
             )}
             {!loadingStoriesReel && storiesData.length === 0 && (
-              <p className="text-sm text-muted-foreground">No stories to show right now. Be the first to share one!</p>
+              <p className="text-sm text-muted-foreground py-2">No stories to show right now. Be the first to share one!</p>
             )}
             {!loadingStoriesReel && storiesData.map((storyUser) => {
               const isCurrentUserStoryAuthor = storyUser.userId === user?.uid;
@@ -418,13 +418,13 @@ export default function FeedPage() {
               return (
                 <div
                   key={storyUser.userId}
-                  className="flex flex-col items-center space-y-1 cursor-pointer"
+                  className="flex flex-col items-center space-y-1.5 cursor-pointer group"
                   onClick={() => handleStoryClick(storyUser)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && handleStoryClick(storyUser)}
                 >
-                  <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5">
+                  <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5 group-hover:border-pink-400 transition-colors">
                     {storyAvatarUrl ? (
                       <Image
                         src={storyAvatarUrl}
@@ -438,7 +438,7 @@ export default function FeedPage() {
                       <AvatarFallback>{storyAvatarFallback}</AvatarFallback>
                     )}
                   </Avatar>
-                  <span className="text-xs text-muted-foreground truncate w-16 text-center">
+                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors truncate w-16 text-center">
                     {storyDisplayName || 'User'}
                   </span>
                 </div>
@@ -463,7 +463,7 @@ export default function FeedPage() {
             <> <PostSkeleton /> <PostSkeleton /> </>
           )}
           {!loadingPosts && posts.length === 0 && (
-            <Card className="py-12 text-center w-full">
+            <Card className="py-12 text-center w-full shadow-lg">
               <CardContent>
                 <p className="text-lg font-semibold text-foreground">No posts yet!</p>
                 <p className="text-muted-foreground">Be the first one to share something.</p>
@@ -493,7 +493,7 @@ export default function FeedPage() {
                         <AvatarFallback>{avatarFallbackInitial}</AvatarFallback>
                       )}
                     </Avatar>
-                    <div>
+                    <div className="flex-grow">
                       <p className="font-semibold text-foreground">{postAuthorDisplayName}</p>
                       <p className="text-xs text-muted-foreground">
                         {post.createdAt ? formatDistanceToNow(post.createdAt, { addSuffix: true }) : 'just now'}
@@ -502,7 +502,7 @@ export default function FeedPage() {
                      {isCurrentUserPost && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="ml-auto h-8 w-8">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                               <MoreHorizontal className="h-4 w-4" />
                               <span className="sr-only">More options</span>
                             </Button>
@@ -519,7 +519,7 @@ export default function FeedPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   {post.imageUrl && (
-                    <div className="relative aspect-video w-full overflow-hidden">
+                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/30">
                       <Image
                         src={post.imageUrl}
                         alt={post.caption || "Post image"}
@@ -527,11 +527,12 @@ export default function FeedPage() {
                         style={{objectFit: 'contain'}}
                         data-ai-hint={post.dataAiHint || "user content"}
                         priority={index < 2}
+                        className="transition-opacity duration-300 hover:opacity-90"
                       />
                     </div>
                   )}
                   {post.videoUrl && (
-                    <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+                    <div className="relative aspect-[16/10] w-full bg-black flex items-center justify-center overflow-hidden">
                        <Image
                          src={post.videoUrl}
                          alt={post.caption || "Post video placeholder"}
@@ -541,14 +542,14 @@ export default function FeedPage() {
                        />
                     </div>
                   )}
-                  {post.caption && <p className="p-4 text-foreground whitespace-pre-wrap">{post.caption}</p>}
+                  {post.caption && <p className="p-4 text-foreground whitespace-pre-wrap text-sm leading-relaxed">{post.caption}</p>}
 
-                  <div className="border-t p-2">
+                  <div className="border-t border-border p-1.5">
                     <div className="flex items-center justify-around text-muted-foreground">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 py-2.5 hover:bg-accent/50"
                         onClick={() => handleLikePost(post.id, post)}
                         disabled={isLiking[post.id]}
                       >
@@ -563,25 +564,25 @@ export default function FeedPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 py-2.5 hover:bg-accent/50"
                         onClick={() => toggleCommentSection(post.id)}
                       >
                         <MessageIcon className="mr-2 h-4 w-4" />
                         Comments ({post.commentsCount || 0})
                       </Button>
-                      <Button variant="ghost" size="sm" className="flex-1" onClick={() => handleSharePost(post)}>
+                      <Button variant="ghost" size="sm" className="flex-1 py-2.5 hover:bg-accent/50" onClick={() => handleSharePost(post)}>
                         <Share2 className="mr-2 h-4 w-4" /> Share
                       </Button>
                     </div>
                   </div>
                   {showComments[post.id] && (
-                    <div className="p-4 border-t">
+                    <div className="p-4 border-t border-border bg-muted/20">
                        <CommentInput
                           postId={post.id}
                           postOwnerId={post.userId}
                           postContentPreview={postContentPreviewForComment}
                         />
-                       <Separator className="my-4" />
+                       <Separator className="my-3 bg-border/70" />
                        <CommentList postId={post.id} />
                     </div>
                   )}
@@ -613,4 +614,3 @@ export default function FeedPage() {
     </MainLayout>
   );
 }
-

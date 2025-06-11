@@ -9,52 +9,52 @@ body {
 
 @layer base {
   :root {
-    --background: 45 30% 98%; /* Very Light Warm Gray/Beige */
-    --foreground: 45 10% 20%; /* Dark Warm Gray/Near Black */
+    --background: 45 30% 98.5%; /* Slightly brighter Very Light Warm Gray/Beige */
+    --foreground: 45 10% 18%; /* Slightly darker Warm Gray/Near Black */
 
     --card: 0 0% 100%; /* White */
-    --card-foreground: 45 10% 20%;
+    --card-foreground: 45 10% 18%;
 
     --popover: 0 0% 100%; /* White */
-    --popover-foreground: 45 10% 20%;
+    --popover-foreground: 45 10% 18%;
 
-    --primary: 120 25% 45%; /* Muted Sage Green */
-    --primary-foreground: 45 30% 98%; /* Light Beige for text on primary */
+    --primary: 120 28% 42%; /* Richer Muted Sage Green */
+    --primary-foreground: 45 30% 99%; /* Lighter Beige for text on primary */
 
-    --secondary: 45 20% 94%; /* Light Warm Gray */
-    --secondary-foreground: 120 25% 35%; /* Darker Sage Green */
+    --secondary: 45 20% 94.5%; /* Light Warm Gray */
+    --secondary-foreground: 120 25% 33%; /* Darker Sage Green */
 
-    --muted: 45 20% 96%; /* Slightly lighter than secondary warm gray */
-    --muted-foreground: 45 10% 50%; /* Medium Warm Gray */
+    --muted: 45 20% 96.5%; /* Slightly lighter than secondary warm gray */
+    --muted-foreground: 45 10% 45%; /* Medium Warm Gray */
 
-    --accent: 90 40% 55%; /* Clearer, Brighter Green (less blue than teal) */
+    --accent: 90 45% 58%; /* Clearer, Brighter Green (less blue than teal), slightly desaturated */
     --accent-foreground: 0 0% 100%; /* White */
 
     --destructive: 0 84.2% 60.2%; /* Standard Red */
     --destructive-foreground: 0 0% 98%; /* Standard Light Gray */
 
-    --border: 45 20% 88%; /* Light Warm Gray Border */
-    --input: 45 20% 92%; /* Slightly lighter warm gray input */
-    --ring: 120 30% 65%; /* Brighter sage green for focus rings */
+    --border: 45 20% 86%; /* Slightly more visible Warm Gray Border */
+    --input: 45 20% 92.5%; /* Slightly lighter warm gray input */
+    --ring: 120 33% 60%; /* Brighter sage green for focus rings */
 
-    --radius: 0.5rem;
+    --radius: 0.65rem; /* Slightly increased radius */
 
     /* Custom sidebar colors */
-    --sidebar-background: 45 25% 95%; /* Very light warm gray/beige for sidebar */
-    --sidebar-foreground: 120 25% 30%; /* Dark Sage Green for sidebar text */
-    --sidebar-border: 45 20% 85%;
-    --sidebar-active: 90 40% 55%; /* Accent Green for active items */
+    --sidebar-background: 45 25% 95.5%; /* Very light warm gray/beige for sidebar */
+    --sidebar-foreground: 120 25% 28%; /* Dark Sage Green for sidebar text */
+    --sidebar-border: 45 20% 84%;
+    --sidebar-active: 90 45% 58%; /* Accent Green for active items */
     --sidebar-active-foreground: 0 0% 100%; /* White */
-    --sidebar-hover: 45 25% 90%;
-    --sidebar-hover-foreground: 120 25% 20%; /* Darker Sage on hover */
+    --sidebar-hover: 45 25% 91%;
+    --sidebar-hover-foreground: 120 25% 18%; /* Darker Sage on hover */
 
-    --chart-1: 90 40% 55%; /* Accent Green */
-    --chart-2: 120 25% 60%; /* Lighter Primary Sage Green */
-    --chart-3: 45 30% 60%;  /* Warm Gray/Beige variant for charts */
-    --chart-4: 30 60% 60%;  /* Muted Orange/Terracotta for contrast in charts */
-    --chart-5: 45 15% 70%; /* Light Warm Gray for charts */
+    --chart-1: 90 45% 58%; /* Accent Green */
+    --chart-2: 120 28% 58%; /* Lighter Primary Sage Green */
+    --chart-3: 45 30% 62%;  /* Warm Gray/Beige variant for charts */
+    --chart-4: 30 60% 62%;  /* Muted Orange/Terracotta for contrast in charts */
+    --chart-5: 45 15% 72%; /* Light Warm Gray for charts */
 
-    --logo-text-color: 120 25% 30%; /* Dark Sage Green for logo text */
+    --logo-text-color: 120 25% 28%; /* Dark Sage Green for logo text */
 
     /* Sidebar specific widths */
     --sidebar-width: 16rem; /* Default expanded width for desktop */
@@ -66,38 +66,38 @@ body {
     --background: 120 10% 10%; /* Very Dark Desaturated Green/Charcoal */
     --foreground: 45 20% 90%; /* Light Warm Gray/Beige text */
 
-    --card: 120 10% 14%; /* Slightly Lighter Dark Green/Charcoal */
+    --card: 120 10% 13%; /* Slightly Lighter Dark Green/Charcoal */
     --card-foreground: 45 20% 90%;
 
-    --popover: 120 10% 14%;
+    --popover: 120 10% 13%;
     --popover-foreground: 45 20% 90%;
 
-    --primary: 120 30% 60%; /* Brighter Sage Green for Dark Mode Primary */
-    --primary-foreground: 120 10% 15%; /* Dark text for contrast on dark primary */
+    --primary: 120 33% 62%; /* Brighter Sage Green for Dark Mode Primary */
+    --primary-foreground: 120 10% 13%; /* Dark text for contrast on dark primary */
 
-    --secondary: 120 10% 18%; /* Darker shade for secondary elements */
+    --secondary: 120 10% 17%; /* Darker shade for secondary elements */
     --secondary-foreground: 45 20% 80%; /* Lighter beige/gray text */
 
-    --muted: 120 8% 16%; /* Even darker, subtle green-gray */
-    --muted-foreground: 45 15% 55%; /* Muted warm gray text */
+    --muted: 120 8% 15%; /* Even darker, subtle green-gray */
+    --muted-foreground: 45 15% 50%; /* Muted warm gray text */
 
-    --accent: 90 45% 65%; /* Brighter Clear Green for Dark Mode Accent */
-    --accent-foreground: 120 10% 15%; /* Dark text on accent */
+    --accent: 90 48% 68%; /* Brighter Clear Green for Dark Mode Accent */
+    --accent-foreground: 120 10% 13%; /* Dark text on accent */
 
     --destructive: 0 72.2% 50.6%; /* Slightly darker red */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 120 10% 25%; /* Dark Green-Gray Border */
-    --input: 120 10% 20%; /* Darker Green-Gray Input */
-    --ring: 120 35% 70%; /* Brighter sage accent for focus rings */
+    --border: 120 10% 23%; /* Dark Green-Gray Border */
+    --input: 120 10% 19%; /* Darker Green-Gray Input */
+    --ring: 120 38% 72%; /* Brighter sage accent for focus rings */
 
     /* Custom sidebar colors for dark mode */
-    --sidebar-background: 120 10% 12%; /* Slightly darker than main dark bg */
+    --sidebar-background: 120 10% 11%; /* Slightly darker than main dark bg */
     --sidebar-foreground: 45 20% 85%; /* Light warm gray/beige text */
-    --sidebar-border: 120 10% 22%;
-    --sidebar-active: 90 45% 65%; /* Accent Green for dark mode */
-    --sidebar-active-foreground: 120 10% 15%; /* Dark text on active */
-    --sidebar-hover: 120 10% 16%;
+    --sidebar-border: 120 10% 21%;
+    --sidebar-active: 90 48% 68%; /* Accent Green for dark mode */
+    --sidebar-active-foreground: 120 10% 13%; /* Dark text on active */
+    --sidebar-hover: 120 10% 15%;
     --sidebar-hover-foreground: 45 20% 95%;
     
     --logo-text-color: 90 40% 70%; /* Lighter, clearer green for logo text in dark mode */

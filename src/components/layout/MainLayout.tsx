@@ -62,9 +62,9 @@ function LayoutContent({ children }: MainLayoutProps) {
           </Sheet>
           
           <div className="flex flex-1 flex-col">
-            <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sm:px-6">
+            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 shadow-sm backdrop-blur-sm sm:px-6">
               <SidebarTrigger asChild>
-                <Button variant="outline" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                   <PanelLeft className="h-5 w-5" />
                   <span className="sr-only">Toggle Menu</span>
                 </Button>
@@ -74,7 +74,7 @@ function LayoutContent({ children }: MainLayoutProps) {
               </div>
             </header>
             <main className="flex-1 overflow-y-auto">
-              <div className={cn(
+               <div className={cn(
                 "w-full", 
                 isMobile ? "px-6 py-4" : "p-4 md:p-6 md:max-w-7xl md:mx-auto" 
               )}>
@@ -89,13 +89,13 @@ function LayoutContent({ children }: MainLayoutProps) {
             collapsible="icon"
             variant="sidebar"
             side="left"
-            className="border-sidebar-border bg-sidebar text-sidebar-foreground"
+            className="border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md"
           >
             <AppSidebar /> 
           </Sidebar>
           <SidebarInset>
             <main className="flex-1 overflow-y-auto">
-              <div className="w-full p-4 md:max-w-7xl md:mx-auto md:p-6">
+               <div className="w-full p-4 md:max-w-7xl md:mx-auto md:p-6">
                 {children}
               </div>
             </main>
@@ -114,4 +114,3 @@ export function MainLayout({ children }: MainLayoutProps) {
     </SidebarProvider>
   )
 }
-
