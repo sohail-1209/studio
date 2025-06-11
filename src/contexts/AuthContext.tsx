@@ -35,42 +35,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        setFirebaseUser(fbUser);
-        // Fetch user profile from Firestore
-        const userRef = doc(db, 'users', fbUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          setUser(userSnap.data() as UserProfile);
+      try {
+        if (fbUser) {
+          setFirebaseUser(fbUser);
+          // Fetch user profile from Firestore
+          const userRef = doc(db, 'users', fbUser.uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            setUser(userSnap.data() as UserProfile);
+          } else {
+            // Create a basic profile if it doesn't exist
+            const derivedDisplayName = fbUser.displayName || fbUser.email?.split('@')[0] || 'Anonymous';
+            const derivedPhotoURL = fbUser.photoURL || `https://placehold.co/100x100.png?text=${derivedDisplayName.charAt(0).toUpperCase()}`;
+            const derivedUsername = (fbUser.email?.split('@')[0] || derivedDisplayName).toLowerCase().replace(/\s+/g, '') || 'user' + fbUser.uid.substring(0,5);
+            
+            const newUserProfile: UserProfile = {
+              uid: fbUser.uid,
+              email: fbUser.email,
+              displayName: derivedDisplayName,
+              photoURL: derivedPhotoURL,
+              username: derivedUsername,
+              bio: '', // Default bio
+            };
+            await setDoc(userRef, newUserProfile);
+            setUser(newUserProfile);
+          }
         } else {
-          // Create a basic profile if it doesn't exist
-          const newUserProfile: UserProfile = {
-            uid: fbUser.uid,
-            email: fbUser.email,
-            displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Anonymous',
-            photoURL: fbUser.photoURL || `https://placehold.co/100x100.png?text=${(fbUser.displayName || fbUser.email || 'A').charAt(0).toUpperCase()}`,
-            username: fbUser.displayName || fbUser.email?.split('@')[0] || 'anonymous'
-          };
-          await setDoc(userRef, newUserProfile);
-          setUser(newUserProfile);
+          setFirebaseUser(null);
+          setUser(null);
         }
-      } else {
+      } catch (error) {
+        console.error("Error in onAuthStateChanged handler:", error);
+        // If an error occurs (e.g., Firestore issue), ensure user is logged out
         setFirebaseUser(null);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
   const logout = async () => {
-    setLoading(true);
-    await firebaseSignOut(auth);
-    setUser(null);
-    setFirebaseUser(null);
-    setLoading(false);
-    router.push('/login');
+    try {
+      await firebaseSignOut(auth);
+      // onAuthStateChanged will handle setting user/firebaseUser to null and loading to false.
+      router.push('/login'); // Ensure redirection to login page
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Fallback if firebaseSignOut itself fails, though onAuthStateChanged should ideally handle state.
+      // To be absolutely safe, one might clear local state here, but it could conflict with onAuthStateChanged.
+      // For now, we rely on onAuthStateChanged triggered by a successful signOut.
+    }
   };
   
   return (
