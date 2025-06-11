@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Paperclip, Send, Phone, Video, Smile, XCircle } from 'lucide-react';
+import { ArrowLeft, Paperclip, Send, Phone, Video, Smile, XCircle, Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, use, useRef, ChangeEvent } from 'react';
@@ -25,8 +25,9 @@ import {
   updateDoc,
   Timestamp,
   writeBatch,
+  deleteDoc,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import type { ChatMessage, ChatMessageDocument, ChatSessionDocument, ChatSessionUserDetail } from '@/types/chat';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,6 +38,16 @@ import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import { Theme } from 'emoji-picker-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 export default function ChatPage({ params: paramsPromise }: { params: { chatId: string } }) {
@@ -50,12 +61,17 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [isPartnerTyping, setIsPartnerTyping] = useState(false); // Placeholder
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false); 
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+
+  const [isDeleteMessageDialogOpen, setIsDeleteMessageDialogOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<ChatMessage | null>(null);
+  const [isDeletingMessage, setIsDeletingMessage] = useState(false);
+
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -149,7 +165,6 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     setNewMessage((prevMessage) => prevMessage + emojiData.emoji);
-    // setIsEmojiPickerOpen(false); // Optionally close picker on emoji select
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -230,6 +245,72 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     }
   };
 
+  const handleDeleteMessageRequest = (msg: ChatMessage) => {
+    setMessageToDelete(msg);
+    setIsDeleteMessageDialogOpen(true);
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!messageToDelete || !user || messageToDelete.senderId !== user.uid) {
+      toast({ title: "Error", description: "Cannot delete this message.", variant: "destructive" });
+      setIsDeleteMessageDialogOpen(false);
+      setMessageToDelete(null);
+      return;
+    }
+
+    setIsDeletingMessage(true);
+    try {
+      const messageRef = doc(db, 'chats', chatId, 'messages', messageToDelete.id);
+      
+      // Delete image from storage if it exists
+      if (messageToDelete.imagePath) {
+        const imageFileRef = storageRef(storage, messageToDelete.imagePath);
+        await deleteObject(imageFileRef).catch(storageError => {
+          console.warn("Error deleting image from storage:", storageError);
+          toast({ title: "Storage Warning", description: "Could not delete image file from storage.", variant: "default", duration: 4000 });
+        });
+      }
+
+      // Delete the message document
+      await deleteDoc(messageRef);
+
+      // Update last message on chat session if this was the last message
+      // This is a simplified client-side check. For more robust "last message" updates,
+      // especially if multiple users can delete, a Cloud Function might be better.
+      const currentMessages = messages.filter(m => m.id !== messageToDelete.id);
+      if (currentMessages.length > 0) {
+        const lastMsgInUI = currentMessages[currentMessages.length - 1];
+        if (messageToDelete.timestamp >= (lastMsgInUI.timestamp || new Date(0))) { // Check if deleted was indeed last or newer
+             const chatDocRef = doc(db, 'chats', chatId);
+             await updateDoc(chatDocRef, {
+                lastMessageText: lastMsgInUI.imageUrl ? (lastMsgInUI.text ? lastMsgInUI.text : "📷 Image") : lastMsgInUI.text,
+                lastMessageSenderId: lastMsgInUI.senderId,
+                lastMessageTimestamp: serverTimestamp(), // Or use lastMsgInUI.timestamp if it's already a server timestamp
+                updatedAt: serverTimestamp(),
+             });
+        }
+      } else { // No messages left or deleted message was the only one
+         const chatDocRef = doc(db, 'chats', chatId);
+         await updateDoc(chatDocRef, {
+            lastMessageText: "🗑️ Message deleted",
+            lastMessageSenderId: null,
+            lastMessageTimestamp: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+         });
+      }
+
+
+      toast({ title: "Message Deleted", description: "The message has been removed." });
+    } catch (error: any) {
+      console.error("Error deleting message:", error);
+      toast({ title: "Deletion Failed", description: error.message || "Could not delete message.", variant: "destructive" });
+    } finally {
+      setIsDeletingMessage(false);
+      setIsDeleteMessageDialogOpen(false);
+      setMessageToDelete(null);
+    }
+  };
+
   const MessageSkeleton = () => (
     <div className="flex items-end space-x-2 my-2">
       <Skeleton className="h-8 w-8 rounded-full" />
@@ -282,7 +363,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                       ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
                     </Avatar>
                   )}
-                  <div className={cn("max-w-xs rounded-lg p-1 lg:max-w-md shadow", msg.senderId === user?.uid ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>
+                  <div className={cn("max-w-xs rounded-lg p-1 lg:max-w-md shadow relative group", msg.senderId === user?.uid ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>
                     {msg.imageUrl ? (
                       <div className="p-2">
                         <Image src={msg.imageUrl} alt="Sent image" width={250} height={250} className="rounded-md max-w-full h-auto object-contain" data-ai-hint={msg.dataAiHint || "chat image"} />
@@ -291,6 +372,18 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                     ) : (
                        msg.text && <p className="text-sm whitespace-pre-wrap p-3">{msg.text}</p>
                     )}
+                     {msg.senderId === user?.uid && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-0.5 right-0.5 h-6 w-6 p-1 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary/50 transition-opacity"
+                          onClick={() => handleDeleteMessageRequest(msg)}
+                          title="Delete message"
+                          disabled={isDeletingMessage}
+                        >
+                          {isDeletingMessage && messageToDelete?.id === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={12} />}
+                        </Button>
+                      )}
                     <p className={cn("mt-1 text-xs px-3 pb-1", msg.senderId === user?.uid ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-right")}>
                       {msg.timestamp ? format(msg.timestamp, 'p') : ''}
                     </p>
@@ -360,6 +453,26 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
           </form>
         </footer>
       </div>
+       {messageToDelete && (
+        <AlertDialog open={isDeleteMessageDialogOpen} onOpenChange={setIsDeleteMessageDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Message?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete this message.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setMessageToDelete(null)} disabled={isDeletingMessage}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteMessage} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingMessage}>
+                {isDeletingMessage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </MainLayout>
   );
 }
+
