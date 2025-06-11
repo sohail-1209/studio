@@ -231,8 +231,7 @@ export default function ExplorePage() {
   console.log("ExplorePage Render: showSuggestions:", showSuggestions, "suggestedUsers:", suggestedUsers.length, "searchTerm:", searchTerm.length, "inputFocusedRef.current:", inputFocusedRef.current, "loadingSuggestions:", loadingSuggestions);
 
   return (
-    <MainLayout>
-      <div className="w-full">
+    <div className="w-full">
         <Card className="shadow-lg w-full">
           <CardHeader>
             <div className="flex items-center space-x-3">
@@ -243,7 +242,7 @@ export default function ExplorePage() {
           <CardContent>
             <div className="mb-6 relative">
               <h3 className="text-lg font-semibold text-foreground mb-2">Find a User by Username</h3>
-              <form onSubmit={handleExactUsernameSearch} className="flex items-center space-x-2">
+              <form onSubmit={handleExactUsernameSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                 <Input
                   type="text"
                   placeholder="Enter Username..."
@@ -269,13 +268,13 @@ export default function ExplorePage() {
                   disabled={isSearchingUserExact}
                   autoComplete="off"
                 />
-                <Button type="submit" disabled={isSearchingUserExact || loadingSuggestions}>
+                <Button type="submit" disabled={isSearchingUserExact || loadingSuggestions} className="w-full sm:w-auto">
                   {isSearchingUserExact ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SearchIcon className="mr-2 h-4 w-4" />}
                    Search
                 </Button>
               </form>
               {showSuggestions && searchTerm.length >= 2 && (
-                 <div className="absolute z-10 w-[calc(100%-5rem)] mt-1 max-h-60 overflow-y-auto rounded-md border bg-background shadow-lg">
+                 <div className="absolute z-10 w-full sm:w-[calc(100%-5rem)] mt-1 max-h-60 overflow-y-auto rounded-md border bg-background shadow-lg">
                   {loadingSuggestions && (
                     <div className="p-3 text-sm text-muted-foreground text-center">Loading suggestions...</div>
                   )}
@@ -301,7 +300,7 @@ export default function ExplorePage() {
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                Start typing a username to see suggestions, or press Enter for an exact match.
+                Start typing a username to see suggestions, or press Enter/Search for an exact match.
               </p>
             </div>
             <Separator className="my-6" />
@@ -354,6 +353,6 @@ export default function ExplorePage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
   );
 }
+

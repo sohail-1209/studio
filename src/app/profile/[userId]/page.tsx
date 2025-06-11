@@ -449,18 +449,15 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   if (loadingProfile || !userId) {
     return (
-      <MainLayout>
-        <div className="w-full">
+      <div className="w-full">
           <ProfileSkeleton />
-        </div>
-      </MainLayout>
+      </div>
     );
   }
 
   if (!profile) {
      return (
-      <MainLayout>
-        <div className="text-center w-full">
+      <div className="text-center w-full">
           <Card className="w-full shadow-lg">
             <CardContent className="p-12">
               <h2 className="text-2xl font-semibold">Profile Not Found</h2>
@@ -468,7 +465,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             </CardContent>
           </Card>
         </div>
-      </MainLayout>
     );
   }
 
@@ -501,8 +497,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const canMessage = followStatus === 'following' || followStatus === 'follow_back';
 
   return (
-    <MainLayout>
-      <div className="w-full">
+    <div className="w-full">
         <Card className="overflow-hidden shadow-lg w-full">
           <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
             <div className="relative h-48 w-full md:h-64">
@@ -528,7 +523,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
                 <p className="text-sm text-muted-foreground">@{profile.username || profile.uid.substring(0,8)}</p>
               </div>
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+              <div className="flex flex-col space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                 {isOwnProfile ? (
                   <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto"><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
                 ) : (
@@ -545,7 +540,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             
             <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
             
-            <div className="flex space-x-4 sm:space-x-6 text-sm text-muted-foreground mb-8">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
               <span><strong className="text-foreground font-medium">{posts.length}</strong> Posts</span>
               <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
               <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
@@ -559,7 +554,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
               </TabsList>
               <TabsContent value="posts" className="mt-6">
                 {loadingPosts && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
                     {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md" />)}
                   </div>
                 )}
@@ -573,7 +568,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   </div>
                 )}
                 {!loadingPosts && posts.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
                     {posts.map(post => (
                       <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
                         <Image
@@ -655,6 +650,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           </AlertDialogContent>
         </AlertDialog>
       )}
-    </MainLayout>
+    </div>
   );
 }
+

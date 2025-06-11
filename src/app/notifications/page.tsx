@@ -187,8 +187,7 @@ export default function NotificationsPage() {
 
 
   return (
-    <MainLayout>
-      <div className="w-full">
+    <div className="w-full">
         <Card className="shadow-lg w-full">
           <CardHeader className="flex flex-row items-center justify-between border-b">
             <div className="flex items-center space-x-3">
@@ -271,11 +270,12 @@ export default function NotificationsPage() {
                         </p>
 
                         {notif.type === 'follow_request' && !notif.actionTaken && (
-                          <div className="mt-2 flex space-x-2">
+                          <div className="mt-2 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                             <Button
                               size="sm"
                               onClick={() => handleAcceptFollowRequest(notif)}
                               disabled={processingRequestId === notif.id}
+                              className="w-full sm:w-auto"
                             >
                               {processingRequestId === notif.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <UserCheck className="mr-2 h-3 w-3"/>}
                               Accept
@@ -285,6 +285,7 @@ export default function NotificationsPage() {
                               variant="outline"
                               onClick={() => handleDeclineFollowRequest(notif)}
                               disabled={processingRequestId === notif.id}
+                              className="w-full sm:w-auto"
                             >
                               {processingRequestId === notif.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
                               Decline
@@ -309,7 +310,6 @@ export default function NotificationsPage() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
   );
 }
 

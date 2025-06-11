@@ -1,3 +1,4 @@
+
 // src/app/messages/[chatId]/page.tsx
 'use client';
 
@@ -26,7 +27,6 @@ import {
   writeBatch,
   deleteDoc,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import type { ChatMessage, ChatMessageDocument, ChatSessionDocument, ChatSessionUserDetail } from '@/types/chat';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -334,16 +334,15 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const callButtonsDisabled = !chatPartnerId || !chatPartnerProfile;
 
   return (
-    <MainLayout>
-      <div className="flex h-[calc(100vh-theme(spacing.24))] flex-col">
+    <div className="flex h-[calc(100vh-theme(spacing.24))] flex-col">
         <header className="flex items-center justify-between border-b bg-card p-4">
           <div className="flex items-center space-x-3 min-w-0">
-            <Button variant="ghost" size="icon" asChild className="md:hidden">
+            <Button variant="ghost" size="icon" asChild className="md:hidden flex-shrink-0">
               <Link href="/messages"> <ArrowLeft className="h-5 w-5" /> </Link>
             </Button>
             {chatPartnerProfile ? (
               <>
-                <Avatar>
+                <Avatar className="flex-shrink-0">
                   {chatPartnerProfile.photoURL ? (
                     <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
                   ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || 'U').charAt(0)}</AvatarFallback> )}
@@ -354,12 +353,12 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
               </>
             ) : (
               <>
-                <Skeleton className="h-10 w-10 rounded-full" />
+                <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
                 <div className="space-y-1 min-w-0"> <Skeleton className="h-4 w-24" /> </div>
               </>
             )}
           </div>
-          <div className="flex items-center space-x-1 sm:space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             <Button variant="ghost" size="icon" title="Voice Call (Coming Soon)" onClick={() => handleInitiateCall('audio')} disabled={callButtonsDisabled}>
               <Phone className="h-5 w-5" />
             </Button>
@@ -378,7 +377,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
               {messages.map((msg) => (
                 <div key={msg.id} className={cn("flex items-end space-x-2 group", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
                   {msg.senderId !== user?.uid && chatPartnerProfile && (
-                    <Avatar className="h-8 w-8 self-start">
+                    <Avatar className="h-8 w-8 self-start flex-shrink-0">
                        {chatPartnerProfile.photoURL ? (
                         <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || 'Sender'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
                       ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
@@ -453,7 +452,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
               ))}
               {isPartnerTyping && chatPartnerProfile && (
                 <div className="flex items-end space-x-2 justify-start">
-                   <Avatar className="h-8 w-8 self-start">
+                   <Avatar className="h-8 w-8 self-start flex-shrink-0">
                       {chatPartnerProfile.photoURL ? (
                         <Image src={chatPartnerProfile.photoURL} alt="Sender" width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
                        ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
@@ -483,7 +482,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
           <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
             <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" type="button" title="Emoji">
+                <Button variant="ghost" size="icon" type="button" title="Emoji" className="flex-shrink-0">
                   <Smile className="h-5 w-5 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
@@ -498,7 +497,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="ghost" size="icon" type="button" onClick={() => fileInputRef.current?.click()} disabled={sendingMessage}>
+            <Button variant="ghost" size="icon" type="button" onClick={() => fileInputRef.current?.click()} disabled={sendingMessage} className="flex-shrink-0">
               <Paperclip className="h-5 w-5 text-muted-foreground" />
             </Button>
             <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" disabled={sendingMessage}/>
@@ -510,7 +509,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
               onChange={(e) => setNewMessage(e.target.value)}
               disabled={sendingMessage || (selectedFile && uploadProgress !== null && uploadProgress < 100)}
             />
-            <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90" disabled={sendingMessage || (!newMessage.trim() && !selectedFile) || (selectedFile && uploadProgress !== null && uploadProgress < 100)}>
+            <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 flex-shrink-0" disabled={sendingMessage || (!newMessage.trim() && !selectedFile) || (selectedFile && uploadProgress !== null && uploadProgress < 100)}>
               {sendingMessage ? <Spinner size={18} className="text-primary-foreground" /> : <Send className="h-5 w-5 text-primary-foreground" />}
             </Button>
           </form>
@@ -535,6 +534,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
           </AlertDialogContent>
         </AlertDialog>
       )}
-    </MainLayout>
+    </div>
   );
 }
+

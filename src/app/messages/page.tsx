@@ -112,13 +112,12 @@ export default function MessagesPage() {
 
 
   return (
-    <MainLayout>
-      <div className="h-[calc(100vh-theme(spacing.24))] w-full">
+    <div className="h-[calc(100vh-theme(spacing.24))] w-full"> {/* Adjusted height for main layout padding */}
         <Card className="h-full flex flex-col shadow-lg w-full">
           <CardHeader className="border-b">
             <div className="flex items-center justify-between">
               <CardTitle className="font-headline text-2xl">Messages</CardTitle>
-              <Button variant="outline" size="icon" onClick={() => setIsNewChatDialogOpen(true)}>
+              <Button variant="outline" size="icon" onClick={() => setIsNewChatDialogOpen(true)} className="flex-shrink-0">
                 <MessageSquarePlus className="h-5 w-5" />
                 <span className="sr-only">New Message</span>
               </Button>
@@ -152,7 +151,7 @@ export default function MessagesPage() {
                   {filteredChats.map((chat) => (
                     <Link href={`/messages/${chat.id}`} key={chat.id} className="block hover:bg-muted/50 transition-colors">
                       <div className="flex items-center space-x-4 p-4">
-                        <Avatar className="h-12 w-12">
+                        <Avatar className="h-12 w-12 flex-shrink-0">
                           {chat.otherUser?.photoURL ? (
                              <Image src={chat.otherUser.photoURL} alt={chat.otherUser?.displayName || 'User'} width={48} height={48} className="rounded-full" data-ai-hint="user avatar" />
                           ) : (
@@ -163,7 +162,7 @@ export default function MessagesPage() {
                           <div className="flex items-center justify-between">
                             <p className="truncate font-semibold text-foreground">{chat.otherUser?.displayName || 'Unnamed Chat'}</p>
                             {chat.lastMessageTimestamp && (
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground flex-shrink-0 ml-2">
                                 {formatDistanceToNow(chat.lastMessageTimestamp, { addSuffix: true })}
                               </p>
                             )}
@@ -181,8 +180,8 @@ export default function MessagesPage() {
             </ScrollArea>
           </CardContent>
         </Card>
-      </div>
       <NewChatDialog open={isNewChatDialogOpen} onOpenChange={setIsNewChatDialogOpen} />
-    </MainLayout>
+    </div>
   );
 }
+

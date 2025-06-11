@@ -10,15 +10,15 @@ import { useEffect } from 'react';
 import { Spinner } from '@/components/shared/Spinner';
 import {
   SidebarProvider,
-  Sidebar, 
-  SidebarInset, 
-  useSidebar, 
-  SidebarTrigger, 
+  Sidebar,
+  SidebarInset,
+  useSidebar,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'; 
-import { Button } from '@/components/ui/button'; 
-import { PanelLeft } from 'lucide-react'; 
-import { Logo } from '@/components/shared/Logo'; 
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { PanelLeft } from 'lucide-react';
+import { Logo } from '@/components/shared/Logo';
 import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {
@@ -28,7 +28,7 @@ interface MainLayoutProps {
 function LayoutContent({ children }: MainLayoutProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { isMobile, openMobile, setOpenMobile } = useSidebar(); 
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -54,13 +54,13 @@ function LayoutContent({ children }: MainLayoutProps) {
         <>
           <Sheet open={openMobile} onOpenChange={setOpenMobile}>
             <SheetContent side="left" className="w-[var(--sidebar-width-mobile)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
-              <SheetHeader className="sr-only"> {/* Visually hidden header for accessibility */}
+               <SheetHeader className="sr-only">
                 <SheetTitle>Navigation Menu</SheetTitle>
               </SheetHeader>
               <AppSidebar isForMobileSheet={true} />
             </SheetContent>
           </Sheet>
-          
+
           <div className="flex flex-1 flex-col">
             <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 shadow-sm backdrop-blur-sm sm:px-6">
               <SidebarTrigger asChild>
@@ -69,15 +69,12 @@ function LayoutContent({ children }: MainLayoutProps) {
                   <span className="sr-only">Toggle Menu</span>
                 </Button>
               </SidebarTrigger>
-              <div className="ml-auto">
+              <div className="ml-auto"> {/* Pushes Logo to the right if no other items */}
                 <Logo iconSize={24} textSize="text-lg" />
               </div>
             </header>
             <main className="flex-1 overflow-y-auto">
-               <div className={cn(
-                "w-full", 
-                isMobile ? "px-6 py-4" : "p-4 md:p-6 md:max-w-7xl md:mx-auto" 
-              )}>
+              <div className="w-full px-4 py-4 sm:px-6">
                 {children}
               </div>
             </main>
@@ -91,11 +88,11 @@ function LayoutContent({ children }: MainLayoutProps) {
             side="left"
             className="border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md"
           >
-            <AppSidebar /> 
+            <AppSidebar />
           </Sidebar>
           <SidebarInset>
             <main className="flex-1 overflow-y-auto">
-               <div className="w-full p-4 md:max-w-7xl md:mx-auto md:p-6">
+              <div className="w-full p-4 md:p-6 lg:max-w-7xl lg:mx-auto">
                 {children}
               </div>
             </main>
@@ -109,8 +106,9 @@ function LayoutContent({ children }: MainLayoutProps) {
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
-    <SidebarProvider defaultOpen={true}> 
+    <SidebarProvider defaultOpen={true}>
       <LayoutContent>{children}</LayoutContent>
     </SidebarProvider>
   )
 }
+

@@ -176,6 +176,7 @@ export default function SettingsPage() {
       await deleteAuthUser(firebaseUser);
 
       toast({ title: "Account Deleted", description: "Your account and associated data have been successfully deleted." });
+      // await logout(); // User will be signed out and onAuthStateChanged will redirect
     } catch (error: any) {
       console.error("Error deleting account:", error);
       toast({ title: "Account Deletion Failed", description: error.message || "Could not delete your account. Please try again.", variant: "destructive" });
@@ -200,8 +201,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <MainLayout>
-      <div className="w-full">
+    <div className="w-full">
         <Card className="shadow-lg w-full">
           <CardHeader>
             <div className="flex items-center space-x-3">
@@ -216,7 +216,7 @@ export default function SettingsPage() {
               {loadingProfile ? (
                 <ProfileInfoSkeleton />
               ) : userProfileData ? (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 bg-muted/30 space-y-3 sm:space-y-0">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 bg-muted/30 space-y-3 sm:space-y-0 sm:gap-4">
                   <div className="flex items-center space-x-4">
                     <Avatar className="h-16 w-16">
                       {userProfileData.photoURL ? (
@@ -230,7 +230,7 @@ export default function SettingsPage() {
                       <p className="text-sm text-muted-foreground">@{userProfileData.username || 'username_not_set'}</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto mt-2 sm:mt-0">
+                  <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto flex-shrink-0">
                     <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
                   </Button>
                 </div>
@@ -250,7 +250,7 @@ export default function SettingsPage() {
                     Toggle between light and dark themes for the application.
                   </p>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-shrink-0">
                   <Sun className={`h-5 w-5 ${currentTheme === 'light' ? 'text-primary' : 'text-muted-foreground'}`} />
                   <Switch
                     id="theme-toggle"
@@ -302,8 +302,8 @@ export default function SettingsPage() {
             </section>
           </CardContent>
         </Card>
-      </div>
-
+      {/* The problematic extra </div> was here. It's now removed. */}
+      {/* All dialogs are now correctly inside the main page wrapper div. */}
       {userProfileData && (
         <EditProfileDialog
           open={isEditDialogOpen}
@@ -340,7 +340,7 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-    </MainLayout>
+    </div>
   );
 }
+
