@@ -11,9 +11,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
 import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit } from 'firebase/firestore';
-import type { Post } from '@/types/post';
-import { formatDistanceToNow } from 'date-fns';
+import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit, where } from 'firebase/firestore';
+import type { Post, PostDocument } from '@/types/post'; // Ensure PostDocument is imported if needed
+import { formatDistanceToNow, subHours } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -43,9 +43,15 @@ export default function FeedPage() {
   const [loadingStories, setLoadingStories] = useState(true);
 
   useEffect(() => {
-    // Fetch Posts
+    // Fetch Posts (regular feed)
     const postsCollection = collection(db, 'posts');
-    const qPosts = query(postsCollection, orderBy('createdAt', 'desc'));
+    // Ensure regular posts are not stories, or handle them as you wish (e.g. show all or filter out stories)
+    // For now, let's assume regular posts query fetches posts that are NOT stories or fetches all and relies on client-side sort/display logic
+    const qPosts = query(postsCollection, where('isStory', '!=', true), orderBy('createdAt', 'desc'));
+    // If you want stories to also appear in the main feed, remove the where('isStory', '!=', true)
+    // Or, if isStory field might be undefined for older posts, use:
+    // const qPosts = query(postsCollection, orderBy('createdAt', 'desc')); 
+    // And then filter client-side if needed, though less efficient.
 
     setLoadingPosts(true);
     const unsubscribePosts = onSnapshot(
@@ -60,9 +66,12 @@ export default function FeedPage() {
             likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
             likesCount: data.likesCount || 0,
             commentsCount: data.commentsCount || 0,
+            isStory: data.isStory || false,
           } as Post;
         });
-        setPosts(fetchedPosts);
+        // Further client-side filtering if `isStory` might be undefined for older posts and you want to exclude them from main feed
+        // setPosts(fetchedPosts.filter(p => !p.isStory));
+        setPosts(fetchedPosts); 
         setLoadingPosts(false);
       },
       (error) => {
@@ -76,13 +85,23 @@ export default function FeedPage() {
       }
     );
 
-    // Fetch Stories Data (derived from recent posts)
+    // Fetch Stories Data
     setLoadingStories(true);
-    const qStories = query(postsCollection, orderBy('createdAt', 'desc'), firestoreLimit(15));
+    const twentyFourHoursAgo = subHours(new Date(), 24);
+    const twentyFourHoursAgoTimestamp = Timestamp.fromDate(twentyFourHoursAgo);
+
+    const qStories = query(
+      collection(db, 'posts'), // Assuming stories are also in the 'posts' collection
+      where('isStory', '==', true),
+      where('createdAt', '>=', twentyFourHoursAgoTimestamp),
+      orderBy('createdAt', 'desc'),
+      firestoreLimit(15) // Fetch a bit more to get unique users
+    );
+
     const unsubscribeStories = onSnapshot(qStories, (snapshot) => {
       const uniqueUsersMap = new Map<string, StoryUserData>();
       snapshot.docs.forEach(docSnapshot => {
-        const post = docSnapshot.data() as PostDocument;
+        const post = docSnapshot.data() as PostDocument; // PostDocument has userDisplayName etc.
         if (post.userId && !uniqueUsersMap.has(post.userId)) {
           uniqueUsersMap.set(post.userId, {
             userId: post.userId,
@@ -97,7 +116,11 @@ export default function FeedPage() {
     }, (error) => {
       console.error('Error fetching stories data:', error);
       setLoadingStories(false);
-      // Optional: toast for stories error
+      toast({
+          title: 'Error Fetching Stories',
+          description: 'Could not load stories. Please try again later.',
+          variant: 'destructive',
+        });
     });
 
     return () => {
@@ -273,10 +296,12 @@ export default function FeedPage() {
               [...Array(5)].map((_, i) => <StorySkeleton key={`story-skel-${i}`} />)
             )}
             {!loadingStories && storiesData.length === 0 && (
-              <p className="text-sm text-muted-foreground">No stories to show right now.</p>
+              <p className="text-sm text-muted-foreground">No stories to show right now. Be the first to share one!</p>
             )}
             {!loadingStories && storiesData.map((storyUser) => {
+              // Determine if the storyUser is the current logged-in user
               const isCurrentUserStory = storyUser.userId === user?.uid;
+              // Use AuthContext's photoURL for current user for consistency, otherwise use storyUser.photoURL
               const storyAvatarUrl = isCurrentUserStory ? user?.photoURL || storyUser.photoURL : storyUser.photoURL;
               const storyDisplayName = isCurrentUserStory ? user?.displayName || storyUser.displayName : storyUser.displayName;
               const storyAvatarFallback = (storyDisplayName || 'U').charAt(0).toUpperCase();
@@ -323,7 +348,7 @@ export default function FeedPage() {
           )}
           {!loadingPosts && posts.map((post, index) => {
             const isCurrentUserPost = post.userId === user?.uid;
-            const avatarUrl = isCurrentUserPost ? user?.photoURL : post.userAvatarUrl;
+            const avatarUrl = isCurrentUserPost ? (user?.photoURL || post.userAvatarUrl) : post.userAvatarUrl;
             const avatarAlt = isCurrentUserPost ? (user?.displayName || 'Your avatar') : (post.userDisplayName || 'User avatar');
             const avatarFallbackInitial = (isCurrentUserPost ? (user?.displayName || 'U') : (post.userDisplayName || 'U')).charAt(0).toUpperCase();
             const postAuthorDisplayName = isCurrentUserPost ? (user?.displayName || 'You') : (post.userDisplayName || 'Anonymous User');

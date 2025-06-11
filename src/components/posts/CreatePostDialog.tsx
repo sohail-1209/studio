@@ -18,6 +18,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch'; // Added Switch
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
@@ -30,6 +31,7 @@ import Image from 'next/image';
 
 const postSchema = z.object({
   caption: z.string().min(1, { message: 'Caption cannot be empty' }).max(1000, {message: 'Caption too long'}),
+  // isStory field will be handled outside react-hook-form for simplicity with the Switch
 });
 
 type PostFormInputs = z.infer<typeof postSchema>;
@@ -44,6 +46,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isStory, setIsStory] = useState(false); // State for the story switch
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -76,6 +79,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
     setSelectedFile(null);
     setPreviewUrl(null);
     setUploadProgress(null);
+    setIsStory(false); // Reset story switch
   };
 
   const handleDialogClose = (isOpen: boolean) => {
@@ -94,6 +98,14 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
       return;
     }
+
+    // If it's a story, an image might be preferred or required by your product logic.
+    // For now, we allow stories with or without images, similar to posts.
+    // if (isStory && !selectedFile) {
+    //   toast({ title: "Story requires an image", description: "Please select an image for your story.", variant: "destructive"});
+    //   return;
+    // }
+
     setLoading(true);
     setUploadProgress(0);
 
@@ -129,12 +141,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
             }
           );
         });
-        if (!imageUrl) {
+        if (!imageUrl && selectedFile) { // Ensure imageUrl is set if a file was supposed to be uploaded
           throw new Error("Image upload completed but failed to get URL.");
         }
       }
       
-      setUploadProgress(100);
+      setUploadProgress(selectedFile ? 100 : null); // Only show 100% if a file was processed
 
       const postData: PostDocument = {
         userId: user.uid,
@@ -148,21 +160,22 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         commentsCount: 0,
         createdAt: serverTimestamp(),
         dataAiHint: selectedFile ? 'user uploaded content' : undefined,
+        isStory: isStory, // Add the isStory flag
       };
 
       await addDoc(collection(db, 'posts'), postData);
 
       toast({
-        title: 'Post Created!',
-        description: 'Your post has been successfully published.',
+        title: isStory ? 'Story Created!' : 'Post Created!',
+        description: isStory ? 'Your story has been shared.' : 'Your post has been successfully published.',
       });
       resetFormStates();
       onOpenChange(false);
     } catch (error: any) {
-      console.error('Error creating post:', error);
+      console.error('Error creating post/story:', error);
       toast({
-        title: 'Error Creating Post',
-        description: error.message || 'Could not create post. Please try again.',
+        title: isStory ? 'Error Creating Story' : 'Error Creating Post',
+        description: error.message || 'Could not create content. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -177,7 +190,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         <DialogHeader>
           <DialogTitle>Create a new post</DialogTitle>
           <DialogDescription>
-            Share your thoughts, and optionally an image, with the world.
+            Share your thoughts, and optionally an image, with the world. You can also share it as a story.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
@@ -228,7 +241,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
             {selectedFile && <p className="text-xs text-muted-foreground">Selected: {selectedFile.name}</p>}
           </div>
           
-          {uploadProgress !== null && loading && (
+          {uploadProgress !== null && loading && selectedFile && (
             <div className="space-y-1">
               <Label className="text-xs">Upload progress: {Math.round(uploadProgress)}%</Label>
               <div className="w-full bg-muted rounded-full h-2.5">
@@ -236,6 +249,16 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
               </div>
             </div>
           )}
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="isStorySwitch"
+              checked={isStory}
+              onCheckedChange={setIsStory}
+              disabled={loading}
+            />
+            <Label htmlFor="isStorySwitch" className="cursor-pointer">Share as a Story (visible for 24h)</Label>
+          </div>
 
 
           <DialogFooter>
@@ -246,7 +269,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
             </DialogClose>
             <Button type="submit" disabled={loading || (selectedFile && uploadProgress !== null && uploadProgress < 100)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               {loading && <Spinner className="mr-2 h-4 w-4" />}
-              {loading ? (uploadProgress !== null ? 'Uploading...' : 'Posting...') : 'Post'}
+              {loading ? (selectedFile && uploadProgress !== null ? 'Uploading...' : 'Sharing...') : (isStory ? 'Share Story' : 'Post')}
             </Button>
           </DialogFooter>
         </form>

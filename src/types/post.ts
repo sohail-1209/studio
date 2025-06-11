@@ -28,9 +28,11 @@ export interface PostDocument {
   commentsCount: number;
   createdAt: FieldValue;
   dataAiHint?: string;
+  isStory?: boolean; // Flag to indicate if this post is a story
 }
 
 export interface Post extends Omit<PostDocument, 'createdAt'> {
   id: string;
   createdAt: Date;
+  isStory?: boolean; // Flag to indicate if this post is a story
 }
