@@ -1,3 +1,4 @@
+
 // src/app/messages/page.tsx
 'use client';
 
@@ -16,12 +17,15 @@ import { collection, query, where, orderBy, onSnapshot, Timestamp, doc, getDoc }
 import type { ChatSession, ChatSessionDocument, ChatSessionUserDetail } from '@/types/chat';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { NewChatDialog } from '@/components/messages/NewChatDialog'; // Import the new dialog
+import Image from 'next/image';
 
 export default function MessagesPage() {
   const { user } = useAuth();
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [loadingChats, setLoadingChats] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isNewChatDialogOpen, setIsNewChatDialogOpen] = useState(false); // State for dialog
 
   useEffect(() => {
     if (!user?.uid) {
@@ -114,7 +118,7 @@ export default function MessagesPage() {
           <CardHeader className="border-b">
             <div className="flex items-center justify-between">
               <CardTitle className="font-headline text-2xl">Messages</CardTitle>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" onClick={() => setIsNewChatDialogOpen(true)}>
                 <MessageSquarePlus className="h-5 w-5" />
                 <span className="sr-only">New Message</span>
               </Button>
@@ -140,7 +144,7 @@ export default function MessagesPage() {
               )}
               {!loadingChats && filteredChats.length === 0 && (
                  <div className="p-8 text-center text-muted-foreground">
-                    No chats found.
+                    No chats found. Start a new conversation!
                  </div>
               )}
               {!loadingChats && filteredChats.length > 0 && (
@@ -149,8 +153,11 @@ export default function MessagesPage() {
                     <Link href={`/messages/${chat.id}`} key={chat.id} className="block hover:bg-muted/50 transition-colors">
                       <div className="flex items-center space-x-4 p-4">
                         <Avatar className="h-12 w-12">
-                          <AvatarImage src={chat.otherUser?.photoURL || undefined} alt={chat.otherUser?.displayName || 'User'} data-ai-hint="user avatar" />
-                          <AvatarFallback>{(chat.otherUser?.displayName || 'U').charAt(0)}</AvatarFallback>
+                          {chat.otherUser?.photoURL ? (
+                             <Image src={chat.otherUser.photoURL} alt={chat.otherUser?.displayName || 'User'} width={48} height={48} className="rounded-full" data-ai-hint="user avatar" />
+                          ) : (
+                             <AvatarFallback>{(chat.otherUser?.displayName || 'U').charAt(0)}</AvatarFallback>
+                          )}
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
@@ -164,11 +171,6 @@ export default function MessagesPage() {
                           <div className="flex items-center justify-between mt-1">
                             <p className="truncate text-sm text-muted-foreground">{chat.lastMessageText || 'No messages yet'}</p>
                             {/* Placeholder for unread count, not implemented yet */}
-                            {/* {chat.unread > 0 && (
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                                {chat.unread}
-                              </span>
-                            )} */}
                           </div>
                         </div>
                       </div>
@@ -180,6 +182,7 @@ export default function MessagesPage() {
           </CardContent>
         </Card>
       </div>
+      <NewChatDialog open={isNewChatDialogOpen} onOpenChange={setIsNewChatDialogOpen} />
     </MainLayout>
   );
 }
