@@ -47,9 +47,14 @@ interface EditProfileDialogProps {
 
 export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUpdate }: EditProfileDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(userProfile.photoURL);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(userProfile.photoURL);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState<number | null>(null);
+
+  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(userProfile.coverPhotoURL);
+  const [coverUploadProgress, setCoverUploadProgress] = useState<number | null>(null);
+
 
   const { toast } = useToast();
   const { firebaseUser: currentAuthUser, reloadUser } = useAuth();
@@ -75,31 +80,55 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
         bio: userProfile.bio || '',
         username: userProfile.username || '',
       });
-      setPreviewUrl(userProfile.photoURL);
-      setSelectedFile(null);
-      setUploadProgress(null);
+      setAvatarPreviewUrl(userProfile.photoURL);
+      setSelectedAvatarFile(null);
+      setAvatarUploadProgress(null);
+      setCoverPreviewUrl(userProfile.coverPhotoURL);
+      setSelectedCoverFile(null);
+      setCoverUploadProgress(null);
     }
   }, [userProfile, open, reset]);
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({ title: "File Too Large", description: "Please select an image smaller than 5MB.", variant: "destructive" });
+        toast({ title: "Avatar File Too Large", description: "Please select an image smaller than 5MB.", variant: "destructive" });
         return;
       }
       if (!file.type.startsWith('image/')) {
-        toast({ title: "Invalid File Type", description: "Please select an image file (PNG, JPG, GIF).", variant: "destructive" });
+        toast({ title: "Invalid Avatar File Type", description: "Please select an image file (PNG, JPG, GIF).", variant: "destructive" });
         return;
       }
-      setSelectedFile(file);
+      setSelectedAvatarFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
+        setAvatarPreviewUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
+
+  const handleCoverFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit for cover
+        toast({ title: "Cover Photo Too Large", description: "Please select an image smaller than 10MB.", variant: "destructive" });
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Invalid Cover Photo File Type", description: "Please select an image file (PNG, JPG, GIF).", variant: "destructive" });
+        return;
+      }
+      setSelectedCoverFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
 
   const resetDialogStates = () => {
     reset({
@@ -107,9 +136,12 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
       bio: userProfile.bio || '',
       username: userProfile.username || '',
     });
-    setSelectedFile(null);
-    setPreviewUrl(userProfile.photoURL);
-    setUploadProgress(null);
+    setSelectedAvatarFile(null);
+    setAvatarPreviewUrl(userProfile.photoURL);
+    setAvatarUploadProgress(null);
+    setSelectedCoverFile(null);
+    setCoverPreviewUrl(userProfile.coverPhotoURL);
+    setCoverUploadProgress(null);
   };
 
   const onSubmit: SubmitHandler<ProfileFormInputs> = async (data) => {
@@ -118,7 +150,8 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
       return;
     }
     setLoading(true);
-    setUploadProgress(null); // Reset progress at the beginning of submission
+    setAvatarUploadProgress(null);
+    setCoverUploadProgress(null);
 
     try {
       const updates: Partial<UserProfile> = {
@@ -128,37 +161,44 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
       };
 
       let newPhotoURL: string | null = userProfile.photoURL;
+      let newCoverPhotoURL: string | null = userProfile.coverPhotoURL;
 
-      if (selectedFile) {
-        setUploadProgress(0); // Start progress indication
-        const fileExtension = selectedFile.name.split('.').pop() || 'jpg';
-        const fileName = `profile_pic.${fileExtension}`;
-        const profilePicRef = storageRef(storage, `profile_pictures/${userProfile.uid}/${fileName}`);
+      if (selectedAvatarFile) {
+        setAvatarUploadProgress(0); 
+        const fileExtension = selectedAvatarFile.name.split('.').pop() || 'jpg';
+        const fileName = `profile_pic.${fileExtension}?t=${Date.now()}`; // Add timestamp to bust cache
+        const avatarPicRef = storageRef(storage, `profile_pictures/${userProfile.uid}/${fileName}`);
         
-        const uploadTask = uploadBytesResumable(profilePicRef, selectedFile);
-
+        const uploadTask = uploadBytesResumable(avatarPicRef, selectedAvatarFile);
         newPhotoURL = await new Promise<string>((resolve, reject) => {
-          uploadTask.on(
-            'state_changed',
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
-            },
-            (error) => {
-              console.error('Upload failed:', error);
-              reject(error);
-            },
+          uploadTask.on('state_changed',
+            (snapshot) => setAvatarUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+            (error) => { console.error('Avatar upload failed:', error); reject(error); },
             async () => {
-              try {
-                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve(downloadURL);
-              } catch (urlError) {
-                reject(urlError);
-              }
+              try { resolve(await getDownloadURL(uploadTask.snapshot.ref)); } catch (urlError) { reject(urlError); }
             }
           );
         });
         updates.photoURL = newPhotoURL;
+      }
+
+      if (selectedCoverFile) {
+        setCoverUploadProgress(0);
+        const fileExtension = selectedCoverFile.name.split('.').pop() || 'jpg';
+        const fileName = `cover_photo.${fileExtension}?t=${Date.now()}`; // Add timestamp
+        const coverPicRef = storageRef(storage, `cover_pictures/${userProfile.uid}/${fileName}`);
+
+        const uploadTask = uploadBytesResumable(coverPicRef, selectedCoverFile);
+        newCoverPhotoURL = await new Promise<string>((resolve, reject) => {
+          uploadTask.on('state_changed',
+            (snapshot) => setCoverUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+            (error) => { console.error('Cover photo upload failed:', error); reject(error); },
+            async () => {
+              try { resolve(await getDownloadURL(uploadTask.snapshot.ref)); } catch (urlError) { reject(urlError); }
+            }
+          );
+        });
+        updates.coverPhotoURL = newCoverPhotoURL;
       }
       
       const profileDocRef = doc(db, 'profiles', userProfile.uid);
@@ -168,28 +208,23 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
       if (updates.displayName && currentAuthUser.displayName !== updates.displayName) {
         authProfileUpdates.displayName = updates.displayName;
       }
-      if (newPhotoURL !== userProfile.photoURL && newPhotoURL !== undefined) { // Check if photoURL actually changed
+      if (newPhotoURL !== userProfile.photoURL && newPhotoURL !== undefined) { 
          authProfileUpdates.photoURL = newPhotoURL;
       }
 
       if (Object.keys(authProfileUpdates).length > 0) {
         await updateAuthProfile(currentAuthUser, authProfileUpdates);
-        // Consider calling reloadUser() if onAuthStateChanged doesn't pick up changes fast enough
-        // or if more immediate consistency is required across the app for the Auth object itself.
-        // For now, onAuthStateChanged in AuthContext should handle updating the Firestore-backed profile.
       }
       
       toast({ title: "Profile Updated", description: "Your profile has been successfully updated." });
       onProfileUpdate({ ...userProfile, ...updates }); 
-      onOpenChange(false);
+      onOpenChange(false); 
+      await reloadUser(); // Reload user to get fresh data including new URLs
     } catch (error: any) {
       console.error("Error updating profile:", error);
       toast({ title: "Update Failed", description: error.message || "Could not update profile.", variant: "destructive" });
     } finally {
       setLoading(false);
-      // Only clear uploadProgress if it was a successful upload or if dialog is closed.
-      // If error during upload, user might want to see the failed progress.
-      // The useEffect for 'open' or handleDialogClose will handle resetting progress display on close.
     }
   };
   
@@ -202,21 +237,21 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
 
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg"> 
         <DialogHeader>
           <DialogTitle>Edit your profile</DialogTitle>
           <DialogDescription>
-            Make changes to your profile information and photo.
+            Make changes to your profile information, avatar, and cover photo.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 py-4 max-h-[70vh] overflow-y-auto pr-2">
           
           <div className="space-y-2">
             <Label htmlFor="profile-picture-input-actual">Profile Picture</Label>
             <div className="flex items-center space-x-4">
               <div className="relative h-24 w-24 rounded-full overflow-hidden border border-muted bg-muted flex items-center justify-center">
-                {previewUrl ? (
-                  <Image src={previewUrl} alt="Profile preview" fill style={{objectFit: 'cover'}} data-ai-hint="profile avatar" />
+                {avatarPreviewUrl ? (
+                  <Image src={avatarPreviewUrl} alt="Profile preview" fill style={{objectFit: 'cover'}} data-ai-hint="profile avatar" />
                 ) : (
                   <UploadCloud className="h-10 w-10 text-muted-foreground" />
                 )}
@@ -230,18 +265,49 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
               type="file"
               className="hidden"
               accept="image/png, image/jpeg, image/gif"
-              onChange={handleFileChange}
+              onChange={handleAvatarFileChange}
               disabled={loading}
             />
-            {uploadProgress !== null && uploadProgress >= 0 && loading && (
-              <div className="space-y-1 pt-2">
-                <Label className="text-xs">Upload progress: {Math.round(uploadProgress)}%</Label>
+            {avatarUploadProgress !== null && avatarUploadProgress >= 0 && loading && selectedAvatarFile && (
+              <div className="space-y-1 pt-1">
+                <Label className="text-xs text-muted-foreground">Avatar Upload: {Math.round(avatarUploadProgress)}%</Label>
                 <div className="w-full bg-muted rounded-full h-1.5">
-                  <div className="bg-primary h-1.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+                  <div className="bg-primary h-1.5 rounded-full" style={{ width: `${avatarUploadProgress}%` }}></div>
                 </div>
               </div>
             )}
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cover-photo-input-actual">Cover Photo</Label>
+            <div className="w-full aspect-video rounded-md overflow-hidden border border-muted bg-muted flex items-center justify-center relative">
+                {coverPreviewUrl ? (
+                  <Image src={coverPreviewUrl} alt="Cover photo preview" fill style={{objectFit: 'cover'}} data-ai-hint="profile cover background" />
+                ) : (
+                  <UploadCloud className="h-12 w-12 text-muted-foreground" />
+                )}
+            </div>
+             <Button type="button" variant="outline" size="sm" className="mt-2 w-full sm:w-auto" onClick={() => document.getElementById('cover-photo-input-actual')?.click()} disabled={loading}>
+                Change Cover Photo
+              </Button>
+            <Input
+              id="cover-photo-input-actual"
+              type="file"
+              className="hidden"
+              accept="image/png, image/jpeg, image/gif"
+              onChange={handleCoverFileChange}
+              disabled={loading}
+            />
+            {coverUploadProgress !== null && coverUploadProgress >= 0 && loading && selectedCoverFile &&(
+              <div className="space-y-1 pt-1">
+                <Label className="text-xs text-muted-foreground">Cover Upload: {Math.round(coverUploadProgress)}%</Label>
+                <div className="w-full bg-muted rounded-full h-1.5">
+                  <div className="bg-primary h-1.5 rounded-full" style={{ width: `${coverUploadProgress}%` }}></div>
+                </div>
+              </div>
+            )}
+          </div>
+
 
           <div className="space-y-2">
             <Label htmlFor="displayName">Display Name</Label>
@@ -279,13 +345,20 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
             {errors.bio && <p className="text-sm text-destructive">{errors.bio.message}</p>}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-4">
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={loading}>
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={loading || (selectedFile !== null && uploadProgress !== null && uploadProgress < 100)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button 
+              type="submit" 
+              disabled={loading || 
+                        (selectedAvatarFile !== null && avatarUploadProgress !== null && avatarUploadProgress < 100) ||
+                        (selectedCoverFile !== null && coverUploadProgress !== null && coverUploadProgress < 100)
+                       } 
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
               {loading ? <Spinner className="mr-2 h-4 w-4" /> : null}
               Save Changes
             </Button>
@@ -295,3 +368,4 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
     </Dialog>
   );
 }
+

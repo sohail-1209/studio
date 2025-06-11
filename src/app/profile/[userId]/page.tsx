@@ -85,9 +85,11 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setExistingRequestId(null);
 
     try {
+      const followRequestsRef = collection(db, 'followRequests');
+      
       // Check if current user has sent a request to the profile user
       const qSent = query(
-        collection(db, 'followRequests'),
+        followRequestsRef,
         where('requesterId', '==', currentUser.uid),
         where('recipientId', '==', userId),
         limit(1)
@@ -102,7 +104,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           setExistingRequestId(requestId); 
         } else if (request.status === 'accepted') {
           setFollowStatus('following'); 
-          setExistingRequestId(requestId);
+          setExistingRequestId(requestId); // Crucial for unfollow
         } else { 
           setFollowStatus('not_following');
         }
@@ -112,7 +114,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
       // Check if profile user has sent a request to the current user
       const qReceived = query(
-        collection(db, 'followRequests'),
+        followRequestsRef,
         where('requesterId', '==', userId), 
         where('recipientId', '==', currentUser.uid), 
         limit(1)
@@ -123,12 +125,10 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         const request = receivedSnapshot.docs[0].data() as FollowRequestDocument;
         if (request.status === 'pending') {
           setFollowStatus('pending_me'); 
+          // Do NOT set existingRequestId here, as this ID is for the request received by current user,
+          // not the one sent by them.
         } else if (request.status === 'accepted') {
-          // Profile user follows current user, but current user might not be following back yet.
-          // We still need to check if current user initiated a follow that got accepted.
-          // The previous check for qSent would have caught 'following'.
-          // So if we reach here with an accepted qReceived, it means current user is not 'following'.
-          setFollowStatus('follow_back');
+          setFollowStatus('follow_back'); // They follow current user, current user does not (yet) follow them
         } else {
           setFollowStatus('not_following');
         }
@@ -286,24 +286,26 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     const followRequestRef = doc(db, 'followRequests', existingRequestId);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
     // We will NOT attempt to update the target user's followersCount from the client due to permissions.
-    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); 
 
     try {
       batch.delete(followRequestRef); 
       batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-      // REMOVED: batch.update(targetUserProfileRef, { followersCount: increment(-1) }); 
+      // NOTE: The target user's (profile.uid) followersCount is NOT decremented here by the current user.
+      // This should ideally be handled by a Cloud Function for atomicity and permissions.
 
       await batch.commit();
 
       setFollowStatus('not_following');
       setExistingRequestId(null);
       toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName || 'this user'}.` });
-    } catch (error: any)
-     {
+      // Manually trigger a re-check or rely on onSnapshot for profile to update local state if counts change
+      if (profile.uid === currentUser.uid) { // If unfollowing self (edge case, though UI prevents this)
+         await reloadUser(); // Reload current user's profile if counts might change on it
+      }
+    } catch (error: any) {
       console.error("Error unfollowing user:", error);
       toast({ title: "Unfollow Error", description: error.message || "Could not unfollow user.", variant: "destructive" });
-      // Re-check status to reflect potential partial success/failure if needed.
-      checkFollowStatus();
+      checkFollowStatus(); // Re-check status to reflect potential partial success/failure.
     } finally {
       setIsProcessingFollow(false);
     }
@@ -313,8 +315,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const handleMessageUser = async () => {
     if (!currentUser || !profile || currentUser.uid === profile.uid || isMessaging) return;
     
-    // Allow messaging if 'following' (current user follows profile user) or 'follow_back' (profile user follows current user).
-    // This means at least one-way follow exists. Mutual following is ideal but this is simpler.
     const canActuallyMessage = followStatus === 'following' || followStatus === 'follow_back';
     if (!canActuallyMessage) {
         toast({ title: "Cannot Message", description: `You need to be connected to message ${profile.displayName || 'this user'}.`, variant: "default" });
@@ -384,9 +384,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       await batch.commit();
 
       if (postToDelete.imagePath) {
-        const { ref: storageRef, deleteObject } = await import('firebase/storage'); // Dynamic import
-        const imageFileRef = storageRef(storage, postToDelete.imagePath);
-        await deleteObject(imageFileRef).catch(storageError => {
+        const { ref: storageRefFc, deleteObject: deleteObjectFc } = await import('firebase/storage'); 
+        const imageFileRef = storageRefFc(storage, postToDelete.imagePath);
+        await deleteObjectFc(imageFileRef).catch(storageError => {
           console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
         });
       }
@@ -474,27 +474,29 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   const handleProfileUpdate = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile); 
-    reloadUser(); 
+    if (currentUser && updatedProfile.uid === currentUser.uid) {
+        reloadUser(); // Reload auth context user if current user's profile was updated
+    }
   };
   
-  const FollowButtonComponent = () => {
+ const FollowButtonComponent = () => {
     if (isProcessingFollow) {
-      return <Button disabled><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
+        return <Button disabled><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
     }
     switch (followStatus) {
-      case 'pending_them': 
-        return <Button variant="outline" onClick={handleCancelFollowRequest}><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
-      case 'following': 
-        return <Button variant="outline" onClick={handleUnfollowUser}><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
-      case 'pending_me': 
-        return <Button onClick={() => router.push('/notifications')}><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
-      case 'follow_back': 
-         return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>;
-      case 'not_following':
-      default:
-        return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
+        case 'pending_them':
+            return <Button variant="outline" onClick={handleCancelFollowRequest}><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
+        case 'following':
+            return <Button variant="outline" onClick={handleUnfollowUser}><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
+        case 'pending_me':
+            return <Button onClick={() => router.push('/notifications')}><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
+        case 'follow_back':
+            return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>;
+        case 'not_following':
+        default:
+            return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
     }
-  };
+ };
   
   const canMessage = followStatus === 'following' || followStatus === 'follow_back';
 
@@ -503,34 +505,34 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       <div className="container mx-auto max-w-4xl py-8">
         <Card className="overflow-hidden shadow-lg">
           <CardHeader className="bg-muted/30 p-0">
-            <div className="relative h-48 w-full">
+            <div className="relative h-48 w-full md:h-64">
               <Image
-                src={profile.coverPhotoURL || "https://placehold.co/1200x300.png/E1D9F3/332E40"} 
+                src={profile.coverPhotoURL || "https://placehold.co/1200x400.png/E1D9F3/332E40"} 
                 alt={`${profile.displayName || 'User'}'s cover photo`}
                 fill
                 style={{objectFit: 'cover'}}
-                data-ai-hint="abstract background"
+                data-ai-hint="abstract background landscape"
                 priority
               />
-              <div className="absolute -bottom-16 left-8">
-                <Avatar className="h-32 w-32 border-4 border-card shadow-md">
+              <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-8">
+                <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-card shadow-md">
                   <AvatarImage src={profile.photoURL || `https://placehold.co/128x128.png?text=${(profile.displayName || 'U').charAt(0)}`} alt={profile.displayName || 'User'} data-ai-hint="profile picture" />
                   <AvatarFallback>{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
               </div>
             </div>
-            <div className="pt-20 px-8 pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end">
+            <div className="pt-16 sm:pt-20 px-4 sm:px-8 pb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end">
               <div className="mb-4 sm:mb-0">
-                <h1 className="font-headline text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
+                <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
                 <p className="text-sm text-muted-foreground">@{profile.username || profile.uid.substring(0,8)}</p>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex space-x-2 w-full sm:w-auto">
                 {isOwnProfile ? (
-                  <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
+                  <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto"><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
                 ) : (
                   <>
                     <FollowButtonComponent />
-                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage}>
+                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full sm:w-auto">
                       {isMessaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
                       Message
                     </Button>
@@ -539,9 +541,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-8">
+          <CardContent className="p-4 sm:p-8">
             <p className="text-foreground mb-6 whitespace-pre-wrap">{profile.bio || "No bio yet."}</p>
-            <div className="flex space-x-6 text-sm text-muted-foreground mb-8">
+            <div className="flex space-x-4 sm:space-x-6 text-sm text-muted-foreground mb-8">
               <span><strong className="text-foreground">{posts.length}</strong> Posts</span>
               <span><strong className="text-foreground">{profile.followersCount || 0}</strong> Followers</span>
               <span><strong className="text-foreground">{profile.followingCount || 0}</strong> Following</span>
@@ -555,7 +557,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
               </TabsList>
               <TabsContent value="posts">
                 {loadingPosts && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mt-6">
                     {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md" />)}
                   </div>
                 )}
@@ -569,7 +571,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   </div>
                 )}
                 {!loadingPosts && posts.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mt-6">
                     {posts.map(post => (
                       <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer">
                         <Image
