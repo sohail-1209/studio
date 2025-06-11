@@ -29,7 +29,6 @@ export default function FeedPage() {
   const { toast } = useToast();
 
   const [isLiking, setIsLiking] = useState<{[postId: string]: boolean}>({});
-  // const [isCommenting, setIsCommenting] = useState<{[postId: string]: boolean}>({}); // Replaced by CommentInput's own state
   const [showComments, setShowComments] = useState<{[postId: string]: boolean}>({});
 
 
@@ -109,7 +108,7 @@ export default function FeedPage() {
     setShowComments(prev => ({...prev, [postId]: !prev[postId]}));
   };
 
-  const handleSharePost = async (post: Post) => {
+ const handleSharePost = async (post: Post) => {
     if (!user) {
       toast({ title: 'Authentication Error', description: 'Please log in to share posts.', variant: 'destructive' });
       return;
@@ -117,7 +116,7 @@ export default function FeedPage() {
     const shareData = {
       title: `Check out this post on NExCHAT by ${post.userDisplayName || 'a user'}!`,
       text: post.caption || 'An interesting post from NExCHAT.',
-      url: window.location.origin + `/post/${post.id}`, 
+      url: window.location.origin + `/post/${post.id}`, // Assuming post detail pages exist or will exist
     };
 
     if (navigator.share) {
@@ -142,7 +141,7 @@ export default function FeedPage() {
             });
           }
         } else {
-          toast({
+           toast({
             title: 'Share Failed',
             description: 'Sharing is not supported or was blocked, and clipboard access is not available.',
             variant: 'destructive',
@@ -259,7 +258,7 @@ export default function FeedPage() {
               </CardContent>
             </Card>
           )}
-          {!loadingPosts && posts.map((post) => {
+          {!loadingPosts && posts.map((post, index) => {
             const isLikedByCurrentUser = post.likedBy && user ? post.likedBy.includes(user.uid) : false;
             return (
               <Card key={post.id} className="overflow-hidden shadow-lg">
@@ -283,12 +282,26 @@ export default function FeedPage() {
                 <CardContent className="p-0">
                   {post.imageUrl && (
                     <div className="relative aspect-video w-full">
-                      <Image src={post.imageUrl} alt={post.caption || "Post image"} layout="fill" objectFit="cover" data-ai-hint={post.dataAiHint || "user content"} />
+                      <Image 
+                        src={post.imageUrl} 
+                        alt={post.caption || "Post image"} 
+                        fill 
+                        style={{objectFit: 'cover'}} 
+                        data-ai-hint={post.dataAiHint || "user content"}
+                        priority={index === 0} // Add priority to the first image
+                      />
                     </div>
                   )}
                   {post.videoUrl && (
+                    // Assuming videoUrl is a placeholder image for a video
                     <div className="relative aspect-video w-full bg-black flex items-center justify-center">
-                       <Image src={post.videoUrl} alt={post.caption || "Post video placeholder"} layout="fill" objectFit="contain" data-ai-hint={post.dataAiHint || "user content video"} />
+                       <Image 
+                         src={post.videoUrl} 
+                         alt={post.caption || "Post video placeholder"} 
+                         fill 
+                         style={{objectFit: 'contain'}} 
+                         data-ai-hint={post.dataAiHint || "user content video"}
+                       />
                     </div>
                   )}
                   {post.caption && <p className="p-4 text-foreground whitespace-pre-wrap">{post.caption}</p>}
@@ -315,7 +328,6 @@ export default function FeedPage() {
                         size="sm"
                         className="flex-1"
                         onClick={() => toggleCommentSection(post.id)}
-                        // disabled={isCommenting[post.id]} // Replaced by CommentInput's own state
                       >
                         <MessageIcon className="mr-2 h-4 w-4" />
                         Comments ({post.commentsCount || 0})

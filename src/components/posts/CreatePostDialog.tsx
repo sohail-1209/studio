@@ -144,8 +144,8 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         imageUrl: imageUrl,
         videoUrl: null,
         likesCount: 0,
-        likedBy: [], // Initialize likedBy as empty array
-        commentsCount: 0, // Initialize commentsCount
+        likedBy: [], 
+        commentsCount: 0,
         createdAt: serverTimestamp(),
         dataAiHint: selectedFile ? 'user uploaded content' : undefined,
       };
@@ -205,7 +205,13 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                 >
                     {previewUrl ? (
                         <div className="relative w-full h-full">
-                           <Image src={previewUrl} alt="Preview" layout="fill" objectFit="contain" className="rounded-md" />
+                           <Image 
+                             src={previewUrl} 
+                             alt="Preview" 
+                             fill 
+                             style={{objectFit: 'contain'}} 
+                             className="rounded-md" 
+                           />
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center pt-5 pb-6">

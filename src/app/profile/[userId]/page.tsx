@@ -36,7 +36,14 @@ export default function UserProfilePage({ params }: { params: { userId: string }
         <Card className="overflow-hidden shadow-lg">
           <CardHeader className="bg-muted/30 p-0">
             <div className="relative h-48 w-full">
-              <Image src="https://placehold.co/1200x300.png" alt="Cover photo" layout="fill" objectFit="cover" data-ai-hint="abstract background" />
+              <Image 
+                src="https://placehold.co/1200x300.png" 
+                alt="Cover photo" 
+                fill 
+                style={{objectFit: 'cover'}} 
+                data-ai-hint="abstract background" 
+                priority // Cover photos are often high priority
+              />
               <div className="absolute -bottom-16 left-8">
                 <Avatar className="h-32 w-32 border-4 border-card shadow-md">
                   <AvatarImage src={userProfile.avatar} alt={userProfile.name} data-ai-hint="profile picture" />
@@ -80,7 +87,13 @@ export default function UserProfilePage({ params }: { params: { userId: string }
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
                   {placeholderPosts.map(post => (
                     <div key={post.id} className="aspect-square relative rounded-md overflow-hidden">
-                       <Image src={post.imageUrl} alt={`Post ${post.id}`} layout="fill" objectFit="cover" data-ai-hint={post.aiHint} />
+                       <Image 
+                         src={post.imageUrl} 
+                         alt={`Post ${post.id}`} 
+                         fill 
+                         style={{objectFit: 'cover'}} 
+                         data-ai-hint={post.aiHint} 
+                       />
                     </div>
                   ))}
                 </div>
