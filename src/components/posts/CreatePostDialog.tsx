@@ -1,7 +1,7 @@
 // src/components/posts/CreatePostDialog.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, ChangeEvent } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,15 +17,20 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input'; // Added for file input
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase'; // Added storage
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; // Added storage functions
 import type { PostDocument } from '@/types/post';
 import { Spinner } from '@/components/shared/Spinner';
+import { UploadCloud, Image as ImageIcon } from 'lucide-react';
+import Image from 'next/image'; // For image preview
 
 const postSchema = z.object({
   caption: z.string().min(1, { message: 'Caption cannot be empty' }).max(1000, {message: 'Caption too long'}),
+  // File is handled separately, not part of Zod schema for this form directly
 });
 
 type PostFormInputs = z.infer<typeof postSchema>;
@@ -37,6 +42,9 @@ interface CreatePostDialogProps {
 
 export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -49,6 +57,35 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
     resolver: zodResolver(postSchema),
   });
 
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    }
+  };
+
+  const resetFormStates = () => {
+    reset();
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setUploadProgress(null);
+  };
+
+  const handleDialogClose = (isOpen: boolean) => {
+    if (!isOpen) {
+      resetFormStates();
+    }
+    onOpenChange(isOpen);
+  };
+
   const onSubmit: SubmitHandler<PostFormInputs> = async (data) => {
     if (!user) {
       toast({
@@ -59,17 +96,58 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       return;
     }
     setLoading(true);
+    setUploadProgress(0);
+
     try {
+      let imageUrl: string | null = null;
+
+      if (selectedFile) {
+        const uniqueFileName = `${Date.now()}-${selectedFile.name}`;
+        const fileRef = storageRef(storage, `post_images/${user.uid}/${uniqueFileName}`);
+        const uploadTask = uploadBytesResumable(fileRef, selectedFile);
+
+        await new Promise<void>((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(progress);
+            },
+            (error) => {
+              console.error('Upload failed:', error);
+              toast({
+                title: 'Image Upload Failed',
+                description: error.message || 'Could not upload image. Please try again.',
+                variant: 'destructive',
+              });
+              setLoading(false);
+              setUploadProgress(null);
+              reject(error);
+            },
+            async () => {
+              imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve();
+            }
+          );
+        });
+        if (!imageUrl) { // If imageUrl is still null, it means upload failed before getDownloadURL
+          throw new Error("Image upload completed but failed to get URL.");
+        }
+      }
+      
+      setUploadProgress(100); // Mark as complete if file processing is done or no file
+
       const postData: PostDocument = {
         userId: user.uid,
-        userDisplayName: user.displayName,
-        userAvatarUrl: user.photoURL,
+        userDisplayName: user.displayName || 'Anonymous',
+        userAvatarUrl: user.photoURL || null,
         caption: data.caption,
-        imageUrl: null, // Placeholder for future image upload
-        videoUrl: null, // Placeholder for future video upload
+        imageUrl: imageUrl,
+        videoUrl: null, // Video uploads not implemented in this step
         likesCount: 0,
         commentsCount: 0,
         createdAt: serverTimestamp(),
+        dataAiHint: selectedFile ? 'user uploaded content' : undefined, // Basic hint
       };
 
       await addDoc(collection(db, 'posts'), postData);
@@ -78,10 +156,10 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         title: 'Post Created!',
         description: 'Your post has been successfully published.',
       });
-      reset();
-      onOpenChange(false);
+      resetFormStates();
+      onOpenChange(false); // Close dialog
     } catch (error: any) {
-      console.error("Error creating post:", error);
+      console.error('Error creating post:', error);
       toast({
         title: 'Error Creating Post',
         description: error.message || 'Could not create post. Please try again.',
@@ -89,16 +167,17 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
     } finally {
       setLoading(false);
+      setUploadProgress(null); // Reset progress after operation
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={handleDialogClose}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Create a new post</DialogTitle>
           <DialogDescription>
-            Share your thoughts with the world. Click post when you&apos;re ready.
+            Share your thoughts, and optionally an image, with the world.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
@@ -109,21 +188,59 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
               placeholder="What's on your mind?"
               {...register('caption')}
               className={errors.caption ? 'border-destructive' : ''}
-              rows={5}
+              rows={3}
+              disabled={loading}
             />
             {errors.caption && (
               <p className="text-sm text-destructive">{errors.caption.message}</p>
             )}
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="post-image">Image (Optional)</Label>
+            <div className="flex items-center justify-center w-full">
+                <Label
+                    htmlFor="post-image-input"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 border-input"
+                >
+                    {previewUrl ? (
+                        <div className="relative w-full h-full">
+                           <Image src={previewUrl} alt="Preview" layout="fill" objectFit="contain" className="rounded-md" />
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+                            <p className="mb-1 text-sm text-muted-foreground">
+                                <span className="font-semibold">Click to upload</span> or drag and drop
+                            </p>
+                            <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
+                        </div>
+                    )}
+                    <Input id="post-image-input" type="file" className="hidden" onChange={handleFileChange} accept="image/png, image/jpeg, image/gif" disabled={loading} />
+                </Label>
+            </div>
+            {selectedFile && <p className="text-xs text-muted-foreground">Selected: {selectedFile.name}</p>}
+          </div>
+          
+          {uploadProgress !== null && loading && (
+            <div className="space-y-1">
+              <Label className="text-xs">Upload progress: {Math.round(uploadProgress)}%</Label>
+              <div className="w-full bg-muted rounded-full h-2.5">
+                <div className="bg-primary h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+            </div>
+          )}
+
+
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => handleDialogClose(false)} disabled={loading}>
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={loading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              {loading ? <Spinner className="mr-2 h-4 w-4" /> : null}
-              Post
+            <Button type="submit" disabled={loading || (selectedFile && uploadProgress !== null && uploadProgress < 100)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              {loading && <Spinner className="mr-2 h-4 w-4" />}
+              {loading ? (uploadProgress !== null ? 'Uploading...' : 'Posting...') : 'Post'}
             </Button>
           </DialogFooter>
         </form>
