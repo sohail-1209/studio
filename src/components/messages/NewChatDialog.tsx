@@ -75,8 +75,14 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
   }, [allUsers, searchTerm]);
 
   const handleSelectUser = async (selectedUser: UserProfile) => {
-    if (!currentUser || !selectedUser.uid) {
+    if (!currentUser || !currentUser.uid) {
+        toast({ title: "Authentication Error", description: "Current user not found. Please re-login.", variant: "destructive" });
+        console.error("NewChatDialog: Current user or UID is missing.", currentUser);
+        return;
+    }
+    if (!selectedUser || !selectedUser.uid) {
         toast({ title: "Error", description: "Selected user data is incomplete.", variant: "destructive" });
+        console.error("NewChatDialog: Selected user or UID is missing.", selectedUser);
         return;
     }
     setIsCreatingChat(true);
@@ -87,6 +93,7 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
     try {
       const chatSnap = await getDoc(chatDocRef);
       if (chatSnap.exists()) {
+        console.log(`NewChatDialog: Chat with ID ${chatId} already exists. Navigating.`);
         router.push(`/messages/${chatId}`);
         onOpenChange(false); 
       } else {
@@ -109,17 +116,39 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           updatedAt: serverTimestamp(),
         };
 
-        console.log('Attempting to create chat with data:', JSON.stringify(newChatData, null, 2));
+        // --- START Enhanced Pre-flight Checks & Logging ---
+        console.log('NewChatDialog: Pre-flight Data for New Chat Creation:');
         console.log('Current User UID:', currentUser.uid);
         console.log('Selected User UID:', selectedUser.uid);
         console.log('Generated Chat ID:', chatId);
+        console.log('Data to be written (newChatData):', JSON.stringify(newChatData, null, 2));
+
+        const clientSideRuleCheck = currentUser && currentUser.uid && newChatData.userIds.includes(currentUser.uid);
+        console.log(`NewChatDialog: Client-side rule check (currentUser.uid in newChatData.userIds): ${clientSideRuleCheck}`);
+
+        if (!clientSideRuleCheck) {
+          console.error("NewChatDialog: CRITICAL - Client-side rule check FAILED. currentUser.uid is not in newChatData.userIds. Aborting Firestore write.");
+          toast({ 
+            title: "Client Data Error", 
+            description: "Could not prepare chat data correctly. Please report this issue.", 
+            variant: "destructive" 
+          });
+          setIsCreatingChat(false);
+          return;
+        }
+        console.log("NewChatDialog: Client-side rule check PASSED. Attempting Firestore write...");
+        // --- END Enhanced Pre-flight Checks & Logging ---
         
         await setDoc(chatDocRef, newChatData);
+        console.log(`NewChatDialog: Successfully created chat with ID ${chatId}. Navigating.`);
         router.push(`/messages/${chatId}`);
         onOpenChange(false);
       }
-    } catch (error: any) { // Catch any error
-      console.error("FirebaseError creating or finding chat:", error); // Log the full error object
+    } catch (error: any) {
+      console.error("NewChatDialog: FirebaseError creating or finding chat:", error);
+      console.error("Error Code:", error.code);
+      console.error("Error Message:", error.message);
+      console.error("Error Details (if any):", error.details);
       toast({ 
         title: "Chat Error", 
         description: `Could not start chat: ${error.message || 'Please try again.'}`, 
@@ -204,3 +233,4 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
     </Dialog>
   );
 }
+
