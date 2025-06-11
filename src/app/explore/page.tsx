@@ -232,8 +232,8 @@ export default function ExplorePage() {
 
   return (
     <MainLayout>
-      <div> {/* Removed container, mx-auto, max-w-5xl, py-8 */}
-        <Card className="shadow-lg max-w-5xl mx-auto"> {/* Added max-w-5xl mx-auto to the Card */}
+      <div>
+        <Card className="shadow-lg w-full max-w-5xl mx-auto">
           <CardHeader>
             <div className="flex items-center space-x-3">
               <Compass className="h-6 w-6 text-primary" />

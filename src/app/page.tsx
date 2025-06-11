@@ -345,7 +345,7 @@ export default function FeedPage() {
 
 
   const PostSkeleton = () => (
-    <Card className="overflow-hidden shadow-lg max-w-2xl mx-auto">
+    <Card className="overflow-hidden shadow-lg w-full max-w-2xl mx-auto">
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
           <Skeleton className="h-10 w-10 rounded-full" />
@@ -387,7 +387,7 @@ export default function FeedPage() {
 
   return (
     <MainLayout>
-      <div> {/* Removed container, mx-auto, max-w-2xl, py-8 */}
+      <div>
         <div className="mb-6 flex items-center justify-between">
           <h1 className="font-headline text-3xl font-bold text-foreground">Feed</h1>
           <Button onClick={() => setIsCreatePostDialogOpen(true)}>
@@ -398,7 +398,7 @@ export default function FeedPage() {
 
         <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
 
-        <Card className="mb-8 max-w-2xl mx-auto"> {/* Added max-w-2xl mx-auto here for stories card */}
+        <Card className="mb-8 w-full max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline text-xl">Stories</CardTitle>
           </CardHeader>
@@ -463,7 +463,7 @@ export default function FeedPage() {
             <> <PostSkeleton /> <PostSkeleton /> </>
           )}
           {!loadingPosts && posts.length === 0 && (
-            <Card className="py-12 text-center max-w-2xl mx-auto"> {/* Added max-w-2xl mx-auto */}
+            <Card className="py-12 text-center w-full max-w-2xl mx-auto">
               <CardContent>
                 <p className="text-lg font-semibold text-foreground">No posts yet!</p>
                 <p className="text-muted-foreground">Be the first one to share something.</p>
@@ -483,7 +483,7 @@ export default function FeedPage() {
                 : (post.imageUrl ? 'your image' : (post.videoUrl ? 'your video' : 'your post'));
 
             return (
-              <Card key={post.id} className="overflow-hidden shadow-lg max-w-2xl mx-auto"> {/* Added max-w-2xl mx-auto */}
+              <Card key={post.id} className="overflow-hidden shadow-lg w-full max-w-2xl mx-auto">
                 <CardHeader className="p-4">
                   <div className="flex items-center space-x-3">
                     <Avatar>

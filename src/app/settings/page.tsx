@@ -201,8 +201,8 @@ export default function SettingsPage() {
 
   return (
     <MainLayout>
-      <div> {/* Removed container, mx-auto, max-w-3xl, py-8 */}
-        <Card className="shadow-lg max-w-3xl mx-auto"> {/* Added max-w-3xl mx-auto to the Card */}
+      <div>
+        <Card className="shadow-lg w-full max-w-3xl mx-auto">
           <CardHeader>
             <div className="flex items-center space-x-3">
               <SettingsIcon className="h-7 w-7 text-primary" />
