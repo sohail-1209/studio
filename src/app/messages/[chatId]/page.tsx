@@ -87,6 +87,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   useEffect(() => {
     if (!chatId || !user?.uid) {
       setLoadingMessages(false);
+      setChatPartnerId(null);
+      setChatPartnerProfile(null);
       return;
     }
     setLoadingMessages(true);
@@ -111,15 +113,20 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
             }
           });
         } else {
-           setChatPartnerProfile({ displayName: 'Group Chat', photoURL: `https://placehold.co/40x40.png?text=G` });
+           // This case might occur if chatData.userIds doesn't produce an otherUserId (e.g. self-chat, or bad data)
+           // Or if it's intended as a group chat without specific partner profile logic yet.
+           setChatPartnerProfile({ displayName: 'Chat Details Error', photoURL: `https://placehold.co/40x40.png?text=E` });
+           console.warn("ChatPage: Could not determine chat partner from chat document:", chatData);
         }
       } else {
-        console.error("Chat session not found!");
+        console.error("Chat session not found for ID:", chatId);
         setChatPartnerProfile({ displayName: 'Chat Not Found', photoURL: `https://placehold.co/40x40.png?text=E` });
+        setChatPartnerId(null);
       }
     }, (error) => {
         console.error("Error fetching chat details:", error);
         setChatPartnerProfile({ displayName: 'Error Loading', photoURL: `https://placehold.co/40x40.png?text=E` });
+        setChatPartnerId(null);
     });
 
     const messagesCollection = collection(db, 'chats', chatId, 'messages');
@@ -309,27 +316,50 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   };
 
   const handleInitiateCall = async (callType: 'audio' | 'video') => {
-    if (!user || !chatPartnerProfile || !chatPartnerId || isInitiatingCall) {
-      toast({
-        title: "Cannot Initiate Call",
-        description: "User or chat partner information is missing, or a call is already being initiated.",
-        variant: "destructive",
-      });
+    // More specific checks before proceeding
+    if (!user) {
+      toast({ title: "Authentication Error", description: "You must be logged in to initiate a call.", variant: "destructive" });
+      console.error("Call initiation failed: User not authenticated.");
       return;
     }
+    if (!chatPartnerId) {
+      toast({ title: "Chat Partner Error", description: "Chat partner ID is not available. Cannot initiate call.", variant: "destructive" });
+      console.error("Call initiation failed: chatPartnerId is null or undefined.");
+      return;
+    }
+    if (!chatPartnerProfile) {
+      toast({ title: "Chat Partner Error", description: "Chat partner profile is not available. Cannot initiate call.", variant: "destructive" });
+      console.error("Call initiation failed: chatPartnerProfile is null or undefined.");
+      return;
+    }
+     if (!chatId) {
+      toast({ title: "Chat Error", description: "Current chat ID is missing. Cannot initiate call.", variant: "destructive" });
+      console.error("Call initiation failed: chatId is null or undefined.");
+      return;
+    }
+    if (isInitiatingCall) {
+        // This state should ideally prevent the button from being clicked again,
+        // but this is a safeguard.
+        console.log("Call initiation already in progress.");
+        return;
+    }
+
     setIsInitiatingCall(true);
     try {
       const callAttemptsRef = collection(db, 'callAttempts');
-      await addDoc(callAttemptsRef, {
+      const callData = {
         callerId: user.uid,
         callerName: user.displayName || 'Unknown Caller',
-        calleeId: chatPartnerId,
-        calleeName: chatPartnerProfile.displayName || 'Unknown Recipient',
-        chatId: chatId,
+        calleeId: chatPartnerId, // Ensured non-null by checks above
+        calleeName: chatPartnerProfile.displayName || 'Unknown Recipient', // Fallback
+        chatId: chatId, // Ensured non-null
         callType: callType,
-        status: 'initiating', // Other statuses could be 'ringing', 'answered', 'declined', 'ended'
+        status: 'initiating',
         timestamp: serverTimestamp(),
-      });
+      };
+      
+      console.log("Attempting to add call document:", callData);
+      await addDoc(callAttemptsRef, callData);
 
       toast({
         title: `Simulated ${callType} Call Initiated`,
@@ -338,10 +368,10 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       });
 
     } catch (error: any) {
-      console.error(`Error initiating ${callType} call:`, error);
+      console.error(`Error initiating ${callType} call. Raw error:`, error);
       toast({
         title: "Call Initiation Failed",
-        description: `Could not simulate ${callType} call. ${error.message || 'Please try again.'}`,
+        description: `Could not simulate ${callType} call. ${error.message || 'An unexpected error occurred. Check console for details.'}`,
         variant: "destructive",
       });
     } finally {
@@ -356,6 +386,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       <Skeleton className="h-12 w-3/5 rounded-lg" />
     </div>
   );
+
+  const callButtonsDisabled = isInitiatingCall || !chatPartnerId || !chatPartnerProfile;
 
   return (
     <MainLayout>
@@ -382,10 +414,10 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
             )}
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" title="Voice Call" onClick={() => handleInitiateCall('audio')} disabled={isInitiatingCall}>
+            <Button variant="ghost" size="icon" title="Voice Call" onClick={() => handleInitiateCall('audio')} disabled={callButtonsDisabled}>
               {isInitiatingCall ? <Loader2 className="h-5 w-5 animate-spin" /> : <Phone className="h-5 w-5" />}
             </Button>
-            <Button variant="ghost" size="icon" title="Video Call" onClick={() => handleInitiateCall('video')} disabled={isInitiatingCall}>
+            <Button variant="ghost" size="icon" title="Video Call" onClick={() => handleInitiateCall('video')} disabled={callButtonsDisabled}>
               {isInitiatingCall ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" />}
             </Button>
           </div>
@@ -493,7 +525,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
         <footer className="border-t bg-card p-4">
           {filePreviewUrl && (
             <div className="mb-2 p-2 border rounded-md relative bg-card shadow-sm">
-              <Image src={filePreviewUrl} alt="File preview" width={80} height={80} className="rounded object-contain" />
+              <Image src={filePreviewUrl} alt="File preview" width={80} height={80} className="rounded object-contain border border-border/20" />
               <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={clearFileSelection}>
                 <XCircle className="h-4 w-4" />
               </Button>
