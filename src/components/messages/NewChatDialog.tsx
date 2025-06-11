@@ -49,11 +49,11 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
       
       getDocs(q)
         .then((snapshot) => {
-          const usersList = snapshot.docs.map(doc => doc.data() as UserProfile);
+          const usersList = snapshot.docs.map(docSnap => docSnap.data() as UserProfile);
           setAllUsers(usersList);
         })
         .catch((error) => {
-          console.error("Error fetching users:", error);
+          console.error("Error fetching users for NewChatDialog:", error);
           toast({ title: "Error", description: "Could not load users.", variant: "destructive" });
         })
         .finally(() => {
@@ -118,9 +118,13 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
         router.push(`/messages/${chatId}`);
         onOpenChange(false);
       }
-    } catch (error) {
-      console.error("Error creating or finding chat:", error);
-      toast({ title: "Chat Error", description: "Could not start chat. Please try again.", variant: "destructive" });
+    } catch (error: any) { // Catch any error
+      console.error("FirebaseError creating or finding chat:", error); // Log the full error object
+      toast({ 
+        title: "Chat Error", 
+        description: `Could not start chat: ${error.message || 'Please try again.'}`, 
+        variant: "destructive" 
+      });
     } finally {
       setIsCreatingChat(false);
     }
