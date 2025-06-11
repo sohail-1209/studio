@@ -1,12 +1,15 @@
+
 // src/types/chat.ts
 import type { Timestamp, FieldValue } from 'firebase/firestore';
 
 export interface ChatMessageDocument {
   senderId: string;
-  text: string;
+  text?: string | null; // Text is now optional
   timestamp: FieldValue; // For writing new messages
   imageUrl?: string | null;
-  dataAiHint?: string;
+  imagePath?: string | null; // To potentially delete from storage if message is deleted
+  fileType?: string | null; // e.g., 'image/jpeg'
+  dataAiHint?: string; // For images, if applicable
 }
 
 export interface ChatMessage extends Omit<ChatMessageDocument, 'timestamp'> {
@@ -22,7 +25,6 @@ export interface ChatSessionUserDetail {
 
 export interface ChatSessionDocument {
   userIds: string[]; // Array of two user UIDs
-  // Store details of both users for easier display in the chat list
   userDetails: {
     [key: string]: ChatSessionUserDetail; // key is userId
   };
@@ -30,16 +32,11 @@ export interface ChatSessionDocument {
   lastMessageSenderId: string | null;
   lastMessageTimestamp: FieldValue | null; // For updating with serverTimestamp
   updatedAt: FieldValue; // For sorting chats, use serverTimestamp
-  // Optional: unread counts per user
-  // unreadCounts?: {
-  //   [key: string]: number; // key is userId
-  // };
 }
 
 export interface ChatSession extends Omit<ChatSessionDocument, 'lastMessageTimestamp' | 'updatedAt'> {
   id: string; // Firestore document ID
   lastMessageTimestamp: Date | null; // Converted for display
   updatedAt: Date; // Converted for display
-  // Derived property for easier access to the other user in a 1:1 chat
   otherUser?: ChatSessionUserDetail & { uid: string };
 }
