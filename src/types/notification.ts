@@ -3,20 +3,23 @@
 import type { Timestamp, FieldValue } from 'firebase/firestore';
 
 export interface NotificationDocument {
-  recipientId: string; 
-  actorId: string;     
+  recipientId: string;
+  actorId: string;
   actorDisplayName: string | null;
   actorAvatarUrl: string | null;
-  type: 'like' | 'comment' | 'follow_request' | 'follow_accept'; 
-  postId?: string;        // Optional: ID of the related post (for likes/comments)
-  postContentPreview?: string; 
-  commentText?: string; 
-  followRequestId?: string; // Optional: ID of the related follow request
-  createdAt: FieldValue; 
-  isRead: boolean;       
+  type: 'like' | 'comment' | 'follow_request' | 'follow_accept';
+  postId?: string;
+  postContentPreview?: string;
+  commentText?: string;
+  followRequestId?: string; // ID of the FollowRequest document
+  createdAt: FieldValue;
+  isRead: boolean;
+  actionTaken?: 'accepted' | 'declined' | null; // For follow_request notifications
+  originalFollowRequestId?: string; // Not typically needed for 'follow_request' itself, but for 'follow_accept'
 }
 
 export interface Notification extends Omit<NotificationDocument, 'createdAt'> {
-  id: string;          
-  createdAt: Date;     
+  id: string;
+  createdAt: Date;
+  actionTaken?: 'accepted' | 'declined' | null;
 }
