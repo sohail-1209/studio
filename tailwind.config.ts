@@ -71,6 +71,7 @@ export default {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
+        logoText: 'hsl(var(--logo-text-color))', // Added new logo text color
       },
       borderRadius: {
         lg: 'var(--radius)',
