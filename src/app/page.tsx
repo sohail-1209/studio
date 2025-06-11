@@ -519,19 +519,19 @@ export default function FeedPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   {post.imageUrl && (
-                    <div className="relative aspect-video w-full">
+                    <div className="relative aspect-video w-full overflow-hidden">
                       <Image 
                         src={post.imageUrl} 
                         alt={post.caption || "Post image"} 
                         fill 
-                        style={{objectFit: 'cover'}} 
+                        style={{objectFit: 'contain'}} 
                         data-ai-hint={post.dataAiHint || "user content"}
                         priority={index < 2}
                       />
                     </div>
                   )}
                   {post.videoUrl && (
-                    <div className="relative aspect-video w-full bg-black flex items-center justify-center">
+                    <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
                        <Image 
                          src={post.videoUrl} 
                          alt={post.caption || "Post video placeholder"} 
