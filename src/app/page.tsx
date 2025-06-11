@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, Heart, MessageCircle as MessageIcon, Share2 } from 'lucide-react';
 import Image from 'next/image';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit, where } from 'firebase/firestore';
-import type { Post, PostDocument } from '@/types/post'; // Ensure PostDocument is imported if needed
+import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit, where, getDocs } from 'firebase/firestore';
+import type { Post, PostDocument } from '@/types/post';
 import { formatDistanceToNow, subHours } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,6 +21,7 @@ import { Spinner } from '@/components/shared/Spinner';
 import { CommentInput } from '@/components/posts/CommentInput';
 import { CommentList } from '@/components/posts/CommentList';
 import { Separator } from '@/components/ui/separator';
+import { StoryViewerDialog } from '@/components/stories/StoryViewerDialog'; // Import StoryViewerDialog
 
 interface StoryUserData {
   userId: string;
@@ -39,19 +40,19 @@ export default function FeedPage() {
   const [isLiking, setIsLiking] = useState<{[postId: string]: boolean}>({});
   const [showComments, setShowComments] = useState<{[postId: string]: boolean}>({});
 
+  // Story specific state
   const [storiesData, setStoriesData] = useState<StoryUserData[]>([]);
-  const [loadingStories, setLoadingStories] = useState(true);
+  const [loadingStoriesReel, setLoadingStoriesReel] = useState(true);
+  const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
+  const [selectedStoryAuthor, setSelectedStoryAuthor] = useState<StoryUserData | null>(null);
+  const [currentUserStories, setCurrentUserStories] = useState<Post[]>([]);
+  const [loadingCurrentUserStories, setLoadingCurrentUserStories] = useState(false);
+
 
   useEffect(() => {
     // Fetch Posts (regular feed)
     const postsCollection = collection(db, 'posts');
-    // Ensure regular posts are not stories, or handle them as you wish (e.g. show all or filter out stories)
-    // For now, let's assume regular posts query fetches posts that are NOT stories or fetches all and relies on client-side sort/display logic
-    const qPosts = query(postsCollection, where('isStory', '!=', true), orderBy('createdAt', 'desc'));
-    // If you want stories to also appear in the main feed, remove the where('isStory', '!=', true)
-    // Or, if isStory field might be undefined for older posts, use:
-    // const qPosts = query(postsCollection, orderBy('createdAt', 'desc')); 
-    // And then filter client-side if needed, though less efficient.
+    const qPosts = query(postsCollection, where('isStory', '!=', true), orderBy('createdAt', 'desc')); 
 
     setLoadingPosts(true);
     const unsubscribePosts = onSnapshot(
@@ -69,8 +70,6 @@ export default function FeedPage() {
             isStory: data.isStory || false,
           } as Post;
         });
-        // Further client-side filtering if `isStory` might be undefined for older posts and you want to exclude them from main feed
-        // setPosts(fetchedPosts.filter(p => !p.isStory));
         setPosts(fetchedPosts); 
         setLoadingPosts(false);
       },
@@ -85,47 +84,47 @@ export default function FeedPage() {
       }
     );
 
-    // Fetch Stories Data
-    setLoadingStories(true);
+    // Fetch Stories Data for the Reel
+    setLoadingStoriesReel(true);
     const twentyFourHoursAgo = subHours(new Date(), 24);
     const twentyFourHoursAgoTimestamp = Timestamp.fromDate(twentyFourHoursAgo);
 
-    const qStories = query(
-      collection(db, 'posts'), // Assuming stories are also in the 'posts' collection
+    const qStoriesReel = query(
+      collection(db, 'posts'),
       where('isStory', '==', true),
       where('createdAt', '>=', twentyFourHoursAgoTimestamp),
-      orderBy('createdAt', 'desc'),
-      firestoreLimit(15) // Fetch a bit more to get unique users
+      orderBy('createdAt', 'desc'), // Get latest stories first
+      firestoreLimit(20) // Fetch a bit more to find unique users
     );
 
-    const unsubscribeStories = onSnapshot(qStories, (snapshot) => {
+    const unsubscribeStoriesReel = onSnapshot(qStoriesReel, (snapshot) => {
       const uniqueUsersMap = new Map<string, StoryUserData>();
       snapshot.docs.forEach(docSnapshot => {
-        const post = docSnapshot.data() as PostDocument; // PostDocument has userDisplayName etc.
+        const post = docSnapshot.data() as PostDocument;
         if (post.userId && !uniqueUsersMap.has(post.userId)) {
           uniqueUsersMap.set(post.userId, {
             userId: post.userId,
             displayName: post.userDisplayName,
             photoURL: post.userAvatarUrl,
-            dataAiHint: "portrait person", // Generic hint for story avatars
+            dataAiHint: "portrait person",
           });
         }
       });
-      setStoriesData(Array.from(uniqueUsersMap.values()).slice(0, 7)); // Display up to 7 stories
-      setLoadingStories(false);
+      setStoriesData(Array.from(uniqueUsersMap.values()).slice(0, 7)); // Display up to 7 unique users
+      setLoadingStoriesReel(false);
     }, (error) => {
-      console.error('Error fetching stories data:', error);
-      setLoadingStories(false);
+      console.error('Error fetching stories data for reel:', error);
+      setLoadingStoriesReel(false);
       toast({
           title: 'Error Fetching Stories',
-          description: 'Could not load stories. Please try again later.',
+          description: 'Could not load stories reel. Please try again later.',
           variant: 'destructive',
         });
     });
 
     return () => {
       unsubscribePosts();
-      unsubscribeStories();
+      unsubscribeStoriesReel();
     };
   }, [toast]);
 
@@ -184,54 +183,72 @@ export default function FeedPage() {
       try {
         await navigator.share(shareData);
       } catch (error: any) {
-        console.warn('Warning sharing post via navigator.share (likely permission denied or non-HTTPS):', error);
+        console.warn('Warning sharing post via navigator.share:', error);
         if (navigator.clipboard && navigator.clipboard.writeText) {
           try {
             await navigator.clipboard.writeText(shareData.url);
             toast({
               title: 'Share Failed, Link Copied!',
               description: 'Could not open share dialog. Post link copied to clipboard.',
-              variant: 'default', 
             });
           } catch (copyError) {
             console.error('Error copying link to clipboard:', copyError);
-            toast({
-              title: 'Share Failed',
-              description: 'Could not share or copy the post link. Please try manually.',
-              variant: 'destructive',
-            });
+            toast({ title: 'Share Failed', description: 'Could not share or copy the post link.', variant: 'destructive' });
           }
         } else {
-           toast({
-            title: 'Share Failed',
-            description: 'Sharing is not supported or was blocked, and clipboard access is not available.',
-            variant: 'destructive',
-          });
+           toast({ title: 'Share Failed', description: 'Sharing is not supported or was blocked.', variant: 'destructive'});
         }
       }
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(shareData.url);
-        toast({
-          title: 'Link Copied!',
-          description: 'Post link copied to clipboard. Share it with your friends!',
-        });
+        toast({ title: 'Link Copied!', description: 'Post link copied to clipboard.' });
       } catch (copyError) {
         console.error('Error copying link to clipboard:', copyError);
-        toast({
-          title: 'Share Unavailable',
-          description: 'Could not copy the post link. Please try manually.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Share Unavailable', description: 'Could not copy the post link.', variant: 'destructive'});
       }
     } else {
-      toast({
-        title: 'Share Unavailable',
-        description: 'Sharing is not supported on this browser.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Share Unavailable', description: 'Sharing is not supported on this browser.', variant: 'destructive'});
     }
   };
+
+  const handleStoryClick = useCallback(async (storyAuthor: StoryUserData) => {
+    if (!storyAuthor.userId) return;
+
+    setSelectedStoryAuthor(storyAuthor);
+    setIsStoryViewerOpen(true);
+    setLoadingCurrentUserStories(true);
+    setCurrentUserStories([]); // Clear previous stories
+
+    const twentyFourHoursAgo = subHours(new Date(), 24);
+    const twentyFourHoursAgoTimestamp = Timestamp.fromDate(twentyFourHoursAgo);
+    const postsCollectionRef = collection(db, 'posts');
+
+    const q = query(
+      postsCollectionRef,
+      where('userId', '==', storyAuthor.userId),
+      where('isStory', '==', true),
+      where('createdAt', '>=', twentyFourHoursAgoTimestamp),
+      orderBy('createdAt', 'desc') // Show newest stories first
+    );
+
+    try {
+      const querySnapshot = await getDocs(q);
+      const fetchedStories = querySnapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+        createdAt: (docSnap.data().createdAt as Timestamp).toDate(),
+      } as Post));
+      setCurrentUserStories(fetchedStories);
+    } catch (error: any) {
+      console.error(`Error fetching stories for user ${storyAuthor.userId}:`, error);
+      toast({ title: "Error Fetching Stories", description: error.message, variant: "destructive" });
+      setCurrentUserStories([]);
+    } finally {
+      setLoadingCurrentUserStories(false);
+    }
+  }, [toast]);
+
 
   const PostSkeleton = () => (
     <Card className="overflow-hidden shadow-lg">
@@ -287,27 +304,33 @@ export default function FeedPage() {
 
         <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
 
+        {/* Stories Reel */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="font-headline text-xl">Stories</CardTitle>
           </CardHeader>
           <CardContent className="flex space-x-4 overflow-x-auto p-4">
-            {loadingStories && (
+            {loadingStoriesReel && (
               [...Array(5)].map((_, i) => <StorySkeleton key={`story-skel-${i}`} />)
             )}
-            {!loadingStories && storiesData.length === 0 && (
+            {!loadingStoriesReel && storiesData.length === 0 && (
               <p className="text-sm text-muted-foreground">No stories to show right now. Be the first to share one!</p>
             )}
-            {!loadingStories && storiesData.map((storyUser) => {
-              // Determine if the storyUser is the current logged-in user
-              const isCurrentUserStory = storyUser.userId === user?.uid;
-              // Use AuthContext's photoURL for current user for consistency, otherwise use storyUser.photoURL
-              const storyAvatarUrl = isCurrentUserStory ? user?.photoURL || storyUser.photoURL : storyUser.photoURL;
-              const storyDisplayName = isCurrentUserStory ? user?.displayName || storyUser.displayName : storyUser.displayName;
+            {!loadingStoriesReel && storiesData.map((storyUser) => {
+              const isCurrentUserStoryAuthor = storyUser.userId === user?.uid;
+              const storyAvatarUrl = isCurrentUserStoryAuthor ? user?.photoURL || storyUser.photoURL : storyUser.photoURL;
+              const storyDisplayName = isCurrentUserStoryAuthor ? user?.displayName || storyUser.displayName : storyUser.displayName;
               const storyAvatarFallback = (storyDisplayName || 'U').charAt(0).toUpperCase();
               
               return (
-                <div key={storyUser.userId} className="flex flex-col items-center space-y-1 cursor-pointer">
+                <div 
+                  key={storyUser.userId} 
+                  className="flex flex-col items-center space-y-1 cursor-pointer"
+                  onClick={() => handleStoryClick(storyUser)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && handleStoryClick(storyUser)}
+                >
                   <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5">
                     {storyAvatarUrl ? (
                       <Image
@@ -330,13 +353,23 @@ export default function FeedPage() {
             })}
           </CardContent>
         </Card>
+        {/* End Stories Reel */}
 
+        {/* Story Viewer Dialog */}
+        {selectedStoryAuthor && (
+            <StoryViewerDialog
+            open={isStoryViewerOpen}
+            onOpenChange={setIsStoryViewerOpen}
+            stories={currentUserStories}
+            author={selectedStoryAuthor}
+            loadingStories={loadingCurrentUserStories}
+            />
+        )}
+
+        {/* Posts Feed */}
         <div className="space-y-8">
           {loadingPosts && (
-            <>
-              <PostSkeleton />
-              <PostSkeleton />
-            </>
+            <> <PostSkeleton /> <PostSkeleton /> </>
           )}
           {!loadingPosts && posts.length === 0 && (
             <Card className="py-12 text-center">
@@ -382,7 +415,7 @@ export default function FeedPage() {
                         fill 
                         style={{objectFit: 'cover'}} 
                         data-ai-hint={post.dataAiHint || "user content"}
-                        priority={index < 2} // Prioritize loading for first few images
+                        priority={index < 2}
                       />
                     </div>
                   )}
@@ -447,4 +480,3 @@ export default function FeedPage() {
   );
 }
     
-
