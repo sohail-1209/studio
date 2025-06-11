@@ -40,7 +40,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
-  const [acceptingRequest, setAcceptingRequest] = useState(false);
+  // No longer need acceptingRequest state if we use processingRequestId and optimistic UI update
 
 
   useEffect(() => {
@@ -82,22 +82,32 @@ export default function NotificationsPage() {
 
     const batch = writeBatch(db);
     notifications.forEach(notif => {
-      if (!notif.isRead) {
+      if (!notif.isRead && !notif.actionTaken) { // Only mark as read if no action was taken yet on requests
         const notifRef = doc(db, 'notifications', notif.id);
         batch.update(notifRef, { isRead: true });
       }
     });
     try {
       await batch.commit();
+      // Optimistic UI update for isRead can be added here if desired,
+      // but onSnapshot should eventually reflect the changes.
     } catch (error) {
       console.error("Error marking notifications as read:", error);
     }
   };
 
+  const updateLocalNotificationAction = (notificationId: string, action: 'accepted' | 'declined') => {
+    setNotifications(prevNotifications =>
+      prevNotifications.map(n =>
+        n.id === notificationId ? { ...n, actionTaken: action, isRead: true } : n
+      )
+    );
+  };
+
   const handleAcceptFollowRequest = async (notification: Notification) => {
-    if (!user || !notification.followRequestId) return;
+    if (!user || !notification.followRequestId || notification.actionTaken) return;
     setProcessingRequestId(notification.id);
-    setAcceptingRequest(true);
+    updateLocalNotificationAction(notification.id, 'accepted'); // Optimistic UI update
 
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', notification.followRequestId);
@@ -106,24 +116,18 @@ export default function NotificationsPage() {
     const originalNotificationRef = doc(db, 'notifications', notification.id);
 
     try {
-      // 1. Update FollowRequest status
       batch.update(followRequestRef, { status: 'accepted', updatedAt: serverTimestamp() });
-
-      // 2. Increment recipient's followersCount & requester's followingCount
       batch.update(recipientProfileRef, { followersCount: increment(1) });
       batch.update(requesterProfileRef, { followingCount: increment(1) });
-      
-      // 3. Update original 'follow_request' notification
       batch.update(originalNotificationRef, { isRead: true, actionTaken: 'accepted' });
 
-      // 4. Create a 'follow_accept' notification for the requester
       const acceptNotificationData: Omit<NotificationDocument, 'createdAt'> = {
-        recipientId: notification.actorId, // Requester becomes recipient of this new notification
-        actorId: user.uid,                 // Current user (acceptor) is the actor
+        recipientId: notification.actorId, 
+        actorId: user.uid,                 
         actorDisplayName: user.displayName,
         actorAvatarUrl: user.photoURL,
         type: 'follow_accept',
-        originalFollowRequestId: notification.followRequestId, // Link back if needed
+        originalFollowRequestId: notification.followRequestId, 
         isRead: false,
       };
       const newNotifRef = doc(collection(db, 'notifications'));
@@ -134,16 +138,17 @@ export default function NotificationsPage() {
     } catch (error: any) {
       console.error("Error accepting follow request:", error);
       toast({ title: "Error", description: error.message || "Could not accept follow request.", variant: "destructive" });
+      // Revert optimistic update if needed, or rely on onSnapshot to correct
+      setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, actionTaken: null, isRead: false } : n));
     } finally {
       setProcessingRequestId(null);
-      setAcceptingRequest(false);
     }
   };
 
   const handleDeclineFollowRequest = async (notification: Notification) => {
-    if (!user || !notification.followRequestId) return;
+    if (!user || !notification.followRequestId || notification.actionTaken) return;
     setProcessingRequestId(notification.id);
-    setAcceptingRequest(false);
+    updateLocalNotificationAction(notification.id, 'declined'); // Optimistic UI update
 
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', notification.followRequestId);
@@ -156,6 +161,8 @@ export default function NotificationsPage() {
     } catch (error: any) {
       console.error("Error declining follow request:", error);
       toast({ title: "Error", description: error.message || "Could not decline follow request.", variant: "destructive" });
+      // Revert optimistic update
+      setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, actionTaken: null, isRead: false } : n));
     } finally {
       setProcessingRequestId(null);
     }
@@ -163,13 +170,13 @@ export default function NotificationsPage() {
 
 
   const NotificationItemSkeleton = () => (
-    <div className="flex items-center space-x-3 p-4 border-b">
+    <li className="flex items-center space-x-3 p-4 border-b">
       <Skeleton className="h-10 w-10 rounded-full" />
       <div className="flex-1 space-y-1">
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-3 w-1/4" />
       </div>
-    </div>
+    </li>
   );
 
 
@@ -177,22 +184,22 @@ export default function NotificationsPage() {
     <MainLayout>
       <div className="container mx-auto max-w-2xl py-8">
         <Card className="shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row items-center justify-between border-b">
             <div className="flex items-center space-x-3">
               <Bell className="h-6 w-6 text-primary" />
               <CardTitle className="font-headline text-2xl">Notifications</CardTitle>
             </div>
-            {notifications.some(n => !n.isRead) && (
+            {notifications.some(n => !n.isRead && !n.actionTaken) && (
                  <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>Mark all as read</Button>
             )}
           </CardHeader>
           <CardContent className="p-0">
             {loading && (
-              <div>
+              <ul className="divide-y divide-border">
                 <NotificationItemSkeleton />
                 <NotificationItemSkeleton />
                 <NotificationItemSkeleton />
-              </div>
+              </ul>
             )}
             {!loading && notifications.length === 0 && (
               <div className="py-12 text-center">
@@ -219,7 +226,7 @@ export default function NotificationsPage() {
                         <p className="text-sm">
                           {notif.type === 'like' && (
                             <>
-                              <span className="font-semibold text-foreground">{notif.actorDisplayName || 'Someone'}</span>
+                              <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
                               {' liked '}
                               <Link href={`/post/${notif.postId}`} className="text-primary hover:underline cursor-pointer">
                                 {notif.postContentPreview || 'your post'}
@@ -228,7 +235,7 @@ export default function NotificationsPage() {
                           )}
                           {notif.type === 'comment' && (
                             <>
-                              <span className="font-semibold text-foreground">{notif.actorDisplayName || 'Someone'}</span>
+                              <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
                               {' commented on '}
                               <Link href={`/post/${notif.postId}`} className="text-primary hover:underline cursor-pointer">
                                 {notif.postContentPreview || 'your post'}
@@ -242,13 +249,13 @@ export default function NotificationsPage() {
                           )}
                           {notif.type === 'follow_request' && (
                             <>
-                              <span className="font-semibold text-foreground">{notif.actorDisplayName || 'Someone'}</span>
+                               <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
                               {' wants to follow you.'}
                             </>
                           )}
                           {notif.type === 'follow_accept' && (
                              <>
-                              <span className="font-semibold text-foreground">{notif.actorDisplayName || 'Someone'}</span>
+                              <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
                               {' accepted your follow request.'}
                             </>
                           )}
@@ -257,7 +264,6 @@ export default function NotificationsPage() {
                           {formatDistanceToNow(notif.createdAt, { addSuffix: true })}
                         </p>
 
-                        {/* Action buttons for follow_request */}
                         {notif.type === 'follow_request' && !notif.actionTaken && (
                           <div className="mt-2 flex space-x-2">
                             <Button
@@ -265,7 +271,7 @@ export default function NotificationsPage() {
                               onClick={() => handleAcceptFollowRequest(notif)}
                               disabled={processingRequestId === notif.id}
                             >
-                              {processingRequestId === notif.id && acceptingRequest ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <UserCheck className="mr-2 h-3 w-3"/>}
+                              {processingRequestId === notif.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <UserCheck className="mr-2 h-3 w-3"/>}
                               Accept
                             </Button>
                             <Button
@@ -274,7 +280,7 @@ export default function NotificationsPage() {
                               onClick={() => handleDeclineFollowRequest(notif)}
                               disabled={processingRequestId === notif.id}
                             >
-                              {processingRequestId === notif.id && !acceptingRequest ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
+                              {processingRequestId === notif.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
                               Decline
                             </Button>
                           </div>
@@ -300,3 +306,4 @@ export default function NotificationsPage() {
     </MainLayout>
   );
 }
+
