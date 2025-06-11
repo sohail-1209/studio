@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import type { CommentDocument } from '@/types/post';
+import type { NotificationDocument } from '@/types/notification'; // Import notification type
 import { Spinner } from '@/components/shared/Spinner';
 import { Send } from 'lucide-react';
 
@@ -23,10 +24,12 @@ type CommentFormInputs = z.infer<typeof commentSchema>;
 
 interface CommentInputProps {
   postId: string;
+  postOwnerId: string; // ID of the user who owns the post
+  postContentPreview?: string; // A short preview of the post content
   onCommentPosted?: () => void; // Optional callback after comment is posted
 }
 
-export function CommentInput({ postId, onCommentPosted }: CommentInputProps) {
+export function CommentInput({ postId, postOwnerId, postContentPreview, onCommentPosted }: CommentInputProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -45,8 +48,8 @@ export function CommentInput({ postId, onCommentPosted }: CommentInputProps) {
       toast({ title: "Authentication Error", description: "Please log in to comment.", variant: "destructive" });
       return;
     }
-    if (!postId) {
-      toast({ title: "Error", description: "Post ID is missing.", variant: "destructive" });
+    if (!postId || !postOwnerId) {
+      toast({ title: "Error", description: "Post information is missing.", variant: "destructive" });
       return;
     }
 
@@ -60,10 +63,6 @@ export function CommentInput({ postId, onCommentPosted }: CommentInputProps) {
         createdAt: serverTimestamp(),
       };
 
-      // console.log("Attempting to post comment with data:", commentData);
-      // console.log("User UID:", user.uid);
-      // console.log("Post ID:", postId);
-
       const postRef = doc(db, 'posts', postId);
       const commentsCollectionRef = collection(postRef, 'comments');
       
@@ -72,14 +71,30 @@ export function CommentInput({ postId, onCommentPosted }: CommentInputProps) {
         commentsCount: increment(1),
       });
       
+      // Create notification if commenter is not the post owner
+      if (user.uid !== postOwnerId) {
+        const notificationsColRef = collection(db, 'notifications');
+        const commentTextPreview = data.text.substring(0, 70) + (data.text.length > 70 ? '...' : '');
+        const notificationData: Omit<NotificationDocument, 'createdAt'> = {
+          recipientId: postOwnerId,
+          actorId: user.uid,
+          actorDisplayName: user.displayName || 'Someone',
+          actorAvatarUrl: user.photoURL || null,
+          type: 'comment',
+          postId: postId,
+          postContentPreview: postContentPreview || 'your post',
+          commentText: commentTextPreview,
+          isRead: false,
+        };
+        await addDoc(notificationsColRef, { ...notificationData, createdAt: serverTimestamp() });
+      }
+
       reset();
       toast({ title: "Comment Posted!", description: "Your comment has been added." });
-      onCommentPosted?.(); // Call callback if provided
+      onCommentPosted?.();
     } catch (error: any) {
-      console.error("Error posting comment:", error);
-      console.error("Firebase error code:", error.code); // More detailed logging
-      console.error("Firebase error details:", error.details); // More detailed logging
-      toast({ title: "Error Posting Comment", description: error.message || "Could not post comment. Check console for details.", variant: "destructive" });
+      console.error("Error posting comment or creating notification:", error);
+      toast({ title: "Error Posting Comment", description: error.message || "Could not post comment.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

@@ -11,8 +11,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useEffect, useCallback } from 'react';
 import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { Post, PostDocument } from '@/types/post';
+import type { NotificationDocument } from '@/types/notification'; // Import notification type
 import { formatDistanceToNow, subHours } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
@@ -151,9 +152,29 @@ export default function FeedPage() {
           likedBy: arrayUnion(user.uid),
           likesCount: increment(1),
         });
+
+        // Create notification if not liking own post
+        if (user.uid !== currentPost.userId) {
+          const notificationsColRef = collection(db, 'notifications');
+          let contentPreview = currentPost.caption 
+            ? (currentPost.caption.substring(0, 50) + (currentPost.caption.length > 50 ? '...' : '')) 
+            : (currentPost.imageUrl ? 'your image' : (currentPost.videoUrl ? 'your video' : 'your post'));
+
+          const notificationData: Omit<NotificationDocument, 'createdAt'> = {
+            recipientId: currentPost.userId,
+            actorId: user.uid,
+            actorDisplayName: user.displayName || 'Someone',
+            actorAvatarUrl: user.photoURL || null,
+            type: 'like',
+            postId: postId,
+            postContentPreview: contentPreview,
+            isRead: false,
+          };
+          await addDoc(notificationsColRef, { ...notificationData, createdAt: serverTimestamp() });
+        }
       }
     } catch (error: any) {
-      console.error('Error liking post:', error);
+      console.error('Error liking post or creating notification:', error);
       toast({
         title: 'Error Liking Post',
         description: error.message || 'Could not update like. Please try again.',
@@ -378,14 +399,17 @@ export default function FeedPage() {
             </Card>
           )}
           {!loadingPosts && posts.map((post, index) => {
-            // For current user's posts, use their latest avatar from AuthContext
-            // For other users, use the avatar stored with the post
             const isCurrentUserPost = post.userId === user?.uid;
             const avatarUrl = isCurrentUserPost ? (user?.photoURL || post.userAvatarUrl) : post.userAvatarUrl;
             const avatarAlt = isCurrentUserPost ? (user?.displayName || 'Your avatar') : (post.userDisplayName || 'User avatar');
             const avatarFallbackInitial = (isCurrentUserPost ? (user?.displayName || 'U') : (post.userDisplayName || 'U')).charAt(0).toUpperCase();
             const postAuthorDisplayName = isCurrentUserPost ? (user?.displayName || 'You') : (post.userDisplayName || 'Anonymous User');
             const isLikedByCurrentUser = post.likedBy && user ? post.likedBy.includes(user.uid) : false;
+
+            let postContentPreviewForComment = post.caption 
+                ? (post.caption.substring(0, 30) + (post.caption.length > 30 ? '...' : '')) 
+                : (post.imageUrl ? 'your image' : (post.videoUrl ? 'your video' : 'your post'));
+
 
             return (
               <Card key={post.id} className="overflow-hidden shadow-lg">
@@ -465,7 +489,11 @@ export default function FeedPage() {
                   </div>
                   {showComments[post.id] && (
                     <div className="p-4 border-t">
-                       <CommentInput postId={post.id} />
+                       <CommentInput
+                          postId={post.id}
+                          postOwnerId={post.userId}
+                          postContentPreview={postContentPreviewForComment}
+                        />
                        <Separator className="my-4" />
                        <CommentList postId={post.id} />
                     </div>
