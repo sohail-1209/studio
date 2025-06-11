@@ -1,3 +1,4 @@
+
 // src/app/profile/[userId]/page.tsx
 'use client';
 
@@ -48,7 +49,7 @@ type FollowStatus = 'not_following' | 'pending_them' | 'pending_me' | 'following
 
 
 export default function UserProfilePage({ params: paramsPromise }: { params: { userId: string } }) {
-  const params = use(paramsPromise); 
+  const params = use(paramsPromise);
   const { userId } = params;
   const { user: currentUser, reloadUser } = useAuth();
   const router = useRouter();
@@ -78,14 +79,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       setIsProcessingFollow(false);
       return;
     }
-    
+
     setIsProcessingFollow(true);
-    setFollowStatus('not_following'); 
+    setFollowStatus('not_following');
     setExistingRequestId(null);
 
     try {
       const followRequestsRef = collection(db, 'followRequests');
-      
+
       // Check if current user has sent a request to the profile user
       const qSent = query(
         followRequestsRef,
@@ -99,12 +100,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         const request = sentSnapshot.docs[0].data() as FollowRequestDocument;
         const requestId = sentSnapshot.docs[0].id;
         if (request.status === 'pending') {
-          setFollowStatus('pending_them'); 
-          setExistingRequestId(requestId); 
+          setFollowStatus('pending_them');
+          setExistingRequestId(requestId);
         } else if (request.status === 'accepted') {
-          setFollowStatus('following'); 
+          setFollowStatus('following');
           setExistingRequestId(requestId); // Crucial for unfollow
-        } else { 
+        } else {
           setFollowStatus('not_following');
         }
         setIsProcessingFollow(false);
@@ -114,8 +115,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       // Check if profile user has sent a request to the current user
       const qReceived = query(
         followRequestsRef,
-        where('requesterId', '==', userId), 
-        where('recipientId', '==', currentUser.uid), 
+        where('requesterId', '==', userId),
+        where('recipientId', '==', currentUser.uid),
         limit(1)
       );
       const receivedSnapshot = await getDocs(qReceived);
@@ -123,7 +124,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       if (!receivedSnapshot.empty) {
         const request = receivedSnapshot.docs[0].data() as FollowRequestDocument;
         if (request.status === 'pending') {
-          setFollowStatus('pending_me'); 
+          setFollowStatus('pending_me');
           // Do NOT set existingRequestId here, as this ID is for the request received by current user,
           // not the one sent by them.
         } else if (request.status === 'accepted') {
@@ -132,12 +133,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           setFollowStatus('not_following');
         }
       } else {
-        setFollowStatus('not_following'); 
+        setFollowStatus('not_following');
       }
     } catch (error: any) {
         console.error("Error checking follow status:", error);
         toast({ title: "Network Error", description: `Could not check follow status: ${error.message || 'Please try again.'}`, variant: "destructive"});
-        setFollowStatus('not_following'); 
+        setFollowStatus('not_following');
     } finally {
         setIsProcessingFollow(false);
     }
@@ -148,13 +149,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     if (userId) {
       setLoadingProfile(true);
       const profileRef = doc(db, 'profiles', userId);
-      const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => { 
+      const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
         if (docSnap.exists()) {
           setProfile(docSnap.data() as UserProfile);
         } else {
           console.warn("No such profile for userId:", userId);
           toast({ title: "Profile not found", variant: "destructive" });
-          setProfile(null); 
+          setProfile(null);
         }
         setLoadingProfile(false);
       }, (error) => {
@@ -169,7 +170,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         where('userId', '==', userId),
         orderBy('createdAt', 'desc')
       );
-    
+
       const unsubscribePosts = onSnapshot(postsQuery, (querySnapshot) => {
         const userContent = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
@@ -177,16 +178,16 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           createdAt: (docSnap.data().createdAt as Timestamp)?.toDate ? (docSnap.data().createdAt as Timestamp).toDate() : new Date(),
           imagePath: docSnap.data().imagePath || null,
         } as Post));
-        
+
         const regularPosts = userContent.filter(post => post.isStory !== true);
         setPosts(regularPosts);
         setLoadingPosts(false);
       }, (error) => {
         console.error("Error fetching posts:", error);
         if (error.code === 'failed-precondition') {
-             toast({ 
-                title: "Error Fetching User Posts", 
-                description: "A database index might be required. Please check Firebase console.", 
+             toast({
+                title: "Error Fetching User Posts",
+                description: "A database index might be required. Please check Firebase console.",
                 variant: "destructive",
                 duration: 10000
             });
@@ -195,12 +196,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         }
         setLoadingPosts(false);
       });
-      
+
       if (currentUser && userId && !isOwnProfile) {
         checkFollowStatus();
       }
-      
-      return () => { 
+
+      return () => {
         unsubscribeProfile();
         unsubscribePosts();
       };
@@ -235,15 +236,15 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           actorDisplayName: currentUser.displayName,
           actorAvatarUrl: currentUser.photoURL,
           type: 'follow_request',
-          followRequestId: newRequestRef.id, 
+          followRequestId: newRequestRef.id,
           isRead: false,
       };
       batch.set(notificationRef, {...notificationData, createdAt: serverTimestamp()});
-      
+
       await batch.commit();
 
       setFollowStatus('pending_them');
-      setExistingRequestId(newRequestRef.id); 
+      setExistingRequestId(newRequestRef.id);
       toast({ title: "Follow Request Sent", description: `Your request to follow ${profile.displayName || 'this user'} has been sent.` });
     } catch (error: any) {
       console.error("Error sending follow request:", error);
@@ -261,7 +262,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setIsProcessingFollow(true);
     try {
         const requestRef = doc(db, 'followRequests', existingRequestId);
-        await deleteDoc(requestRef); 
+        await deleteDoc(requestRef);
 
         setFollowStatus('not_following');
         setExistingRequestId(null);
@@ -287,7 +288,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     // We will NOT attempt to update the target user's followersCount from the client due to permissions.
 
     try {
-      batch.delete(followRequestRef); 
+      batch.delete(followRequestRef);
       batch.update(currentUserProfileRef, { followingCount: increment(-1) });
       // NOTE: The target user's (profile.uid) followersCount is NOT decremented here by the current user.
       // This should ideally be handled by a Cloud Function for atomicity and permissions.
@@ -313,7 +314,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   const handleMessageUser = async () => {
     if (!currentUser || !profile || currentUser.uid === profile.uid || isMessaging) return;
-    
+
     const canActuallyMessage = followStatus === 'following' || followStatus === 'follow_back';
     if (!canActuallyMessage) {
         toast({ title: "Cannot Message", description: `You need to be connected to message ${profile.displayName || 'this user'}.`, variant: "default" });
@@ -373,7 +374,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setIsDeletingPost(true);
     try {
       const postRef = doc(db, 'posts', postToDelete.id);
-      
+
       const commentsRef = collection(postRef, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
       const batch = writeBatch(db);
@@ -383,7 +384,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       await batch.commit();
 
       if (postToDelete.imagePath) {
-        const { ref: storageRefFc, deleteObject: deleteObjectFc } = await import('firebase/storage'); 
+        const { ref: storageRefFc, deleteObject: deleteObjectFc } = await import('firebase/storage');
         const imageFileRef = storageRefFc(storage, postToDelete.imagePath);
         await deleteObjectFc(imageFileRef).catch(storageError => {
           console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
@@ -401,9 +402,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       setPostToDelete(null);
     }
   };
-  
+
   const ProfileSkeleton = () => (
-    <Card className="overflow-hidden shadow-lg">
+    <Card className="overflow-hidden shadow-lg max-w-4xl mx-auto"> {/* Added max-w constraint */}
       <CardHeader className="bg-muted/30 p-0">
         <Skeleton className="h-48 w-full" />
         <div className="absolute -bottom-16 left-8">
@@ -449,7 +450,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   if (loadingProfile || !userId) {
     return (
       <MainLayout>
-        <div className="container mx-auto max-w-4xl py-8">
+        <div> {/* Removed container, mx-auto, max-w-4xl, py-8 */}
           <ProfileSkeleton />
         </div>
       </MainLayout>
@@ -459,8 +460,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   if (!profile) {
      return (
       <MainLayout>
-        <div className="container mx-auto max-w-4xl py-8 text-center">
-          <Card>
+        <div className="text-center"> {/* Removed container, mx-auto, max-w-4xl, py-8 */}
+          <Card className="max-w-4xl mx-auto"> {/* Added max-w constraint to card */}
             <CardContent className="p-12">
               <h2 className="text-2xl font-semibold">Profile Not Found</h2>
               <p className="text-muted-foreground">The user profile you are looking for does not exist or could not be loaded.</p>
@@ -472,12 +473,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   }
 
   const handleProfileUpdate = (updatedProfile: UserProfile) => {
-    setProfile(updatedProfile); 
+    setProfile(updatedProfile);
     if (currentUser && updatedProfile.uid === currentUser.uid) {
-        reloadUser(); 
+        reloadUser();
     }
   };
-  
+
  const FollowButtonComponent = () => {
     if (isProcessingFollow) {
         return <Button disabled className="w-full"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
@@ -496,17 +497,17 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             return <Button onClick={handleFollowRequest} className="w-full"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
     }
  };
-  
+
   const canMessage = followStatus === 'following' || followStatus === 'follow_back';
 
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-4xl py-8">
-        <Card className="overflow-hidden shadow-lg">
+      <div> {/* Removed container, mx-auto, max-w-4xl, py-8 */}
+        <Card className="overflow-hidden shadow-lg max-w-4xl mx-auto"> {/* Added max-w constraint to the Card */}
           <CardHeader className="bg-muted/30 p-0">
             <div className="relative h-48 w-full md:h-64">
               <Image
-                src={profile.coverPhotoURL || "https://placehold.co/1200x400.png/E1D9F3/332E40"} 
+                src={profile.coverPhotoURL || "https://placehold.co/1200x400.png/E1D9F3/332E40"}
                 alt={`${profile.displayName || 'User'}'s cover photo`}
                 fill
                 style={{objectFit: 'cover'}}

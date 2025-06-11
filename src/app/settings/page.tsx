@@ -1,3 +1,4 @@
+
 // src/app/settings/page.tsx
 'use client';
 
@@ -44,7 +45,7 @@ export default function SettingsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<Theme>('light');
   const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
-  
+
   const [isReauthDialogOpen, setIsReauthDialogOpen] = useState(false);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -99,8 +100,8 @@ export default function SettingsPage() {
   }, [fetchProfile]);
 
   const handleProfileUpdate = async (updatedProfile: UserProfile) => {
-    setUserProfileData(updatedProfile); 
-    await reloadUser(); 
+    setUserProfileData(updatedProfile);
+    await reloadUser();
     toast({ title: "Profile Updated", description: "Your settings page reflects the latest changes." });
   };
 
@@ -122,12 +123,12 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccountRequest = () => {
-    setIsReauthDialogOpen(true); 
+    setIsReauthDialogOpen(true);
   };
 
   const handleReauthSuccess = () => {
-    setIsReauthDialogOpen(false); 
-    setIsConfirmDeleteDialogOpen(true); 
+    setIsReauthDialogOpen(false);
+    setIsConfirmDeleteDialogOpen(true);
   };
 
   const handleConfirmDeleteAccount = async () => {
@@ -154,7 +155,7 @@ export default function SettingsPage() {
         }
         batch.delete(postDoc.ref);
       }
-      
+
       const notificationsQuery = query(collection(db, 'notifications'), where('recipientId', '==', userId));
       const notificationsSnapshot = await getDocs(notificationsQuery);
       notificationsSnapshot.forEach(doc => batch.delete(doc.ref));
@@ -162,7 +163,7 @@ export default function SettingsPage() {
       const followRequestsSentQuery = query(collection(db, 'followRequests'), where('requesterId', '==', userId));
       const followRequestsSentSnapshot = await getDocs(followRequestsSentQuery);
       followRequestsSentSnapshot.forEach(doc => batch.delete(doc.ref));
-      
+
       const followRequestsReceivedQuery = query(collection(db, 'followRequests'), where('recipientId', '==', userId));
       const followRequestsReceivedSnapshot = await getDocs(followRequestsReceivedQuery);
       followRequestsReceivedSnapshot.forEach(doc => batch.delete(doc.ref));
@@ -170,7 +171,7 @@ export default function SettingsPage() {
       const profileRef = doc(db, 'profiles', userId);
       batch.delete(profileRef);
 
-      await batch.commit(); 
+      await batch.commit();
 
       await deleteAuthUser(firebaseUser);
 
@@ -180,7 +181,7 @@ export default function SettingsPage() {
       toast({ title: "Account Deletion Failed", description: error.message || "Could not delete your account. Please try again.", variant: "destructive" });
       if (error.code === 'auth/requires-recent-login') {
         toast({ title: "Re-authentication Required", description: "Please re-authenticate to complete account deletion.", variant: "destructive", duration: 6000});
-        setIsReauthDialogOpen(true); 
+        setIsReauthDialogOpen(true);
       }
     } finally {
       setIsDeletingAccount(false);
@@ -200,8 +201,8 @@ export default function SettingsPage() {
 
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-3xl py-8">
-        <Card className="shadow-lg">
+      <div> {/* Removed container, mx-auto, max-w-3xl, py-8 */}
+        <Card className="shadow-lg max-w-3xl mx-auto"> {/* Added max-w-3xl mx-auto to the Card */}
           <CardHeader>
             <div className="flex items-center space-x-3">
               <SettingsIcon className="h-7 w-7 text-primary" />
@@ -311,7 +312,7 @@ export default function SettingsPage() {
           onProfileUpdate={handleProfileUpdate}
         />
       )}
-      
+
       <ReauthenticateDialog
         open={isReauthDialogOpen}
         onOpenChange={setIsReauthDialogOpen}

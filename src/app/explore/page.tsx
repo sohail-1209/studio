@@ -108,7 +108,7 @@ export default function ExplorePage() {
     }
 
     setIsSearchingUserExact(true);
-    setShowSuggestions(false); 
+    setShowSuggestions(false);
     try {
       const profilesRef = collection(db, 'profiles');
       const q = query(profilesRef, where('username', '==', trimmedUsername), limit(1));
@@ -126,7 +126,7 @@ export default function ExplorePage() {
         const userId = userDoc.id;
         console.log("ExplorePage: User found for exact username, navigating to profile:", userId);
         router.push(`/profile/${userId}`);
-        setSearchTerm(''); 
+        setSearchTerm('');
         setSuggestedUsers([]);
       }
     } catch (error: any) {
@@ -169,11 +169,11 @@ export default function ExplorePage() {
         profilesRef,
         where('username', '>=', lowerCasePrefix),
         where('username', '<=', lowerCasePrefix + '\uf8ff'),
-        limit(5) 
+        limit(5)
       );
       const querySnapshot = await getDocs(q);
       const fetchedUsers = querySnapshot.docs.map(doc => doc.data() as UserProfile);
-      
+
       console.log("ExplorePage: Fetched suggestions:", fetchedUsers.length, fetchedUsers);
       setSuggestedUsers(fetchedUsers);
 
@@ -191,7 +191,7 @@ export default function ExplorePage() {
     } finally {
       setLoadingSuggestions(false);
     }
-  }, [toast]); 
+  }, [toast]);
 
   const debouncedFetchUserSuggestions = useMemo(() => {
     console.log("ExplorePage: Creating new debouncedFetchUserSuggestions function.");
@@ -201,7 +201,7 @@ export default function ExplorePage() {
   useEffect(() => {
     const trimmedSearchTerm = searchTerm.trim();
     console.log("ExplorePage: searchTerm useEffect, current term:", trimmedSearchTerm);
-    
+
     if (trimmedSearchTerm.length >= 2) {
       debouncedFetchUserSuggestions(trimmedSearchTerm);
     } else {
@@ -215,9 +215,9 @@ export default function ExplorePage() {
   const handleSuggestionClick = (userId: string) => {
     console.log("ExplorePage: Suggestion clicked, navigating to profile:", userId);
     router.push(`/profile/${userId}`);
-    setSearchTerm(''); 
-    setSuggestedUsers([]); 
-    setShowSuggestions(false); 
+    setSearchTerm('');
+    setSuggestedUsers([]);
+    setShowSuggestions(false);
   };
 
   const PostGridSkeleton = () => (
@@ -227,13 +227,13 @@ export default function ExplorePage() {
       ))}
     </div>
   );
-  
+
   console.log("ExplorePage Render: showSuggestions:", showSuggestions, "suggestedUsers:", suggestedUsers.length, "searchTerm:", searchTerm.length, "inputFocusedRef.current:", inputFocusedRef.current, "loadingSuggestions:", loadingSuggestions);
 
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-5xl py-8">
-        <Card className="shadow-lg">
+      <div> {/* Removed container, mx-auto, max-w-5xl, py-8 */}
+        <Card className="shadow-lg max-w-5xl mx-auto"> {/* Added max-w-5xl mx-auto to the Card */}
           <CardHeader>
             <div className="flex items-center space-x-3">
               <Compass className="h-6 w-6 text-primary" />
@@ -260,10 +260,10 @@ export default function ExplorePage() {
                   }}
                   onBlur={() => {
                     setTimeout(() => {
-                        inputFocusedRef.current = false; 
+                        inputFocusedRef.current = false;
                         setShowSuggestions(false);
                         console.log("ExplorePage: Input blurred, hiding suggestions after delay.");
-                    }, 200); 
+                    }, 200);
                   }}
                   className="flex-grow"
                   disabled={isSearchingUserExact}
@@ -286,7 +286,7 @@ export default function ExplorePage() {
                     <div
                       key={user.uid}
                       className="flex items-center space-x-2 p-3 hover:bg-muted cursor-pointer"
-                      onMouseDown={() => handleSuggestionClick(user.uid)} 
+                      onMouseDown={() => handleSuggestionClick(user.uid)}
                     >
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />

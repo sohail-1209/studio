@@ -23,7 +23,7 @@ import { Spinner } from '@/components/shared/Spinner';
 import { CommentInput } from '@/components/posts/CommentInput';
 import { CommentList } from '@/components/posts/CommentList';
 import { Separator } from '@/components/ui/separator';
-import { StoryViewerDialog } from '@/components/stories/StoryViewerDialog'; 
+import { StoryViewerDialog } from '@/components/stories/StoryViewerDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,7 +74,7 @@ export default function FeedPage() {
 
   useEffect(() => {
     const postsCollectionRef = collection(db, 'posts');
-    const qPosts = query(postsCollectionRef, where('isStory', '!=', true), orderBy('createdAt', 'desc')); 
+    const qPosts = query(postsCollectionRef, where('isStory', '!=', true), orderBy('createdAt', 'desc'));
 
     setLoadingPosts(true);
     const unsubscribePosts = onSnapshot(
@@ -93,7 +93,7 @@ export default function FeedPage() {
             imagePath: data.imagePath || null,
           } as Post;
         });
-        setPosts(fetchedPosts); 
+        setPosts(fetchedPosts);
         setLoadingPosts(false);
       },
       (error) => {
@@ -112,11 +112,11 @@ export default function FeedPage() {
     const twentyFourHoursAgoTimestamp = Timestamp.fromDate(twentyFourHoursAgo);
 
     const qStoriesReel = query(
-      postsCollectionRef, 
+      postsCollectionRef,
       where('isStory', '==', true),
       where('createdAt', '>=', twentyFourHoursAgoTimestamp),
-      orderBy('createdAt', 'desc'), 
-      firestoreLimit(20) 
+      orderBy('createdAt', 'desc'),
+      firestoreLimit(20)
     );
 
     const unsubscribeStoriesReel = onSnapshot(qStoriesReel, (snapshot) => {
@@ -132,7 +132,7 @@ export default function FeedPage() {
           });
         }
       });
-      setStoriesData(Array.from(uniqueUsersMap.values()).slice(0, 7)); 
+      setStoriesData(Array.from(uniqueUsersMap.values()).slice(0, 7));
       setLoadingStoriesReel(false);
     }, (error) => {
       console.error('Error fetching stories data for reel:', error);
@@ -155,7 +155,7 @@ export default function FeedPage() {
       toast({ title: 'Authentication Error', description: 'Please log in to like posts.', variant: 'destructive' });
       return;
     }
-    if (isLiking[postId]) return; 
+    if (isLiking[postId]) return;
 
     setIsLiking(prev => ({ ...prev, [postId]: true }));
 
@@ -176,8 +176,8 @@ export default function FeedPage() {
 
         if (user.uid !== currentPost.userId && !currentPost.isStory) { // Only notify for non-story posts
           const notificationsColRef = collection(db, 'notifications');
-          let contentPreview = currentPost.caption 
-            ? (currentPost.caption.substring(0, 50) + (currentPost.caption.length > 50 ? '...' : '')) 
+          let contentPreview = currentPost.caption
+            ? (currentPost.caption.substring(0, 50) + (currentPost.caption.length > 50 ? '...' : ''))
             : (currentPost.imageUrl ? 'your image' : (currentPost.videoUrl ? 'your video' : 'your post'));
 
           const notificationData: Omit<NotificationDocument, 'createdAt'> = {
@@ -217,7 +217,7 @@ export default function FeedPage() {
     const shareData = {
       title: `Check out this post on Synora by ${post.userDisplayName || 'a user'}!`,
       text: post.caption || 'An interesting post from Synora.',
-      url: window.location.origin + `/post/${post.id}`, 
+      url: window.location.origin + `/post/${post.id}`,
     };
 
     if (navigator.share) {
@@ -259,7 +259,7 @@ export default function FeedPage() {
     setSelectedStoryAuthor(storyAuthor);
     setIsStoryViewerOpen(true);
     setLoadingCurrentUserStories(true);
-    setCurrentUserStories([]); 
+    setCurrentUserStories([]);
 
     const twentyFourHoursAgo = subHours(new Date(), 24);
     const twentyFourHoursAgoTimestamp = Timestamp.fromDate(twentyFourHoursAgo);
@@ -270,7 +270,7 @@ export default function FeedPage() {
       where('userId', '==', storyAuthor.userId),
       where('isStory', '==', true),
       where('createdAt', '>=', twentyFourHoursAgoTimestamp),
-      orderBy('createdAt', 'desc') 
+      orderBy('createdAt', 'desc')
     );
 
     try {
@@ -306,7 +306,7 @@ export default function FeedPage() {
     setIsDeletingPost(true);
     try {
       const postRef = doc(db, 'posts', postToDelete.id);
-      
+
       // 1. Delete comments subcollection
       const commentsRef = collection(postRef, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
@@ -345,7 +345,7 @@ export default function FeedPage() {
 
 
   const PostSkeleton = () => (
-    <Card className="overflow-hidden shadow-lg">
+    <Card className="overflow-hidden shadow-lg max-w-2xl mx-auto">
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
           <Skeleton className="h-10 w-10 rounded-full" />
@@ -387,7 +387,7 @@ export default function FeedPage() {
 
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-2xl py-8">
+      <div> {/* Removed container, mx-auto, max-w-2xl, py-8 */}
         <div className="mb-6 flex items-center justify-between">
           <h1 className="font-headline text-3xl font-bold text-foreground">Feed</h1>
           <Button onClick={() => setIsCreatePostDialogOpen(true)}>
@@ -397,8 +397,8 @@ export default function FeedPage() {
         </div>
 
         <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
-        
-        <Card className="mb-8">
+
+        <Card className="mb-8 max-w-2xl mx-auto"> {/* Added max-w-2xl mx-auto here for stories card */}
           <CardHeader>
             <CardTitle className="font-headline text-xl">Stories</CardTitle>
           </CardHeader>
@@ -414,10 +414,10 @@ export default function FeedPage() {
               const storyAvatarUrl = isCurrentUserStoryAuthor ? user?.photoURL || storyUser.photoURL : storyUser.photoURL;
               const storyDisplayName = isCurrentUserStoryAuthor ? user?.displayName || storyUser.displayName : storyUser.displayName;
               const storyAvatarFallback = (storyDisplayName || 'U').charAt(0).toUpperCase();
-              
+
               return (
-                <div 
-                  key={storyUser.userId} 
+                <div
+                  key={storyUser.userId}
                   className="flex flex-col items-center space-y-1 cursor-pointer"
                   onClick={() => handleStoryClick(storyUser)}
                   role="button"
@@ -446,7 +446,7 @@ export default function FeedPage() {
             })}
           </CardContent>
         </Card>
-        
+
         {selectedStoryAuthor && (
             <StoryViewerDialog
             open={isStoryViewerOpen}
@@ -463,7 +463,7 @@ export default function FeedPage() {
             <> <PostSkeleton /> <PostSkeleton /> </>
           )}
           {!loadingPosts && posts.length === 0 && (
-            <Card className="py-12 text-center">
+            <Card className="py-12 text-center max-w-2xl mx-auto"> {/* Added max-w-2xl mx-auto */}
               <CardContent>
                 <p className="text-lg font-semibold text-foreground">No posts yet!</p>
                 <p className="text-muted-foreground">Be the first one to share something.</p>
@@ -478,12 +478,12 @@ export default function FeedPage() {
             const postAuthorDisplayName = isCurrentUserPost ? (user?.displayName || 'You') : (post.userDisplayName || 'Anonymous User');
             const isLikedByCurrentUser = post.likedBy && user ? post.likedBy.includes(user.uid) : false;
 
-            let postContentPreviewForComment = post.caption 
-                ? (post.caption.substring(0, 30) + (post.caption.length > 30 ? '...' : '')) 
+            let postContentPreviewForComment = post.caption
+                ? (post.caption.substring(0, 30) + (post.caption.length > 30 ? '...' : ''))
                 : (post.imageUrl ? 'your image' : (post.videoUrl ? 'your video' : 'your post'));
 
             return (
-              <Card key={post.id} className="overflow-hidden shadow-lg">
+              <Card key={post.id} className="overflow-hidden shadow-lg max-w-2xl mx-auto"> {/* Added max-w-2xl mx-auto */}
                 <CardHeader className="p-4">
                   <div className="flex items-center space-x-3">
                     <Avatar>
@@ -520,11 +520,11 @@ export default function FeedPage() {
                 <CardContent className="p-0">
                   {post.imageUrl && (
                     <div className="relative aspect-video w-full overflow-hidden">
-                      <Image 
-                        src={post.imageUrl} 
-                        alt={post.caption || "Post image"} 
-                        fill 
-                        style={{objectFit: 'contain'}} 
+                      <Image
+                        src={post.imageUrl}
+                        alt={post.caption || "Post image"}
+                        fill
+                        style={{objectFit: 'contain'}}
                         data-ai-hint={post.dataAiHint || "user content"}
                         priority={index < 2}
                       />
@@ -532,17 +532,17 @@ export default function FeedPage() {
                   )}
                   {post.videoUrl && (
                     <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
-                       <Image 
-                         src={post.videoUrl} 
-                         alt={post.caption || "Post video placeholder"} 
-                         fill 
-                         style={{objectFit: 'contain'}} 
+                       <Image
+                         src={post.videoUrl}
+                         alt={post.caption || "Post video placeholder"}
+                         fill
+                         style={{objectFit: 'contain'}}
                          data-ai-hint={post.dataAiHint || "user content video"}
                        />
                     </div>
                   )}
                   {post.caption && <p className="p-4 text-foreground whitespace-pre-wrap">{post.caption}</p>}
-                  
+
                   <div className="border-t p-2">
                     <div className="flex items-center justify-around text-muted-foreground">
                       <Button

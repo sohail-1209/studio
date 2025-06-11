@@ -81,7 +81,7 @@ export default function NotificationsPage() {
 
     const batch = writeBatch(db);
     notifications.forEach(notif => {
-      if (!notif.isRead && !notif.actionTaken) { 
+      if (!notif.isRead && !notif.actionTaken) {
         const notifRef = doc(db, 'notifications', notif.id);
         batch.update(notifRef, { isRead: true });
       }
@@ -104,7 +104,7 @@ export default function NotificationsPage() {
   const handleAcceptFollowRequest = async (notification: Notification) => {
     if (!user || !notification.followRequestId || notification.actionTaken) return;
     setProcessingRequestId(notification.id);
-    updateLocalNotificationAction(notification.id, 'accepted'); 
+    updateLocalNotificationAction(notification.id, 'accepted');
 
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', notification.followRequestId);
@@ -115,10 +115,10 @@ export default function NotificationsPage() {
     try {
       // 1. Update the follow request status
       batch.update(followRequestRef, { status: 'accepted', updatedAt: serverTimestamp() });
-      
+
       // 2. Increment current user's (recipient's) followersCount
       batch.update(recipientProfileRef, { followersCount: increment(1) });
-      
+
       // 3. Increment requester's followingCount - THIS WILL LIKELY FAIL with strict profile rules
       // For now, we remove this client-side attempt by the recipient.
       // This count should ideally be updated by a Cloud Function or by the requester's client.
@@ -130,16 +130,16 @@ export default function NotificationsPage() {
       // 5. Create a new 'follow_accept' notification for the original requester
       const acceptNotificationData: Omit<NotificationDocument, 'createdAt'> = {
         recipientId: notification.actorId, // The one who sent the request
-        actorId: user.uid, // The one who accepted the request             
+        actorId: user.uid, // The one who accepted the request
         actorDisplayName: user.displayName,
         actorAvatarUrl: user.photoURL,
         type: 'follow_accept',
-        originalFollowRequestId: notification.followRequestId, 
+        originalFollowRequestId: notification.followRequestId,
         isRead: false,
       };
       const newNotifRef = doc(collection(db, 'notifications'));
       batch.set(newNotifRef, {...acceptNotificationData, createdAt: serverTimestamp()});
-      
+
       await batch.commit();
       toast({ title: "Follow Request Accepted", description: `You are now followed by ${notification.actorDisplayName || 'them'}.` });
     } catch (error: any) {
@@ -155,7 +155,7 @@ export default function NotificationsPage() {
   const handleDeclineFollowRequest = async (notification: Notification) => {
     if (!user || !notification.followRequestId || notification.actionTaken) return;
     setProcessingRequestId(notification.id);
-    updateLocalNotificationAction(notification.id, 'declined'); 
+    updateLocalNotificationAction(notification.id, 'declined');
 
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', notification.followRequestId);
@@ -188,8 +188,8 @@ export default function NotificationsPage() {
 
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-2xl py-8">
-        <Card className="shadow-lg">
+      <div> {/* Removed container, mx-auto, max-w-2xl, py-8 */}
+        <Card className="shadow-lg max-w-2xl mx-auto"> {/* Added max-w-2xl mx-auto to the Card */}
           <CardHeader className="flex flex-row items-center justify-between border-b">
             <div className="flex items-center space-x-3">
               <Bell className="h-6 w-6 text-primary" />
