@@ -63,10 +63,11 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       });
 
       setLoadingPosts(true);
+      // Query to fetch regular posts (not stories) for the user's profile
       const postsQuery = query(
         collection(db, 'posts'),
         where('userId', '==', userId),
-        where('isStory', '!=', true), // Filter out stories
+        where('isStory', '!=', true), // Filter out documents where isStory is true
         orderBy('createdAt', 'desc')
       );
       getDocs(postsQuery).then(querySnapshot => {
@@ -78,7 +79,17 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setPosts(userPosts);
       }).catch(error => {
         console.error("Error fetching posts:", error);
-        toast({ title: "Error fetching posts", description: error.message, variant: "destructive" });
+        // Check if the error is due to a missing index
+        if (error.code === 'failed-precondition') {
+             toast({ 
+                title: "Error Fetching Posts", 
+                description: "A database index is required for this query. Please check Firebase console logs for a link to create it.", 
+                variant: "destructive",
+                duration: 10000
+            });
+        } else {
+            toast({ title: "Error fetching posts", description: error.message, variant: "destructive" });
+        }
       }).finally(() => {
         setLoadingPosts(false);
       });
