@@ -291,11 +291,37 @@ const Sidebar = React.forwardRef<
 Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef<
-  React.ElementRef<typeof Button>,
+  HTMLButtonElement,
   React.ComponentProps<typeof Button>
->(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
+>(({ className, onClick, children, asChild, ...props }, ref) => {
+  const { toggleSidebar } = useSidebar();
 
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (onClick) {
+      onClick(event);
+    }
+    toggleSidebar();
+  };
+
+  if (asChild) {
+    if (!React.isValidElement(children)) {
+      // This should ideally be caught by TypeScript or linting if asChild is misused
+      console.error("SidebarTrigger with asChild expects a single React element child.");
+      return null; 
+    }
+    return (
+      <Slot
+        ref={ref}
+        onClick={handleClick}
+        className={className} // Pass className from SidebarTrigger's usage
+        {...props} // Pass other props from SidebarTrigger's usage
+      >
+        {children}
+      </Slot>
+    );
+  }
+
+  // If not asChild, render the default Button.
   return (
     <Button
       ref={ref}
@@ -303,18 +329,16 @@ const SidebarTrigger = React.forwardRef<
       variant="ghost"
       size="icon"
       className={cn("h-7 w-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
+      onClick={handleClick}
+      {...props} // Other props like aria-label
     >
       <PanelLeft />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
-  )
-})
-SidebarTrigger.displayName = "SidebarTrigger"
+  );
+});
+SidebarTrigger.displayName = "SidebarTrigger";
+
 
 const SidebarRail = React.forwardRef<
   HTMLButtonElement,
@@ -346,12 +370,12 @@ const SidebarRail = React.forwardRef<
 SidebarRail.displayName = "SidebarRail"
 
 const SidebarInset = React.forwardRef<
-  HTMLDivElement, // Changed from main to div for more general use
-  React.ComponentProps<"div"> // Changed from main to div
+  HTMLDivElement, 
+  React.ComponentProps<"div"> 
 >(({ className, ...props }, ref) => {
   const { state, isMobile } = useSidebar();
   return (
-    <div // Changed from main to div
+    <div 
       ref={ref}
       className={cn(
         "relative flex min-h-svh flex-1 flex-col bg-background transition-[margin-left,margin-right] duration-200 ease-linear",
