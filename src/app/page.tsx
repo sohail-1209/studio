@@ -21,7 +21,7 @@ import { Spinner } from '@/components/shared/Spinner';
 import { CommentInput } from '@/components/posts/CommentInput';
 import { CommentList } from '@/components/posts/CommentList';
 import { Separator } from '@/components/ui/separator';
-import { StoryViewerDialog } from '@/components/stories/StoryViewerDialog'; // Import StoryViewerDialog
+import { StoryViewerDialog } from '@/components/stories/StoryViewerDialog'; 
 
 interface StoryUserData {
   userId: string;
@@ -50,9 +50,9 @@ export default function FeedPage() {
 
 
   useEffect(() => {
-    // Fetch Posts (regular feed)
-    const postsCollection = collection(db, 'posts');
-    const qPosts = query(postsCollection, where('isStory', '!=', true), orderBy('createdAt', 'desc')); 
+    const postsCollectionRef = collection(db, 'posts');
+    // Fetch Posts (regular feed - ensure isStory is not true)
+    const qPosts = query(postsCollectionRef, where('isStory', '!=', true), orderBy('createdAt', 'desc')); 
 
     setLoadingPosts(true);
     const unsubscribePosts = onSnapshot(
@@ -67,7 +67,7 @@ export default function FeedPage() {
             likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
             likesCount: data.likesCount || 0,
             commentsCount: data.commentsCount || 0,
-            isStory: data.isStory || false,
+            isStory: data.isStory || false, // Default isStory to false if not present
           } as Post;
         });
         setPosts(fetchedPosts); 
@@ -90,11 +90,11 @@ export default function FeedPage() {
     const twentyFourHoursAgoTimestamp = Timestamp.fromDate(twentyFourHoursAgo);
 
     const qStoriesReel = query(
-      collection(db, 'posts'),
+      postsCollectionRef, // Use the same collection reference
       where('isStory', '==', true),
       where('createdAt', '>=', twentyFourHoursAgoTimestamp),
-      orderBy('createdAt', 'desc'), // Get latest stories first
-      firestoreLimit(20) // Fetch a bit more to find unique users
+      orderBy('createdAt', 'desc'), 
+      firestoreLimit(20) 
     );
 
     const unsubscribeStoriesReel = onSnapshot(qStoriesReel, (snapshot) => {
@@ -110,7 +110,7 @@ export default function FeedPage() {
           });
         }
       });
-      setStoriesData(Array.from(uniqueUsersMap.values()).slice(0, 7)); // Display up to 7 unique users
+      setStoriesData(Array.from(uniqueUsersMap.values()).slice(0, 7)); 
       setLoadingStoriesReel(false);
     }, (error) => {
       console.error('Error fetching stories data for reel:', error);
@@ -218,7 +218,7 @@ export default function FeedPage() {
     setSelectedStoryAuthor(storyAuthor);
     setIsStoryViewerOpen(true);
     setLoadingCurrentUserStories(true);
-    setCurrentUserStories([]); // Clear previous stories
+    setCurrentUserStories([]); 
 
     const twentyFourHoursAgo = subHours(new Date(), 24);
     const twentyFourHoursAgoTimestamp = Timestamp.fromDate(twentyFourHoursAgo);
@@ -229,7 +229,7 @@ export default function FeedPage() {
       where('userId', '==', storyAuthor.userId),
       where('isStory', '==', true),
       where('createdAt', '>=', twentyFourHoursAgoTimestamp),
-      orderBy('createdAt', 'desc') // Show newest stories first
+      orderBy('createdAt', 'desc') 
     );
 
     try {
@@ -304,7 +304,7 @@ export default function FeedPage() {
 
         <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
 
-        {/* Stories Reel */}
+        
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="font-headline text-xl">Stories</CardTitle>
@@ -353,9 +353,7 @@ export default function FeedPage() {
             })}
           </CardContent>
         </Card>
-        {/* End Stories Reel */}
-
-        {/* Story Viewer Dialog */}
+        
         {selectedStoryAuthor && (
             <StoryViewerDialog
             open={isStoryViewerOpen}
@@ -366,7 +364,7 @@ export default function FeedPage() {
             />
         )}
 
-        {/* Posts Feed */}
+        
         <div className="space-y-8">
           {loadingPosts && (
             <> <PostSkeleton /> <PostSkeleton /> </>
@@ -380,6 +378,8 @@ export default function FeedPage() {
             </Card>
           )}
           {!loadingPosts && posts.map((post, index) => {
+            // For current user's posts, use their latest avatar from AuthContext
+            // For other users, use the avatar stored with the post
             const isCurrentUserPost = post.userId === user?.uid;
             const avatarUrl = isCurrentUserPost ? (user?.photoURL || post.userAvatarUrl) : post.userAvatarUrl;
             const avatarAlt = isCurrentUserPost ? (user?.displayName || 'Your avatar') : (post.userDisplayName || 'User avatar');
