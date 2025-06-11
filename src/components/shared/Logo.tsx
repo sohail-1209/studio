@@ -1,4 +1,3 @@
-
 // src/components/shared/Logo.tsx
 import Link from 'next/link';
 import Image from 'next/image'; 
@@ -9,7 +8,7 @@ interface LogoProps {
   textSize?: string;
 }
 
-export function Logo({ className, iconSize = 54, textSize = "text-4xl" }: LogoProps) { 
+export function Logo({ className, iconSize = 36, textSize = "text-3xl" }: LogoProps) { 
   return (
     <Link href="/" className={`flex items-center gap-2 text-logoText ${className}`}>
       <Image
@@ -24,4 +23,3 @@ export function Logo({ className, iconSize = 54, textSize = "text-4xl" }: LogoPr
     </Link>
   );
 }
-

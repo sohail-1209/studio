@@ -1,4 +1,3 @@
-
 // src/components/layout/AppSidebar.tsx
 'use client';
 
@@ -35,7 +34,7 @@ export function AppSidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform md:translate-x-0">
       <div className="flex h-16 items-center justify-start px-6 mt-2.5"> {/* Added mt-2.5 here */}
-        <Logo />
+        <Logo iconSize={32} textSize="text-2xl" />
       </div>
       <Separator className="bg-sidebar-border my-2" /> {/* Added my-2 for spacing */}
       <nav className="flex-1 space-y-1 p-4"> {/* Reduced space-y from 2 to 1 */}
