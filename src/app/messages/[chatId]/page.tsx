@@ -372,7 +372,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                           alt="Sent image" 
                           width={250} 
                           height={250} 
-                          className="rounded max-w-full h-auto object-contain" 
+                          className="rounded max-w-full h-auto object-contain border border-border/10" 
                           data-ai-hint={msg.dataAiHint || "chat image"} 
                         />
                          {msg.text ? (
