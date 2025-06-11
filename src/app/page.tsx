@@ -140,24 +140,23 @@ export default function FeedPage() {
     const shareData = {
       title: `Check out this post on NExCHAT by ${post.userDisplayName || 'a user'}!`,
       text: post.caption || 'An interesting post from NExCHAT.',
-      // Ideally, this URL would be a direct link to the post if your routing supports it.
-      // For now, using the current page URL as a placeholder.
-      url: window.location.origin + `/post/${post.id}`, // Example post URL, adjust if needed
+      url: window.location.origin + `/post/${post.id}`, 
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
       } catch (error: any) {
-        console.error('Error sharing post via navigator.share:', error);
-        // Attempt fallback to clipboard if navigator.share fails (e.g., permission denied)
+        // Using console.warn as console.error might trigger Next.js dev overlay for handled errors.
+        console.warn('Warning sharing post via navigator.share (likely permission denied or non-HTTPS):', error);
+        // Attempt fallback to clipboard if navigator.share fails
         if (navigator.clipboard && navigator.clipboard.writeText) {
           try {
             await navigator.clipboard.writeText(shareData.url);
             toast({
               title: 'Share Failed, Link Copied!',
               description: 'Could not open share dialog. Post link copied to clipboard.',
-              variant: 'default', // 'default' or 'success'
+              variant: 'default', 
             });
           } catch (copyError) {
             console.error('Error copying link to clipboard:', copyError);
@@ -357,4 +356,3 @@ export default function FeedPage() {
     </MainLayout>
   );
 }
-
