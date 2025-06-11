@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot } from 'firebase/firestore';
 import { ref as storageRef, deleteObject } from 'firebase/storage';
 import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext';
 import type { Post } from '@/types/post';
@@ -440,3 +440,4 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     </MainLayout>
   );
 }
+
