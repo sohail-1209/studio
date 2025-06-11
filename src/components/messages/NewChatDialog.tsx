@@ -18,7 +18,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { db } from '@/lib/firebase';
 import { collection, query, getDocs, where, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { useAuth, type UserProfile } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth'; // Corrected import for useAuth
+import type { UserProfile } from '@/contexts/AuthContext'; // Corrected import for UserProfile
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Spinner } from '@/components/shared/Spinner';
@@ -76,7 +77,10 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
   }, [allUsers, searchTerm]);
 
   const handleSelectUser = async (selectedUser: UserProfile) => {
-    if (!currentUser || !selectedUser) return;
+    if (!currentUser || !selectedUser.uid) { // Ensure selectedUser.uid is accessed
+        toast({ title: "Error", description: "Selected user data is incomplete.", variant: "destructive" });
+        return;
+    }
     setIsCreatingChat(true);
 
     const chatId = [currentUser.uid, selectedUser.uid].sort().join('_');
@@ -94,16 +98,16 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           userDetails: {
             [currentUser.uid]: {
               displayName: currentUser.displayName || 'Current User',
-              photoURL: currentUser.photoURL || null,
+              photoURL: currentUser.photoURL || `https://placehold.co/40x40.png?text=${(currentUser.displayName || 'C').charAt(0)}`,
             },
             [selectedUser.uid]: {
               displayName: selectedUser.displayName || 'Selected User',
-              photoURL: selectedUser.photoURL || null,
+              photoURL: selectedUser.photoURL || `https://placehold.co/40x40.png?text=${(selectedUser.displayName || 'S').charAt(0)}`,
             },
           },
           lastMessageText: null,
           lastMessageSenderId: null,
-          lastMessageTimestamp: null, // Will be set on first message or can be serverTimestamp()
+          lastMessageTimestamp: null, 
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         };
