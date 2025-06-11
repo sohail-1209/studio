@@ -60,6 +60,10 @@ export function CommentInput({ postId, onCommentPosted }: CommentInputProps) {
         createdAt: serverTimestamp(),
       };
 
+      // console.log("Attempting to post comment with data:", commentData);
+      // console.log("User UID:", user.uid);
+      // console.log("Post ID:", postId);
+
       const postRef = doc(db, 'posts', postId);
       const commentsCollectionRef = collection(postRef, 'comments');
       
@@ -73,14 +77,16 @@ export function CommentInput({ postId, onCommentPosted }: CommentInputProps) {
       onCommentPosted?.(); // Call callback if provided
     } catch (error: any) {
       console.error("Error posting comment:", error);
-      toast({ title: "Error", description: error.message || "Could not post comment.", variant: "destructive" });
+      console.error("Firebase error code:", error.code); // More detailed logging
+      console.error("Firebase error details:", error.details); // More detailed logging
+      toast({ title: "Error Posting Comment", description: error.message || "Could not post comment. Check console for details.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex items-start space-x-3 py-3 border-t">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex items-start space-x-3 py-3">
       <Textarea
         placeholder="Write a comment..."
         {...register('text')}
