@@ -1,4 +1,3 @@
-
 // src/app/page.tsx (Feed Page)
 'use client';
 
@@ -7,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Heart, MessageCircle as MessageIcon, Share2 } from 'lucide-react';
 import Image from 'next/image';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // AvatarImage removed as it was causing issues with next/image if not used correctly, AvatarFallback is enough with Image direct child
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
 import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
 import { db } from '@/lib/firebase';
@@ -18,6 +17,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Spinner } from '@/components/shared/Spinner';
+import { CommentInput } from '@/components/posts/CommentInput';
+import { CommentList } from '@/components/posts/CommentList';
+import { Separator } from '@/components/ui/separator';
 
 export default function FeedPage() {
   const [isCreatePostDialogOpen, setIsCreatePostDialogOpen] = useState(false);
@@ -27,7 +29,8 @@ export default function FeedPage() {
   const { toast } = useToast();
 
   const [isLiking, setIsLiking] = useState<{[postId: string]: boolean}>({});
-  const [isCommenting, setIsCommenting] = useState<{[postId: string]: boolean}>({});
+  // const [isCommenting, setIsCommenting] = useState<{[postId: string]: boolean}>({}); // Replaced by CommentInput's own state
+  const [showComments, setShowComments] = useState<{[postId: string]: boolean}>({});
 
 
   useEffect(() => {
@@ -102,34 +105,8 @@ export default function FeedPage() {
     }
   };
 
-  const handleCommentPost = async (postId: string) => {
-     if (!user) {
-      toast({ title: 'Authentication Error', description: 'Please log in to comment.', variant: 'destructive' });
-      return;
-    }
-    if (isCommenting[postId]) return;
-
-    setIsCommenting(prev => ({ ...prev, [postId]: true }));
-    const postRef = doc(db, 'posts', postId);
-
-    try {
-      await updateDoc(postRef, {
-        commentsCount: increment(1),
-      });
-      toast({
-        title: 'Comment Added (Count)',
-        description: 'Full comment functionality coming soon!',
-      });
-    } catch (error: any) {
-      console.error('Error commenting on post:', error);
-      toast({
-        title: 'Error Commenting',
-        description: error.message || 'Could not update comment count.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsCommenting(prev => ({ ...prev, [postId]: false }));
-    }
+  const toggleCommentSection = (postId: string) => {
+    setShowComments(prev => ({...prev, [postId]: !prev[postId]}));
   };
 
   const handleSharePost = async (post: Post) => {
@@ -147,9 +124,7 @@ export default function FeedPage() {
       try {
         await navigator.share(shareData);
       } catch (error: any) {
-        // Using console.warn as console.error might trigger Next.js dev overlay for handled errors.
         console.warn('Warning sharing post via navigator.share (likely permission denied or non-HTTPS):', error);
-        // Attempt fallback to clipboard if navigator.share fails
         if (navigator.clipboard && navigator.clipboard.writeText) {
           try {
             await navigator.clipboard.writeText(shareData.url);
@@ -175,7 +150,6 @@ export default function FeedPage() {
         }
       }
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      // Fallback for browsers that don't support navigator.share at all
       try {
         await navigator.clipboard.writeText(shareData.url);
         toast({
@@ -221,6 +195,14 @@ export default function FeedPage() {
             <Skeleton className="h-8 w-16" />
           </div>
         </div>
+        {/* Placeholder for comment section skeleton */}
+        <div className="border-t p-4">
+            <Skeleton className="h-10 w-full mb-3" /> {/* Comment input skeleton */}
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-4/5" />
+                <Skeleton className="h-8 w-3/5" />
+            </div>
+        </div>
       </CardContent>
     </Card>
   );
@@ -255,7 +237,6 @@ export default function FeedPage() {
                     className="rounded-full"
                     data-ai-hint="portrait person"
                   />
-                  {/* <AvatarFallback>{`U`}</AvatarFallback> AvatarImage was removed, check if fallback logic needs change */}
                 </Avatar>
                 <span className="text-xs text-muted-foreground">User {i + 1}</span>
               </div>
@@ -306,7 +287,6 @@ export default function FeedPage() {
                     </div>
                   )}
                   {post.videoUrl && (
-                    // Basic video placeholder - for actual video, you'd use a <video> tag
                     <div className="relative aspect-video w-full bg-black flex items-center justify-center">
                        <Image src={post.videoUrl} alt={post.caption || "Post video placeholder"} layout="fill" objectFit="contain" data-ai-hint={post.dataAiHint || "user content video"} />
                     </div>
@@ -334,12 +314,10 @@ export default function FeedPage() {
                         variant="ghost"
                         size="sm"
                         className="flex-1"
-                        onClick={() => handleCommentPost(post.id)}
-                        disabled={isCommenting[post.id]}
+                        onClick={() => toggleCommentSection(post.id)}
+                        // disabled={isCommenting[post.id]} // Replaced by CommentInput's own state
                       >
-                         {isCommenting[post.id] ? <Spinner size={16} className="mr-2" /> :
-                          <MessageIcon className="mr-2 h-4 w-4" />
-                         }
+                        <MessageIcon className="mr-2 h-4 w-4" />
                         Comments ({post.commentsCount || 0})
                       </Button>
                       <Button variant="ghost" size="sm" className="flex-1" onClick={() => handleSharePost(post)}>
@@ -347,6 +325,13 @@ export default function FeedPage() {
                       </Button>
                     </div>
                   </div>
+                  {showComments[post.id] && (
+                    <div className="p-4 border-t">
+                       <CommentInput postId={post.id} />
+                       <Separator className="my-4" />
+                       <CommentList postId={post.id} />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );

@@ -1,20 +1,36 @@
 // src/types/post.ts
 import type { Timestamp, FieldValue } from 'firebase/firestore';
 
+// For Comment documents in Firestore
+export interface CommentDocument {
+  userId: string;
+  userDisplayName: string | null;
+  userAvatarUrl: string | null;
+  text: string;
+  createdAt: FieldValue; // serverTimestamp
+}
+
+// For Comment objects in the application (after fetching)
+export interface Comment extends Omit<CommentDocument, 'createdAt'> {
+  id: string; // Firestore document ID
+  createdAt: Date; // Converted to Date object
+}
+
 export interface PostDocument {
   userId: string;
   userDisplayName: string | null;
   userAvatarUrl: string | null;
   caption: string;
   imageUrl?: string | null;
-  videoUrl?: string | null; // Kept for future, not used in current implementation
+  videoUrl?: string | null;
   likesCount: number;
+  likedBy?: string[]; // Array of user UIDs who liked the post
   commentsCount: number;
-  createdAt: FieldValue; // For writing to Firestore (serverTimestamp)
-  dataAiHint?: string; // Optional AI hint for images
+  createdAt: FieldValue;
+  dataAiHint?: string;
 }
 
 export interface Post extends Omit<PostDocument, 'createdAt'> {
-  id: string; // Firestore document ID
-  createdAt: Date; // For reading from Firestore, converted to Date object
+  id: string;
+  createdAt: Date;
 }

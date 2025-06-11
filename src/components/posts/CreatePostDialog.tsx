@@ -17,20 +17,19 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input'; // Added for file input
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { db, storage } from '@/lib/firebase'; // Added storage
+import { db, storage } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'; // Added storage functions
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import type { PostDocument } from '@/types/post';
 import { Spinner } from '@/components/shared/Spinner';
-import { UploadCloud, Image as ImageIcon } from 'lucide-react';
-import Image from 'next/image'; // For image preview
+import { UploadCloud } from 'lucide-react';
+import Image from 'next/image';
 
 const postSchema = z.object({
   caption: z.string().min(1, { message: 'Caption cannot be empty' }).max(1000, {message: 'Caption too long'}),
-  // File is handled separately, not part of Zod schema for this form directly
 });
 
 type PostFormInputs = z.infer<typeof postSchema>;
@@ -130,12 +129,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
             }
           );
         });
-        if (!imageUrl) { // If imageUrl is still null, it means upload failed before getDownloadURL
+        if (!imageUrl) {
           throw new Error("Image upload completed but failed to get URL.");
         }
       }
       
-      setUploadProgress(100); // Mark as complete if file processing is done or no file
+      setUploadProgress(100);
 
       const postData: PostDocument = {
         userId: user.uid,
@@ -143,11 +142,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         userAvatarUrl: user.photoURL || null,
         caption: data.caption,
         imageUrl: imageUrl,
-        videoUrl: null, // Video uploads not implemented in this step
+        videoUrl: null,
         likesCount: 0,
-        commentsCount: 0,
+        likedBy: [], // Initialize likedBy as empty array
+        commentsCount: 0, // Initialize commentsCount
         createdAt: serverTimestamp(),
-        dataAiHint: selectedFile ? 'user uploaded content' : undefined, // Basic hint
+        dataAiHint: selectedFile ? 'user uploaded content' : undefined,
       };
 
       await addDoc(collection(db, 'posts'), postData);
@@ -157,7 +157,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         description: 'Your post has been successfully published.',
       });
       resetFormStates();
-      onOpenChange(false); // Close dialog
+      onOpenChange(false);
     } catch (error: any) {
       console.error('Error creating post:', error);
       toast({
@@ -167,7 +167,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       });
     } finally {
       setLoading(false);
-      setUploadProgress(null); // Reset progress after operation
+      setUploadProgress(null);
     }
   };
 
