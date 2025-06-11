@@ -69,8 +69,10 @@ export default function ExplorePage() {
 
   const handleSearchByUid = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (searchUid.trim()) {
-      router.push(`/profile/${searchUid.trim()}`);
+    const trimmedUid = searchUid.trim(); // Use a local variable for the trimmed UID
+
+    if (trimmedUid) {
+      router.push(`/profile/${trimmedUid}`);
     } else {
       toast({
         title: "Empty UID",
@@ -78,6 +80,7 @@ export default function ExplorePage() {
         variant: "default",
       });
     }
+    setSearchUid(''); // Clear the input field after any submission attempt
   };
 
   const PostGridSkeleton = () => (
