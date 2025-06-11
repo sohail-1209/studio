@@ -362,7 +362,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                       "max-w-xs rounded-lg p-2 lg:max-w-md shadow-md relative", 
                       msg.senderId === user?.uid 
                         ? "bg-primary text-primary-foreground rounded-tr-none" 
-                        : "bg-muted text-foreground rounded-tl-none border border-border/40"
+                        : "bg-muted text-foreground rounded-tl-none border border-border/20"
                     )}
                   >
                     {msg.imageUrl ? (
@@ -410,7 +410,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                         <Image src={chatPartnerProfile.photoURL} alt="Sender" width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
                        ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
                     </Avatar>
-                  <div className="bg-muted text-foreground rounded-lg p-2 shadow-md border border-border/40 rounded-tl-none"> 
+                  <div className="bg-muted text-foreground rounded-lg p-2 shadow-md border border-border/20 rounded-tl-none"> 
                     <p className="text-sm italic">typing...</p> 
                   </div>
                 </div>
