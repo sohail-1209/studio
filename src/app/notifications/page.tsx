@@ -40,7 +40,6 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
-  // No longer need acceptingRequest state if we use processingRequestId and optimistic UI update
 
 
   useEffect(() => {
@@ -82,15 +81,13 @@ export default function NotificationsPage() {
 
     const batch = writeBatch(db);
     notifications.forEach(notif => {
-      if (!notif.isRead && !notif.actionTaken) { // Only mark as read if no action was taken yet on requests
+      if (!notif.isRead && !notif.actionTaken) { 
         const notifRef = doc(db, 'notifications', notif.id);
         batch.update(notifRef, { isRead: true });
       }
     });
     try {
       await batch.commit();
-      // Optimistic UI update for isRead can be added here if desired,
-      // but onSnapshot should eventually reflect the changes.
     } catch (error) {
       console.error("Error marking notifications as read:", error);
     }
@@ -107,23 +104,33 @@ export default function NotificationsPage() {
   const handleAcceptFollowRequest = async (notification: Notification) => {
     if (!user || !notification.followRequestId || notification.actionTaken) return;
     setProcessingRequestId(notification.id);
-    updateLocalNotificationAction(notification.id, 'accepted'); // Optimistic UI update
+    updateLocalNotificationAction(notification.id, 'accepted'); 
 
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', notification.followRequestId);
-    const recipientProfileRef = doc(db, 'profiles', notification.recipientId); // Current user's profile
-    const requesterProfileRef = doc(db, 'profiles', notification.actorId);    // Profile of the user who sent the request
+    const recipientProfileRef = doc(db, 'profiles', notification.recipientId); // Current user's profile (who is accepting)
+    // const requesterProfileRef = doc(db, 'profiles', notification.actorId);    // Profile of the user who sent the request
     const originalNotificationRef = doc(db, 'notifications', notification.id);
 
     try {
+      // 1. Update the follow request status
       batch.update(followRequestRef, { status: 'accepted', updatedAt: serverTimestamp() });
+      
+      // 2. Increment current user's (recipient's) followersCount
       batch.update(recipientProfileRef, { followersCount: increment(1) });
-      batch.update(requesterProfileRef, { followingCount: increment(1) });
+      
+      // 3. Increment requester's followingCount - THIS WILL LIKELY FAIL with strict profile rules
+      // For now, we remove this client-side attempt by the recipient.
+      // This count should ideally be updated by a Cloud Function or by the requester's client.
+      // batch.update(requesterProfileRef, { followingCount: increment(1) });
+
+      // 4. Update the original 'follow_request' notification
       batch.update(originalNotificationRef, { isRead: true, actionTaken: 'accepted' });
 
+      // 5. Create a new 'follow_accept' notification for the original requester
       const acceptNotificationData: Omit<NotificationDocument, 'createdAt'> = {
-        recipientId: notification.actorId, 
-        actorId: user.uid,                 
+        recipientId: notification.actorId, // The one who sent the request
+        actorId: user.uid, // The one who accepted the request             
         actorDisplayName: user.displayName,
         actorAvatarUrl: user.photoURL,
         type: 'follow_accept',
@@ -134,12 +141,12 @@ export default function NotificationsPage() {
       batch.set(newNotifRef, {...acceptNotificationData, createdAt: serverTimestamp()});
       
       await batch.commit();
-      toast({ title: "Follow Request Accepted", description: `You are now following ${notification.actorDisplayName || 'them'}.` });
+      toast({ title: "Follow Request Accepted", description: `You are now followed by ${notification.actorDisplayName || 'them'}.` });
     } catch (error: any) {
       console.error("Error accepting follow request:", error);
-      toast({ title: "Error", description: error.message || "Could not accept follow request.", variant: "destructive" });
-      // Revert optimistic update if needed, or rely on onSnapshot to correct
-      setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, actionTaken: null, isRead: false } : n));
+      toast({ title: "Error Accepting Request", description: error.message || "Could not accept follow request.", variant: "destructive" });
+      // Revert optimistic update if batch commit fails
+      setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, actionTaken: null, isRead: notification.isRead } : n));
     } finally {
       setProcessingRequestId(null);
     }
@@ -148,7 +155,7 @@ export default function NotificationsPage() {
   const handleDeclineFollowRequest = async (notification: Notification) => {
     if (!user || !notification.followRequestId || notification.actionTaken) return;
     setProcessingRequestId(notification.id);
-    updateLocalNotificationAction(notification.id, 'declined'); // Optimistic UI update
+    updateLocalNotificationAction(notification.id, 'declined'); 
 
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', notification.followRequestId);
@@ -160,9 +167,8 @@ export default function NotificationsPage() {
       toast({ title: "Follow Request Declined" });
     } catch (error: any) {
       console.error("Error declining follow request:", error);
-      toast({ title: "Error", description: error.message || "Could not decline follow request.", variant: "destructive" });
-      // Revert optimistic update
-      setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, actionTaken: null, isRead: false } : n));
+      toast({ title: "Error Declining Request", description: error.message || "Could not decline follow request.", variant: "destructive" });
+      setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, actionTaken: null, isRead: notification.isRead } : n));
     } finally {
       setProcessingRequestId(null);
     }
