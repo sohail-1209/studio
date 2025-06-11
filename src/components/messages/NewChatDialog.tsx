@@ -91,7 +91,23 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
     const chatDocRef = doc(db, 'chats', chatId);
 
     try {
-      const chatSnap = await getDoc(chatDocRef);
+      let chatSnap;
+      try {
+        chatSnap = await getDoc(chatDocRef);
+      } catch (findError: any) {
+        console.error("NewChatDialog: FirebaseError FINDING chat (getDoc):", findError);
+        console.error("Error Code:", findError.code);
+        console.error("Error Message:", findError.message);
+        console.error("Error Details (if any):", findError.details);
+        toast({ 
+          title: "Chat Find Error", 
+          description: `Could not check for existing chat: ${findError.message || 'Please try again.'}`, 
+          variant: "destructive" 
+        });
+        setIsCreatingChat(false);
+        return;
+      }
+
       if (chatSnap.exists()) {
         console.log(`NewChatDialog: Chat with ID ${chatId} already exists. Navigating.`);
         router.push(`/messages/${chatId}`);
@@ -116,7 +132,6 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           updatedAt: serverTimestamp(),
         };
 
-        // --- START Enhanced Pre-flight Checks & Logging ---
         console.log('NewChatDialog: Pre-flight Data for New Chat Creation:');
         console.log('Current User UID:', currentUser.uid);
         console.log('Selected User UID:', selectedUser.uid);
@@ -124,7 +139,7 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
         console.log('Data to be written (newChatData):', JSON.stringify(newChatData, null, 2));
 
         const clientSideRuleCheck = currentUser && currentUser.uid && newChatData.userIds.includes(currentUser.uid);
-        console.log(`NewChatDialog: Client-side rule check (currentUser.uid in newChatData.userIds): ${clientSideRuleCheck}`);
+        console.log(`NewChatDialog: Client-side rule check (currentUser.uid in newChatData.userIds): ${clientSideRuleCheck ? 'PASSED' : 'FAILED'}`);
 
         if (!clientSideRuleCheck) {
           console.error("NewChatDialog: CRITICAL - Client-side rule check FAILED. currentUser.uid is not in newChatData.userIds. Aborting Firestore write.");
@@ -136,22 +151,32 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           setIsCreatingChat(false);
           return;
         }
-        console.log("NewChatDialog: Client-side rule check PASSED. Attempting Firestore write...");
-        // --- END Enhanced Pre-flight Checks & Logging ---
+        console.log("NewChatDialog: Client-side rule check PASSED. Attempting Firestore write (setDoc)...");
         
-        await setDoc(chatDocRef, newChatData);
-        console.log(`NewChatDialog: Successfully created chat with ID ${chatId}. Navigating.`);
-        router.push(`/messages/${chatId}`);
-        onOpenChange(false);
+        try {
+          await setDoc(chatDocRef, newChatData);
+          console.log(`NewChatDialog: Successfully created chat with ID ${chatId}. Navigating.`);
+          router.push(`/messages/${chatId}`);
+          onOpenChange(false);
+        } catch (createError: any) {
+          console.error("NewChatDialog: FirebaseError CREATING chat (setDoc):", createError);
+          console.error("Error Code:", createError.code);
+          console.error("Error Message:", createError.message);
+          console.error("Error Details (if any):", createError.details);
+          toast({ 
+            title: "Chat Creation Error", 
+            description: `Could not start chat: ${createError.message || 'Please try again.'}`, 
+            variant: "destructive" 
+          });
+        }
       }
     } catch (error: any) {
-      console.error("NewChatDialog: FirebaseError creating or finding chat:", error);
-      console.error("Error Code:", error.code);
-      console.error("Error Message:", error.message);
-      console.error("Error Details (if any):", error.details);
+      // This outer catch is unlikely to be hit if inner ones handle specific Firebase errors,
+      // but it's good for unexpected issues.
+      console.error("NewChatDialog: UNEXPECTED error in handleSelectUser:", error);
       toast({ 
-        title: "Chat Error", 
-        description: `Could not start chat: ${error.message || 'Please try again.'}`, 
+        title: "Unexpected Error", 
+        description: `An unexpected error occurred: ${error.message || 'Please try again.'}`, 
         variant: "destructive" 
       });
     } finally {
