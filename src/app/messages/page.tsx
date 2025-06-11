@@ -1,4 +1,6 @@
 // src/app/messages/page.tsx
+'use client';
+
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -7,18 +9,107 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, MessageSquarePlus } from 'lucide-react';
 import Link from 'next/link';
-
-const placeholderChats = [
-  { id: '1', name: 'Jane Doe', avatar: 'https://placehold.co/50x50.png?text=JD', lastMessage: 'Hey, how are you?', time: '10:30 AM', unread: 2 },
-  { id: '2', name: 'John Smith', avatar: 'https://placehold.co/50x50.png?text=JS', lastMessage: 'See you tomorrow!', time: 'Yesterday', unread: 0 },
-  { id: '3', name: 'Alice Brown', avatar: 'https://placehold.co/50x50.png?text=AB', lastMessage: 'Okay, sounds good.', time: 'Mon', unread: 1 },
-  { id: '4', name: 'Bob Green', avatar: 'https://placehold.co/50x50.png?text=BG', lastMessage: 'Can you send me the file?', time: 'Sun', unread: 0 },
-];
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { db } from '@/lib/firebase';
+import { collection, query, where, orderBy, onSnapshot, Timestamp, doc, getDoc } from 'firebase/firestore';
+import type { ChatSession, ChatSessionDocument, ChatSessionUserDetail } from '@/types/chat';
+import { formatDistanceToNow } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function MessagesPage() {
+  const { user } = useAuth();
+  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [loadingChats, setLoadingChats] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setLoadingChats(false);
+      return;
+    }
+
+    setLoadingChats(true);
+    const chatsCollection = collection(db, 'chats');
+    const q = query(
+      chatsCollection,
+      where('userIds', 'array-contains', user.uid),
+      orderBy('updatedAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        const fetchedChats: ChatSession[] = await Promise.all(
+          snapshot.docs.map(async (docSnapshot) => {
+            const data = docSnapshot.data() as ChatSessionDocument;
+            const otherUserId = data.userIds.find(uid => uid !== user.uid);
+            let otherUserDetails: (ChatSessionUserDetail & { uid: string }) | undefined = undefined;
+
+            if (otherUserId) {
+              if (data.userDetails && data.userDetails[otherUserId]) {
+                 otherUserDetails = {
+                    ...data.userDetails[otherUserId],
+                    uid: otherUserId,
+                 }
+              } else {
+                // Fallback: Fetch profile if not denormalized (less ideal for list performance)
+                const profileDoc = await getDoc(doc(db, 'profiles', otherUserId));
+                if (profileDoc.exists()) {
+                  const profileData = profileDoc.data();
+                  otherUserDetails = {
+                    uid: otherUserId,
+                    displayName: profileData?.displayName || 'User',
+                    photoURL: profileData?.photoURL || `https://placehold.co/50x50.png?text=${(profileData?.displayName || 'U').charAt(0)}`,
+                  };
+                }
+              }
+            }
+            
+            return {
+              id: docSnapshot.id,
+              ...data,
+              lastMessageTimestamp: data.lastMessageTimestamp instanceof Timestamp ? data.lastMessageTimestamp.toDate() : null,
+              updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(),
+              otherUser: otherUserDetails || { uid: '', displayName: 'Unknown User', photoURL: 'https://placehold.co/50x50.png?text=?' },
+            } as ChatSession;
+          })
+        );
+        setChats(fetchedChats);
+        setLoadingChats(false);
+      },
+      (error) => {
+        console.error('Error fetching chats:', error);
+        setLoadingChats(false);
+        // Optionally, show a toast message
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  const filteredChats = chats.filter(chat =>
+    chat.otherUser?.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    chat.lastMessageText?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const ChatListItemSkeleton = () => (
+    <div className="flex items-center space-x-4 p-4">
+      <Skeleton className="h-12 w-12 rounded-full" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-4 w-2/5" />
+          <Skeleton className="h-3 w-1/5" />
+        </div>
+        <Skeleton className="h-4 w-3/5" />
+      </div>
+    </div>
+  );
+
+
   return (
     <MainLayout>
-      <div className="container mx-auto h-[calc(100vh-theme(spacing.24))] max-w-4xl py-8"> {/* Adjust height based on header/paddings */}
+      <div className="container mx-auto h-[calc(100vh-theme(spacing.24))] max-w-4xl py-8">
         <Card className="h-full flex flex-col shadow-lg">
           <CardHeader className="border-b">
             <div className="flex items-center justify-between">
@@ -30,37 +121,61 @@ export default function MessagesPage() {
             </div>
             <div className="relative mt-4">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search messages or users..." className="pl-10" />
+              <Input
+                placeholder="Search messages or users..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
           </CardHeader>
           <CardContent className="flex-1 p-0 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="divide-y">
-                {placeholderChats.map((chat) => (
-                  <Link href={`/messages/${chat.id}`} key={chat.id} className="block hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center space-x-4 p-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={chat.avatar} alt={chat.name} data-ai-hint="user avatar" />
-                        <AvatarFallback>{chat.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="truncate font-semibold text-foreground">{chat.name}</p>
-                          <p className="text-xs text-muted-foreground">{chat.time}</p>
-                        </div>
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="truncate text-sm text-muted-foreground">{chat.lastMessage}</p>
-                          {chat.unread > 0 && (
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                              {chat.unread}
-                            </span>
-                          )}
+              {loadingChats && (
+                <div className="divide-y">
+                  <ChatListItemSkeleton />
+                  <ChatListItemSkeleton />
+                  <ChatListItemSkeleton />
+                </div>
+              )}
+              {!loadingChats && filteredChats.length === 0 && (
+                 <div className="p-8 text-center text-muted-foreground">
+                    No chats found.
+                 </div>
+              )}
+              {!loadingChats && filteredChats.length > 0 && (
+                <div className="divide-y">
+                  {filteredChats.map((chat) => (
+                    <Link href={`/messages/${chat.id}`} key={chat.id} className="block hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center space-x-4 p-4">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={chat.otherUser?.photoURL || undefined} alt={chat.otherUser?.displayName || 'User'} data-ai-hint="user avatar" />
+                          <AvatarFallback>{(chat.otherUser?.displayName || 'U').charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="truncate font-semibold text-foreground">{chat.otherUser?.displayName || 'Unnamed Chat'}</p>
+                            {chat.lastMessageTimestamp && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(chat.lastMessageTimestamp, { addSuffix: true })}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <p className="truncate text-sm text-muted-foreground">{chat.lastMessageText || 'No messages yet'}</p>
+                            {/* Placeholder for unread count, not implemented yet */}
+                            {/* {chat.unread > 0 && (
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                                {chat.unread}
+                              </span>
+                            )} */}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </ScrollArea>
           </CardContent>
         </Card>
