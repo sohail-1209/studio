@@ -1,4 +1,3 @@
-
 // src/components/profile/EditProfileDialog.tsx
 'use client';
 
@@ -166,7 +165,7 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
       if (selectedAvatarFile) {
         setAvatarUploadProgress(0); 
         const fileExtension = selectedAvatarFile.name.split('.').pop() || 'jpg';
-        const fileName = `profile_pic.${fileExtension}?t=${Date.now()}`; // Add timestamp to bust cache
+        const fileName = `profile_pic.${fileExtension}?t=${Date.now()}`; 
         const avatarPicRef = storageRef(storage, `profile_pictures/${userProfile.uid}/${fileName}`);
         
         const uploadTask = uploadBytesResumable(avatarPicRef, selectedAvatarFile);
@@ -185,7 +184,7 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
       if (selectedCoverFile) {
         setCoverUploadProgress(0);
         const fileExtension = selectedCoverFile.name.split('.').pop() || 'jpg';
-        const fileName = `cover_photo.${fileExtension}?t=${Date.now()}`; // Add timestamp
+        const fileName = `cover_photo.${fileExtension}?t=${Date.now()}`; 
         const coverPicRef = storageRef(storage, `cover_pictures/${userProfile.uid}/${fileName}`);
 
         const uploadTask = uploadBytesResumable(coverPicRef, selectedCoverFile);
@@ -219,7 +218,7 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
       toast({ title: "Profile Updated", description: "Your profile has been successfully updated." });
       onProfileUpdate({ ...userProfile, ...updates }); 
       onOpenChange(false); 
-      await reloadUser(); // Reload user to get fresh data including new URLs
+      await reloadUser(); 
     } catch (error: any) {
       console.error("Error updating profile:", error);
       toast({ title: "Update Failed", description: error.message || "Could not update profile.", variant: "destructive" });
@@ -248,7 +247,7 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
           
           <div className="space-y-2">
             <Label htmlFor="profile-picture-input-actual">Profile Picture</Label>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
               <div className="relative h-24 w-24 rounded-full overflow-hidden border border-muted bg-muted flex items-center justify-center">
                 {avatarPreviewUrl ? (
                   <Image src={avatarPreviewUrl} alt="Profile preview" fill style={{objectFit: 'cover'}} data-ai-hint="profile avatar" />
@@ -256,7 +255,7 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
                   <UploadCloud className="h-10 w-10 text-muted-foreground" />
                 )}
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('profile-picture-input-actual')?.click()} disabled={loading}>
+              <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => document.getElementById('profile-picture-input-actual')?.click()} disabled={loading}>
                 Change Photo
               </Button>
             </div>
@@ -368,4 +367,3 @@ export function EditProfileDialog({ open, onOpenChange, userProfile, onProfileUp
     </Dialog>
   );
 }
-

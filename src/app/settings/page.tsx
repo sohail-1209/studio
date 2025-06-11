@@ -1,4 +1,3 @@
-
 // src/app/settings/page.tsx
 'use client';
 
@@ -123,12 +122,12 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccountRequest = () => {
-    setIsReauthDialogOpen(true); // Open re-authentication dialog first
+    setIsReauthDialogOpen(true); 
   };
 
   const handleReauthSuccess = () => {
-    setIsReauthDialogOpen(false); // Close re-auth dialog
-    setIsConfirmDeleteDialogOpen(true); // Open final confirmation dialog
+    setIsReauthDialogOpen(false); 
+    setIsConfirmDeleteDialogOpen(true); 
   };
 
   const handleConfirmDeleteAccount = async () => {
@@ -141,7 +140,6 @@ export default function SettingsPage() {
       const userId = currentUser.uid;
       const batch = writeBatch(db);
 
-      // 1. Delete user's posts and associated images
       const postsQuery = query(collection(db, 'posts'), where('userId', '==', userId));
       const postsSnapshot = await getDocs(postsQuery);
       for (const postDoc of postsSnapshot.docs) {
@@ -152,19 +150,15 @@ export default function SettingsPage() {
             await deleteObject(imageFileRef);
           } catch (storageError) {
             console.warn(`Could not delete post image ${postData.imagePath}:`, storageError);
-            // Non-fatal, continue deletion process
           }
         }
-        // TODO: Delete comments subcollection for each post (more robust with Cloud Functions)
         batch.delete(postDoc.ref);
       }
       
-      // 2. Delete notifications where the user is the recipient
       const notificationsQuery = query(collection(db, 'notifications'), where('recipientId', '==', userId));
       const notificationsSnapshot = await getDocs(notificationsQuery);
       notificationsSnapshot.forEach(doc => batch.delete(doc.ref));
 
-      // 3. Delete follow requests involving the user
       const followRequestsSentQuery = query(collection(db, 'followRequests'), where('requesterId', '==', userId));
       const followRequestsSentSnapshot = await getDocs(followRequestsSentQuery);
       followRequestsSentSnapshot.forEach(doc => batch.delete(doc.ref));
@@ -173,24 +167,20 @@ export default function SettingsPage() {
       const followRequestsReceivedSnapshot = await getDocs(followRequestsReceivedQuery);
       followRequestsReceivedSnapshot.forEach(doc => batch.delete(doc.ref));
 
-      // 4. Delete user's profile document
       const profileRef = doc(db, 'profiles', userId);
       batch.delete(profileRef);
 
-      await batch.commit(); // Commit Firestore deletions
+      await batch.commit(); 
 
-      // 5. Delete the user from Firebase Authentication
       await deleteAuthUser(firebaseUser);
 
       toast({ title: "Account Deleted", description: "Your account and associated data have been successfully deleted." });
-      // AuthContext's onAuthStateChanged will handle logout and redirection
     } catch (error: any) {
       console.error("Error deleting account:", error);
       toast({ title: "Account Deletion Failed", description: error.message || "Could not delete your account. Please try again.", variant: "destructive" });
-      // If auth deletion failed, re-authentication might be required again or it's a different issue.
       if (error.code === 'auth/requires-recent-login') {
         toast({ title: "Re-authentication Required", description: "Please re-authenticate to complete account deletion.", variant: "destructive", duration: 6000});
-        setIsReauthDialogOpen(true); // Prompt for re-auth again if it expired
+        setIsReauthDialogOpen(true); 
       }
     } finally {
       setIsDeletingAccount(false);
@@ -220,13 +210,12 @@ export default function SettingsPage() {
             <CardDescription>Manage your account, profile, and appearance settings.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
-            {/* Profile Settings Section */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-3">Profile Settings</h2>
               {loadingProfile ? (
                 <ProfileInfoSkeleton />
               ) : userProfileData ? (
-                <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 bg-muted/30 space-y-3 sm:space-y-0">
                   <div className="flex items-center space-x-4">
                     <Avatar className="h-16 w-16">
                       {userProfileData.photoURL ? (
@@ -240,7 +229,7 @@ export default function SettingsPage() {
                       <p className="text-sm text-muted-foreground">@{userProfileData.username || 'username_not_set'}</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
+                  <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto mt-2 sm:mt-0">
                     <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
                   </Button>
                 </div>
@@ -251,7 +240,6 @@ export default function SettingsPage() {
 
             <Separator />
 
-            {/* Appearance Settings Section */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-3">Appearance</h2>
               <div className="flex items-center justify-between rounded-lg border p-4">
@@ -276,13 +264,12 @@ export default function SettingsPage() {
 
             <Separator />
 
-            {/* Account Management Section */}
             <section>
               <h2 className="text-xl font-semibold text-foreground mb-3">Account Management</h2>
               <div className="space-y-4">
                 <div className="rounded-lg border p-4">
                   <Label className="text-base">Change Password</Label>
-                   <Button variant="outline" size="sm" className="mt-3" onClick={handleChangePassword} disabled={isSendingResetEmail}>
+                   <Button variant="outline" size="sm" className="mt-3 w-full sm:w-auto" onClick={handleChangePassword} disabled={isSendingResetEmail}>
                     {isSendingResetEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                     Send Password Reset Email
                   </Button>
@@ -294,7 +281,7 @@ export default function SettingsPage() {
                   <Label className="text-base text-destructive flex items-center">
                     <AlertTriangle className="mr-2 h-5 w-5" /> Delete Account
                   </Label>
-                   <Button variant="destructive" size="sm" className="mt-3" onClick={handleDeleteAccountRequest} disabled={isDeletingAccount}>
+                   <Button variant="destructive" size="sm" className="mt-3 w-full sm:w-auto" onClick={handleDeleteAccountRequest} disabled={isDeletingAccount}>
                     {isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" /> }
                     Delete My Account
                   </Button>
@@ -356,4 +343,3 @@ export default function SettingsPage() {
     </MainLayout>
   );
 }
-

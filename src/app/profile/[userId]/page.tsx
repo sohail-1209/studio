@@ -1,4 +1,3 @@
-
 // src/app/profile/[userId]/page.tsx
 'use client';
 
@@ -475,26 +474,26 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const handleProfileUpdate = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile); 
     if (currentUser && updatedProfile.uid === currentUser.uid) {
-        reloadUser(); // Reload auth context user if current user's profile was updated
+        reloadUser(); 
     }
   };
   
  const FollowButtonComponent = () => {
     if (isProcessingFollow) {
-        return <Button disabled><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
+        return <Button disabled className="w-full"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
     }
     switch (followStatus) {
         case 'pending_them':
-            return <Button variant="outline" onClick={handleCancelFollowRequest}><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
+            return <Button variant="outline" onClick={handleCancelFollowRequest} className="w-full"><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
         case 'following':
-            return <Button variant="outline" onClick={handleUnfollowUser}><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
+            return <Button variant="outline" onClick={handleUnfollowUser} className="w-full"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
         case 'pending_me':
-            return <Button onClick={() => router.push('/notifications')}><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
+            return <Button onClick={() => router.push('/notifications')} className="w-full"><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
         case 'follow_back':
-            return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>;
+            return <Button onClick={handleFollowRequest} className="w-full"><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>;
         case 'not_following':
         default:
-            return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
+            return <Button onClick={handleFollowRequest} className="w-full"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
     }
  };
   
@@ -526,13 +525,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
                 <p className="text-sm text-muted-foreground">@{profile.username || profile.uid.substring(0,8)}</p>
               </div>
-              <div className="flex space-x-2 w-full sm:w-auto">
+              <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                 {isOwnProfile ? (
                   <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto"><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
                 ) : (
                   <>
                     <FollowButtonComponent />
-                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full sm:w-auto">
+                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full">
                       {isMessaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
                       Message
                     </Button>
@@ -655,4 +654,3 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     </MainLayout>
   );
 }
-

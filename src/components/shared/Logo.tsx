@@ -8,7 +8,7 @@ interface LogoProps {
   textSize?: string;
 }
 
-export function Logo({ className, iconSize = 36, textSize = "text-3xl" }: LogoProps) { 
+export function Logo({ className, iconSize = 32, textSize = "text-2xl" }: LogoProps) { 
   return (
     <Link href="/" className={`flex items-center gap-2 text-logoText ${className}`}>
       <Image

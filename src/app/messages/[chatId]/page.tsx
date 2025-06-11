@@ -1,4 +1,3 @@
-
 // src/app/messages/[chatId]/page.tsx
 'use client';
 
@@ -318,8 +317,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       return;
     }
     toast({
-      title: `${callType === 'audio' ? 'Voice' : 'Video'} Call`,
-      description: `This feature is coming soon! You'll be able to ${callType} call ${chatPartnerProfile.displayName || 'your chat partner'}.`,
+      title: `${callType === 'audio' ? 'Voice' : 'Video'} Call (Coming Soon)`,
+      description: `This feature is under development. You'll soon be able to ${callType} call ${chatPartnerProfile.displayName || 'your chat partner'}.`,
       duration: 5000,
     });
   };
@@ -338,7 +337,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     <MainLayout>
       <div className="flex h-[calc(100vh-theme(spacing.24))] flex-col">
         <header className="flex items-center justify-between border-b bg-card p-4">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 min-w-0">
             <Button variant="ghost" size="icon" asChild className="md:hidden">
               <Link href="/messages"> <ArrowLeft className="h-5 w-5" /> </Link>
             </Button>
@@ -349,20 +348,22 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                     <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
                   ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || 'U').charAt(0)}</AvatarFallback> )}
                 </Avatar>
-                <div> <p className="font-semibold text-foreground">{chatPartnerProfile.displayName}</p> </div>
+                <div className="min-w-0"> 
+                  <p className="font-semibold text-foreground truncate">{chatPartnerProfile.displayName}</p> 
+                </div>
               </>
             ) : (
               <>
                 <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="space-y-1"> <Skeleton className="h-4 w-24" /> </div>
+                <div className="space-y-1 min-w-0"> <Skeleton className="h-4 w-24" /> </div>
               </>
             )}
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" title="Voice Call" onClick={() => handleInitiateCall('audio')} disabled={callButtonsDisabled}>
+          <div className="flex items-center space-x-1 sm:space-x-2">
+            <Button variant="ghost" size="icon" title="Voice Call (Coming Soon)" onClick={() => handleInitiateCall('audio')} disabled={callButtonsDisabled}>
               <Phone className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" title="Video Call" onClick={() => handleInitiateCall('video')} disabled={callButtonsDisabled}>
+            <Button variant="ghost" size="icon" title="Video Call (Coming Soon)" onClick={() => handleInitiateCall('video')} disabled={callButtonsDisabled}>
               <Video className="h-5 w-5" />
             </Button>
           </div>
@@ -398,7 +399,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                           alt="Sent image" 
                           width={250} 
                           height={250} 
-                          className="rounded max-w-full h-auto object-contain border border-border/20" 
+                          className="rounded max-w-full h-auto object-contain border border-border/5" 
                           data-ai-hint={msg.dataAiHint || "chat image"} 
                         />
                          {msg.text ? (
@@ -537,4 +538,3 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     </MainLayout>
   );
 }
-

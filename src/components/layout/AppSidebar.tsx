@@ -1,4 +1,3 @@
-
 // src/components/layout/AppSidebar.tsx
 'use client';
 
@@ -41,10 +40,10 @@ export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = fa
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const {
-    open: isDesktopExpanded, // Renamed from 'state' for clarity, true if desktop sidebar is expanded
+    open: isDesktopExpanded, 
     isMobile,
-    openMobile: isMobileSheetOpen, // state of the mobile sheet
-    toggleSidebar // Toggles desktop OR mobile sheet based on context
+    openMobile: isMobileSheetOpen, 
+    toggleSidebar 
   } = useSidebar();
 
   const isActive = (href: string) => {
@@ -61,7 +60,7 @@ export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = fa
       <SidebarHeader className="p-3">
         <div className="flex h-10 items-center justify-between">
           {showLabels ? (
-            <Logo iconSize={30} textSize="text-2xl" className="gap-2 ml-1" />
+            <Logo iconSize={28} textSize="text-xl" className="gap-2 ml-1" />
           ) : (
             <Link href="/" className="flex items-center justify-center w-full h-full">
               <Image
@@ -74,13 +73,12 @@ export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = fa
               />
             </Link>
           )}
-          {/* Toggle Button: Shown on desktop or if it's the mobile icon strip. Not inside the mobile sheet. */}
           {(!isMobile || isForMobileIconStrip) && (
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={toggleSidebar} // This smart toggle handles desktop expand/collapse OR mobile sheet open/close
+              onClick={toggleSidebar} 
             >
               <PanelLeft />
               <span className="sr-only">Toggle Sidebar</span>
@@ -93,14 +91,13 @@ export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = fa
       <SidebarContent className="p-2">
         <SidebarMenu>
           {navItems.map((item) => {
-            // An item in the mobile icon strip is a pure trigger for the sheet, not a link itself.
             const isButtonPureTrigger = isMobile && isForMobileIconStrip;
             return (
               <SidebarMenuItem key={item.label}>
                 <SidebarMenuButton
                   asChild={!isButtonPureTrigger}
                   size="default"
-                  isActive={!isButtonPureTrigger && isActive(item.href)} // Active state only for actual links
+                  isActive={!isButtonPureTrigger && isActive(item.href)} 
                   tooltip={showTooltips ? { content: item.tooltip, side: "right", align: "center", className: "ml-1" } : undefined}
                   className="justify-start h-9 px-2.5 text-sm"
                   onClick={isButtonPureTrigger ? () => { if (!isMobileSheetOpen) toggleSidebar(); } : undefined}
@@ -108,7 +105,6 @@ export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = fa
                   {isButtonPureTrigger ? (
                     <>
                       <item.icon className="h-5 w-5 shrink-0" />
-                      {/* No label in icon strip, showLabels will be false here anyway */}
                     </>
                   ) : (
                     <Link href={item.href}>
@@ -127,7 +123,6 @@ export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = fa
       <SidebarFooter className="p-2 space-y-1">
         {user && (
           <SidebarMenu>
-            {/* Profile Link */}
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild={!(isMobile && isForMobileIconStrip)}
@@ -151,7 +146,6 @@ export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = fa
                  )}
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {/* Settings Link */}
              <SidebarMenuItem>
               <SidebarMenuButton
                 asChild={!(isMobile && isForMobileIconStrip)}
@@ -171,17 +165,15 @@ export function AppSidebar({ isForMobileSheet = false, isForMobileIconStrip = fa
                 )}
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {/* Logout Button */}
             <SidebarMenuItem>
               <SidebarMenuButton
-                asChild={false} // Logout is always a button
+                asChild={false} 
                 size="default"
                 onClick={() => {
-                  // If on mobile icon strip, clicking logout should open the sheet to confirm/use full menu logout
                   if (isMobile && isForMobileIconStrip) {
                     if (!isMobileSheetOpen) toggleSidebar();
                   } else {
-                    logout(); // Actual logout for desktop or from mobile sheet
+                    logout(); 
                   }
                 }}
                 tooltip={showTooltips ? { content: "Logout", side: "right", align: "center", className: "ml-1" } : undefined}
