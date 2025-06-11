@@ -262,7 +262,6 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     try {
       const messageRef = doc(db, 'chats', chatId, 'messages', messageToDelete.id);
       
-      // Delete image from storage if it exists
       if (messageToDelete.imagePath) {
         const imageFileRef = storageRef(storage, messageToDelete.imagePath);
         await deleteObject(imageFileRef).catch(storageError => {
@@ -271,25 +270,21 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
         });
       }
 
-      // Delete the message document
       await deleteDoc(messageRef);
 
-      // Update last message on chat session if this was the last message
-      // This is a simplified client-side check. For more robust "last message" updates,
-      // especially if multiple users can delete, a Cloud Function might be better.
       const currentMessages = messages.filter(m => m.id !== messageToDelete.id);
       if (currentMessages.length > 0) {
         const lastMsgInUI = currentMessages[currentMessages.length - 1];
-        if (messageToDelete.timestamp >= (lastMsgInUI.timestamp || new Date(0))) { // Check if deleted was indeed last or newer
+        if (messageToDelete.timestamp >= (lastMsgInUI.timestamp || new Date(0))) { 
              const chatDocRef = doc(db, 'chats', chatId);
              await updateDoc(chatDocRef, {
                 lastMessageText: lastMsgInUI.imageUrl ? (lastMsgInUI.text ? lastMsgInUI.text : "📷 Image") : lastMsgInUI.text,
                 lastMessageSenderId: lastMsgInUI.senderId,
-                lastMessageTimestamp: serverTimestamp(), // Or use lastMsgInUI.timestamp if it's already a server timestamp
+                lastMessageTimestamp: serverTimestamp(), 
                 updatedAt: serverTimestamp(),
              });
         }
-      } else { // No messages left or deleted message was the only one
+      } else { 
          const chatDocRef = doc(db, 'chats', chatId);
          await updateDoc(chatDocRef, {
             lastMessageText: "🗑️ Message deleted",
@@ -298,7 +293,6 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
             updatedAt: serverTimestamp(),
          });
       }
-
 
       toast({ title: "Message Deleted", description: "The message has been removed." });
     } catch (error: any) {
@@ -314,7 +308,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const MessageSkeleton = () => (
     <div className="flex items-end space-x-2 my-2">
       <Skeleton className="h-8 w-8 rounded-full" />
-      <Skeleton className="h-10 w-3/5 rounded-lg" />
+      <Skeleton className="h-12 w-3/5 rounded-lg" />
     </div>
   );
 
@@ -355,7 +349,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
           {!loadingMessages && (
             <div className="space-y-4">
               {messages.map((msg) => (
-                <div key={msg.id} className={cn("flex items-end space-x-2", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
+                <div key={msg.id} className={cn("flex items-end space-x-2 group", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
                   {msg.senderId !== user?.uid && chatPartnerProfile && (
                     <Avatar className="h-8 w-8 self-start">
                        {chatPartnerProfile.photoURL ? (
@@ -363,20 +357,34 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                       ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
                     </Avatar>
                   )}
-                  <div className={cn("max-w-xs rounded-lg p-1 lg:max-w-md shadow relative group", msg.senderId === user?.uid ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>
+                  <div 
+                    className={cn(
+                      "max-w-xs rounded-lg p-2.5 lg:max-w-md shadow-md relative", 
+                      msg.senderId === user?.uid 
+                        ? "bg-primary text-primary-foreground rounded-tr-none" 
+                        : "bg-muted text-foreground rounded-tl-none border border-border/70"
+                    )}
+                  >
                     {msg.imageUrl ? (
-                      <div className="p-2">
-                        <Image src={msg.imageUrl} alt="Sent image" width={250} height={250} className="rounded-md max-w-full h-auto object-contain" data-ai-hint={msg.dataAiHint || "chat image"} />
-                         {msg.text && <p className="text-sm whitespace-pre-wrap pt-2">{msg.text}</p>}
+                      <div className="space-y-1">
+                        <Image 
+                          src={msg.imageUrl} 
+                          alt="Sent image" 
+                          width={250} 
+                          height={250} 
+                          className="rounded max-w-full h-auto object-contain" 
+                          data-ai-hint={msg.dataAiHint || "chat image"} 
+                        />
+                         {msg.text && <p className="text-sm whitespace-pre-wrap px-0.5">{msg.text}</p>}
                       </div>
                     ) : (
-                       msg.text && <p className="text-sm whitespace-pre-wrap p-3">{msg.text}</p>
+                       msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                     )}
                      {msg.senderId === user?.uid && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="absolute top-0.5 right-0.5 h-6 w-6 p-1 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary/50 transition-opacity"
+                          className="absolute top-0.5 right-0.5 h-6 w-6 p-1 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                           onClick={() => handleDeleteMessageRequest(msg)}
                           title="Delete message"
                           disabled={isDeletingMessage}
@@ -384,7 +392,12 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                           {isDeletingMessage && messageToDelete?.id === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={12} />}
                         </Button>
                       )}
-                    <p className={cn("mt-1 text-xs px-3 pb-1", msg.senderId === user?.uid ? "text-primary-foreground/70 text-right" : "text-muted-foreground text-right")}>
+                    <p 
+                      className={cn(
+                        "mt-1.5 text-xs text-right", 
+                        msg.senderId === user?.uid ? "text-primary-foreground/80" : "text-muted-foreground"
+                      )}
+                    >
                       {msg.timestamp ? format(msg.timestamp, 'p') : ''}
                     </p>
                   </div>
@@ -397,7 +410,9 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                         <Image src={chatPartnerProfile.photoURL} alt="Sender" width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
                        ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
                     </Avatar>
-                  <div className="bg-muted text-foreground rounded-lg p-3 shadow"> <p className="text-sm italic">typing...</p> </div>
+                  <div className="bg-muted text-foreground rounded-lg p-2.5 shadow-md border border-border/70 rounded-tl-none"> 
+                    <p className="text-sm italic">typing...</p> 
+                  </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -407,7 +422,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
 
         <footer className="border-t bg-card p-4">
           {filePreviewUrl && (
-            <div className="mb-2 p-2 border rounded-md relative bg-muted">
+            <div className="mb-2 p-2 border rounded-md relative bg-card shadow-sm">
               <Image src={filePreviewUrl} alt="File preview" width={80} height={80} className="rounded object-contain" />
               <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={clearFileSelection}>
                 <XCircle className="h-4 w-4" />
