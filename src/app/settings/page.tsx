@@ -10,35 +10,53 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { SettingsIcon, Edit3, Palette, ShieldCheck, LogOut, AlertTriangle, Moon, Sun } from 'lucide-react';
+import { SettingsIcon, Edit3, Palette, ShieldCheck, LogOut, AlertTriangle, Moon, Sun, Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/contexts/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage, auth } from '@/lib/firebase'; // Ensure auth is imported
+import { doc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { deleteObject, ref as storageRef } from 'firebase/storage';
+import { sendPasswordResetEmail, deleteUser as deleteAuthUser } from 'firebase/auth'; // Import deleteUser
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
+import { ReauthenticateDialog } from '@/components/auth/ReauthenticateDialog'; // Import ReauthenticateDialog
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 type Theme = 'light' | 'dark';
 
 export default function SettingsPage() {
-  const { user: currentUser, logout, reloadUser } = useAuth();
+  const { user: currentUser, firebaseUser, logout, reloadUser } = useAuth();
   const { toast } = useToast();
 
   const [userProfileData, setUserProfileData] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<Theme>('light');
+  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
+  
+  const [isReauthDialogOpen, setIsReauthDialogOpen] = useState(false);
+  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
 
   useEffect(() => {
-    // Initialize theme from localStorage or default to light
     const storedTheme = localStorage.getItem('theme') as Theme | null;
     if (storedTheme) {
       setCurrentTheme(storedTheme);
       document.documentElement.classList.toggle('dark', storedTheme === 'dark');
     } else {
-      // Default to light if no theme is stored
       setCurrentTheme('light');
       document.documentElement.classList.remove('dark');
     }
@@ -82,9 +100,102 @@ export default function SettingsPage() {
   }, [fetchProfile]);
 
   const handleProfileUpdate = async (updatedProfile: UserProfile) => {
-    setUserProfileData(updatedProfile); // Update local state immediately
-    await reloadUser(); // Reload user in AuthContext to reflect changes globally
+    setUserProfileData(updatedProfile); 
+    await reloadUser(); 
     toast({ title: "Profile Updated", description: "Your settings page reflects the latest changes." });
+  };
+
+  const handleChangePassword = async () => {
+    if (!firebaseUser || !firebaseUser.email) {
+      toast({ title: "Error", description: "User email not found. Cannot send reset link.", variant: "destructive"});
+      return;
+    }
+    setIsSendingResetEmail(true);
+    try {
+      await sendPasswordResetEmail(auth, firebaseUser.email);
+      toast({ title: "Password Reset Email Sent", description: `A password reset link has been sent to ${firebaseUser.email}. Please check your inbox.`});
+    } catch (error: any) {
+      console.error("Error sending password reset email:", error);
+      toast({ title: "Error", description: error.message || "Failed to send password reset email.", variant: "destructive"});
+    } finally {
+      setIsSendingResetEmail(false);
+    }
+  };
+
+  const handleDeleteAccountRequest = () => {
+    setIsReauthDialogOpen(true); // Open re-authentication dialog first
+  };
+
+  const handleReauthSuccess = () => {
+    setIsReauthDialogOpen(false); // Close re-auth dialog
+    setIsConfirmDeleteDialogOpen(true); // Open final confirmation dialog
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    if (!firebaseUser || !currentUser) {
+      toast({ title: "Error", description: "User session not found.", variant: "destructive" });
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      const userId = currentUser.uid;
+      const batch = writeBatch(db);
+
+      // 1. Delete user's posts and associated images
+      const postsQuery = query(collection(db, 'posts'), where('userId', '==', userId));
+      const postsSnapshot = await getDocs(postsQuery);
+      for (const postDoc of postsSnapshot.docs) {
+        const postData = postDoc.data();
+        if (postData.imagePath) {
+          try {
+            const imageFileRef = storageRef(storage, postData.imagePath);
+            await deleteObject(imageFileRef);
+          } catch (storageError) {
+            console.warn(`Could not delete post image ${postData.imagePath}:`, storageError);
+            // Non-fatal, continue deletion process
+          }
+        }
+        // TODO: Delete comments subcollection for each post (more robust with Cloud Functions)
+        batch.delete(postDoc.ref);
+      }
+      
+      // 2. Delete notifications where the user is the recipient
+      const notificationsQuery = query(collection(db, 'notifications'), where('recipientId', '==', userId));
+      const notificationsSnapshot = await getDocs(notificationsQuery);
+      notificationsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+      // 3. Delete follow requests involving the user
+      const followRequestsSentQuery = query(collection(db, 'followRequests'), where('requesterId', '==', userId));
+      const followRequestsSentSnapshot = await getDocs(followRequestsSentQuery);
+      followRequestsSentSnapshot.forEach(doc => batch.delete(doc.ref));
+      
+      const followRequestsReceivedQuery = query(collection(db, 'followRequests'), where('recipientId', '==', userId));
+      const followRequestsReceivedSnapshot = await getDocs(followRequestsReceivedQuery);
+      followRequestsReceivedSnapshot.forEach(doc => batch.delete(doc.ref));
+
+      // 4. Delete user's profile document
+      const profileRef = doc(db, 'profiles', userId);
+      batch.delete(profileRef);
+
+      await batch.commit(); // Commit Firestore deletions
+
+      // 5. Delete the user from Firebase Authentication
+      await deleteAuthUser(firebaseUser);
+
+      toast({ title: "Account Deleted", description: "Your account and associated data have been successfully deleted." });
+      // AuthContext's onAuthStateChanged will handle logout and redirection
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      toast({ title: "Account Deletion Failed", description: error.message || "Could not delete your account. Please try again.", variant: "destructive" });
+      // If auth deletion failed, re-authentication might be required again or it's a different issue.
+      if (error.code === 'auth/requires-recent-login') {
+        toast({ title: "Re-authentication Required", description: "Please re-authenticate to complete account deletion.", variant: "destructive", duration: 6000});
+        setIsReauthDialogOpen(true); // Prompt for re-auth again if it expired
+      }
+    } finally {
+      setIsDeletingAccount(false);
+      setIsConfirmDeleteDialogOpen(false);
+    }
   };
 
   const ProfileInfoSkeleton = () => (
@@ -171,21 +282,25 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="rounded-lg border p-4">
                   <Label className="text-base">Change Password</Label>
+                   <Button variant="outline" size="sm" className="mt-3" onClick={handleChangePassword} disabled={isSendingResetEmail}>
+                    {isSendingResetEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                    Send Password Reset Email
+                  </Button>
                   <p className="text-sm text-muted-foreground mt-1">
-                    To change your password, please log out and use the "Forgot Password?" link on the login page.
-                    This feature is not directly available within active sessions for security reasons.
+                    A link to reset your password will be sent to your registered email address.
                   </p>
                 </div>
                 <div className="rounded-lg border p-4 border-destructive/50 bg-destructive/5">
                   <Label className="text-base text-destructive flex items-center">
                     <AlertTriangle className="mr-2 h-5 w-5" /> Delete Account
                   </Label>
-                  <p className="text-sm text-destructive/80 mt-1">
-                    Account deletion is a permanent action and cannot be undone. This feature is currently not implemented.
-                  </p>
-                  <Button variant="destructive" size="sm" className="mt-3" disabled>
-                    Request Account Deletion (Disabled)
+                   <Button variant="destructive" size="sm" className="mt-3" onClick={handleDeleteAccountRequest} disabled={isDeletingAccount}>
+                    {isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" /> }
+                    Delete My Account
                   </Button>
+                  <p className="text-sm text-destructive/80 mt-1">
+                    This action is permanent and cannot be undone. All your data will be removed.
+                  </p>
                 </div>
                  <div className="rounded-lg border p-4">
                    <Button variant="outline" onClick={logout} className="w-full sm:w-auto">
@@ -209,6 +324,35 @@ export default function SettingsPage() {
           onProfileUpdate={handleProfileUpdate}
         />
       )}
+      
+      <ReauthenticateDialog
+        open={isReauthDialogOpen}
+        onOpenChange={setIsReauthDialogOpen}
+        onSuccess={handleReauthSuccess}
+      />
+
+      <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsConfirmDeleteDialogOpen(false)} disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteAccount}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Yes, Delete My Account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </MainLayout>
   );
 }
