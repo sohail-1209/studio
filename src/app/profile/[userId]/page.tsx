@@ -73,7 +73,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         if (docSnap.exists()) {
           setProfile(docSnap.data() as UserProfile);
         } else {
-          console.error("No such profile!");
+          console.warn("Profile not found for userId:", userId);
           toast({ title: "Profile not found", variant: "destructive" });
           setProfile(null); 
         }
@@ -86,28 +86,30 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
 
       setLoadingPosts(true);
+      // Simplified query: fetch all user content (posts & stories), then filter client-side
       const postsQuery = query(
         collection(db, 'posts'),
         where('userId', '==', userId),
-        where('isStory', '!=', true),
         orderBy('createdAt', 'desc')
       );
-
+    
       const unsubscribePosts = onSnapshot(postsQuery, (querySnapshot) => {
-        const userPosts = querySnapshot.docs.map(docSnap => ({
+        const userContent = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
           ...docSnap.data(),
           createdAt: (docSnap.data().createdAt as Timestamp)?.toDate ? (docSnap.data().createdAt as Timestamp).toDate() : new Date(),
           imagePath: docSnap.data().imagePath || null,
         } as Post));
-        setPosts(userPosts);
+        
+        const regularPosts = userContent.filter(post => post.isStory !== true);
+        setPosts(regularPosts);
         setLoadingPosts(false);
       }, (error) => {
         console.error("Error fetching posts:", error);
         if (error.code === 'failed-precondition') {
              toast({ 
-                title: "Error Fetching Posts", 
-                description: "A database index might be required for this query. Please check Firebase console.", 
+                title: "Error Fetching User Posts", 
+                description: "A database index might be required. Please check Firebase console for (userId ASC, createdAt DESC) on 'posts' collection.", 
                 variant: "destructive",
                 duration: 10000
             });
