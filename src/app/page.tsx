@@ -1,10 +1,15 @@
 // src/app/page.tsx (Feed Page)
+'use client';
+
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import Image from 'next/image';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useState } from 'react';
+import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
+
 
 // Placeholder data for posts
 const posts = [
@@ -36,16 +41,20 @@ const posts = [
 ];
 
 export default function FeedPage() {
+  const [isCreatePostDialogOpen, setIsCreatePostDialogOpen] = useState(false);
+
   return (
     <MainLayout>
       <div className="container mx-auto max-w-2xl py-8">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="font-headline text-3xl font-bold text-foreground">Feed</h1>
-          <Button>
+          <Button onClick={() => setIsCreatePostDialogOpen(true)}>
             <PlusCircle className="mr-2 h-5 w-5" />
             Create Post
           </Button>
         </div>
+
+        <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
 
         {/* Placeholder for Stories */}
         <Card className="mb-8">
@@ -74,7 +83,10 @@ export default function FeedPage() {
             <Card key={post.id} className="overflow-hidden shadow-lg">
               <CardHeader className="p-4">
                 <div className="flex items-center space-x-3">
-                  <Image src={post.user.avatar} alt={post.user.name} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
+                  <Avatar>
+                    <AvatarImage src={post.user.avatar} alt={post.user.name} data-ai-hint="user avatar" />
+                    <AvatarFallback>{post.user.name.substring(0,2)}</AvatarFallback>
+                  </Avatar>
                   <div>
                     <p className="font-semibold text-foreground">{post.user.name}</p>
                     <p className="text-xs text-muted-foreground">2 hours ago</p> {/* Placeholder timestamp */}
