@@ -59,7 +59,8 @@ function LayoutContent({ children }: MainLayoutProps) {
           </Sheet>
           {/* Mobile: Main Content Area, offset by the icon strip */}
           <main className="flex-1 overflow-y-auto" style={{ marginLeft: 'var(--sidebar-width-icon)' }}>
-            <div className="mx-auto max-w-md p-4"> {/* Content narrower and centered on mobile */}
+            {/* Removed max-w-md and mx-auto from inner div, ensure children can take full available width with padding */}
+            <div className="p-4">
               {children}
             </div>
           </main>
@@ -97,4 +98,3 @@ export function MainLayout({ children }: MainLayoutProps) {
     </SidebarProvider>
   )
 }
-
