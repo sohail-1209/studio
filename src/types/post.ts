@@ -22,7 +22,9 @@ export interface PostDocument {
   userAvatarUrl: string | null;
   caption: string;
   imageUrl?: string | null;
+  imagePath?: string | null; // Path in Firebase Storage for deletion
   videoUrl?: string | null;
+  // videoPath?: string | null; // Path in Firebase Storage for video deletion
   likesCount: number;
   likedBy?: string[]; // Array of user UIDs who liked the post
   commentsCount: number;

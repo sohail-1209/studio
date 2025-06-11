@@ -1,4 +1,3 @@
-
 // src/components/stories/StoryViewerDialog.tsx
 'use client';
 
@@ -7,35 +6,43 @@ import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import type { Post } from '@/types/post';
 import { formatDistanceToNow } from 'date-fns';
 import { Spinner } from '@/components/shared/Spinner';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+// Note: The AlertDialog for delete confirmation will be managed by the parent (FeedPage) for simplicity
+// or we can pass a specific onDelete function for the currently viewed story.
 
 interface StoryViewerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stories: Post[];
   author: {
+    userId: string;
     displayName: string | null;
     photoURL: string | null;
-    userId: string;
   } | null;
   loadingStories: boolean;
+  onDeleteStory: (story: Post) => void; // Callback to request deletion
 }
 
-export function StoryViewerDialog({ open, onOpenChange, stories, author, loadingStories }: StoryViewerDialogProps) {
+export function StoryViewerDialog({ open, onOpenChange, stories, author, loadingStories, onDeleteStory }: StoryViewerDialogProps) {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    // Reset to first story when dialog opens or stories/author changes
     setCurrentStoryIndex(0);
   }, [open, stories, author]);
 
-  // Parent component (FeedPage) should control dialog rendering via `open` prop.
-  // We assume `author` is valid if `open` is true and not `loadingStories` for a specific author.
-
   const currentStory = stories[currentStoryIndex];
+  const isOwnStory = currentUser?.uid === author?.userId;
 
   const goToNextStory = () => {
     setCurrentStoryIndex((prevIndex) => Math.min(prevIndex + 1, stories.length - 1));
@@ -49,11 +56,26 @@ export function StoryViewerDialog({ open, onOpenChange, stories, author, loading
     onOpenChange(false);
   };
 
+  const handleDeleteClick = () => {
+    if (currentStory && isOwnStory) {
+      onDeleteStory(currentStory);
+      // Dialog might close or show next story depending on parent's logic
+      // For simplicity, we assume parent handles closing or navigating after deletion.
+      // If there are no more stories, parent should close the dialog.
+      if (stories.length === 1) { // If it was the last story
+        onOpenChange(false);
+      } else if (currentStoryIndex >= stories.length -1) { // If deleting the last story in a list
+        setCurrentStoryIndex(Math.max(0, stories.length - 2));
+      }
+      // else currentStoryIndex remains, next story will show. Parent re-fetches/filters list.
+    }
+  };
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl p-0 gap-0 !rounded-lg overflow-hidden aspect-[9/16] max-h-[90vh] flex flex-col bg-black">
-        {/* DialogHeader and DialogTitle are always rendered when DialogContent is open */}
-        <DialogHeader className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/50 to-transparent">
+        <DialogHeader className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/60 to-transparent flex flex-row justify-between items-center">
           <div className="flex items-center space-x-2">
             {author && (
               <Avatar className="h-8 w-8">
@@ -63,7 +85,7 @@ export function StoryViewerDialog({ open, onOpenChange, stories, author, loading
             )}
             <div>
               <DialogTitle className="text-sm font-semibold text-white">
-                {loadingStories ? "Loading Stories..." : (author?.displayName || "Story")}
+                {loadingStories ? "Loading..." : (author?.displayName || "Story")}
               </DialogTitle>
               {!loadingStories && currentStory && author && (
                 <p className="text-xs text-gray-300">
@@ -72,12 +94,26 @@ export function StoryViewerDialog({ open, onOpenChange, stories, author, loading
               )}
             </div>
           </div>
+           {isOwnStory && currentStory && !loadingStories && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 h-8 w-8">
+                  <MoreHorizontal className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Story
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </DialogHeader>
 
-        {/* Main content area: takes up remaining space and has padding for the header */}
-        <div className="flex-1 w-full h-full flex items-center justify-center overflow-hidden pt-[60px]"> {/* pt-[60px] approx header height */}
+        <div className="flex-1 w-full h-full flex items-center justify-center overflow-hidden pt-[60px]">
           {loadingStories && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-20"> {/* Spinner overlay */}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-20">
               <Spinner size={48} className="text-white" />
             </div>
           )}
@@ -108,6 +144,11 @@ export function StoryViewerDialog({ open, onOpenChange, stories, author, loading
                   <p className="whitespace-pre-wrap">{currentStory.caption}</p>
                 </div>
               )}
+              {currentStory.caption && currentStory.imageUrl && ( // Show caption below image if both exist
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+                  <p className="text-white text-sm text-center whitespace-pre-wrap">{currentStory.caption}</p>
+                </div>
+              )}
             </>
           )}
           {!loadingStories && !currentStory && author && (
@@ -117,7 +158,6 @@ export function StoryViewerDialog({ open, onOpenChange, stories, author, loading
           )}
         </div>
 
-        {/* Navigation Buttons */}
         {!loadingStories && stories.length > 1 && (
           <>
             {currentStoryIndex > 0 && (

@@ -1,7 +1,7 @@
 // src/components/posts/CommentList.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import type { Comment } from '@/types/post';
@@ -51,6 +51,13 @@ export function CommentList({ postId }: CommentListProps) {
     return () => unsubscribe();
   }, [postId]);
 
+  const handleCommentDeleted = useCallback((deletedCommentId: string) => {
+    // The onSnapshot listener should automatically update the list.
+    // If not, or for immediate optimistic UI update, you could filter here:
+    // setComments(prevComments => prevComments.filter(comment => comment.id !== deletedCommentId));
+  }, []);
+
+
   if (loadingComments) {
     return (
       <div className="space-y-3 py-3">
@@ -79,7 +86,12 @@ export function CommentList({ postId }: CommentListProps) {
   return (
     <div className="divide-y">
       {comments.map((comment) => (
-        <CommentItem key={comment.id} comment={comment} />
+        <CommentItem 
+          key={comment.id} 
+          comment={comment} 
+          postId={postId} 
+          onCommentDeleted={handleCommentDeleted}
+        />
       ))}
     </div>
   );

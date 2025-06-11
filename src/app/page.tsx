@@ -5,15 +5,16 @@
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Heart, MessageCircle as MessageIcon, Share2 } from 'lucide-react';
+import { PlusCircle, Heart, MessageCircle as MessageIcon, Share2, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useEffect, useCallback } from 'react';
 import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
-import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase';
+import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit, where, getDocs, addDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { ref as storageRef, deleteObject } from 'firebase/storage';
 import type { Post, PostDocument } from '@/types/post';
-import type { NotificationDocument } from '@/types/notification'; // Import notification type
+import type { NotificationDocument } from '@/types/notification';
 import { formatDistanceToNow, subHours } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +24,23 @@ import { CommentInput } from '@/components/posts/CommentInput';
 import { CommentList } from '@/components/posts/CommentList';
 import { Separator } from '@/components/ui/separator';
 import { StoryViewerDialog } from '@/components/stories/StoryViewerDialog'; 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface StoryUserData {
   userId: string;
@@ -41,7 +59,6 @@ export default function FeedPage() {
   const [isLiking, setIsLiking] = useState<{[postId: string]: boolean}>({});
   const [showComments, setShowComments] = useState<{[postId: string]: boolean}>({});
 
-  // Story specific state
   const [storiesData, setStoriesData] = useState<StoryUserData[]>([]);
   const [loadingStoriesReel, setLoadingStoriesReel] = useState(true);
   const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
@@ -49,10 +66,14 @@ export default function FeedPage() {
   const [currentUserStories, setCurrentUserStories] = useState<Post[]>([]);
   const [loadingCurrentUserStories, setLoadingCurrentUserStories] = useState(false);
 
+  // State for delete confirmation
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
+
 
   useEffect(() => {
     const postsCollectionRef = collection(db, 'posts');
-    // Fetch Posts (regular feed - ensure isStory is not true)
     const qPosts = query(postsCollectionRef, where('isStory', '!=', true), orderBy('createdAt', 'desc')); 
 
     setLoadingPosts(true);
@@ -68,7 +89,8 @@ export default function FeedPage() {
             likedBy: Array.isArray(data.likedBy) ? data.likedBy : [],
             likesCount: data.likesCount || 0,
             commentsCount: data.commentsCount || 0,
-            isStory: data.isStory || false, // Default isStory to false if not present
+            isStory: data.isStory || false,
+            imagePath: data.imagePath || null,
           } as Post;
         });
         setPosts(fetchedPosts); 
@@ -85,13 +107,12 @@ export default function FeedPage() {
       }
     );
 
-    // Fetch Stories Data for the Reel
     setLoadingStoriesReel(true);
     const twentyFourHoursAgo = subHours(new Date(), 24);
     const twentyFourHoursAgoTimestamp = Timestamp.fromDate(twentyFourHoursAgo);
 
     const qStoriesReel = query(
-      postsCollectionRef, // Use the same collection reference
+      postsCollectionRef, 
       where('isStory', '==', true),
       where('createdAt', '>=', twentyFourHoursAgoTimestamp),
       orderBy('createdAt', 'desc'), 
@@ -153,8 +174,7 @@ export default function FeedPage() {
           likesCount: increment(1),
         });
 
-        // Create notification if not liking own post
-        if (user.uid !== currentPost.userId) {
+        if (user.uid !== currentPost.userId && !currentPost.isStory) { // Only notify for non-story posts
           const notificationsColRef = collection(db, 'notifications');
           let contentPreview = currentPost.caption 
             ? (currentPost.caption.substring(0, 50) + (currentPost.caption.length > 50 ? '...' : '')) 
@@ -259,6 +279,7 @@ export default function FeedPage() {
         id: docSnap.id,
         ...docSnap.data(),
         createdAt: (docSnap.data().createdAt as Timestamp).toDate(),
+        imagePath: docSnap.data().imagePath || null,
       } as Post));
       setCurrentUserStories(fetchedStories);
     } catch (error: any) {
@@ -269,6 +290,58 @@ export default function FeedPage() {
       setLoadingCurrentUserStories(false);
     }
   }, [toast]);
+
+  const handleDeleteRequest = (post: Post) => {
+    setPostToDelete(post);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeletePost = async () => {
+    if (!postToDelete || !user || postToDelete.userId !== user.uid) {
+      toast({ title: "Error", description: "Cannot delete this post.", variant: "destructive" });
+      setIsDeleteDialogOpen(false);
+      setPostToDelete(null);
+      return;
+    }
+    setIsDeletingPost(true);
+    try {
+      const postRef = doc(db, 'posts', postToDelete.id);
+      
+      // 1. Delete comments subcollection
+      const commentsRef = collection(postRef, 'comments');
+      const commentsSnapshot = await getDocs(commentsRef);
+      const batch = writeBatch(db);
+      commentsSnapshot.docs.forEach(commentDoc => {
+        batch.delete(commentDoc.ref);
+      });
+      await batch.commit();
+
+      // 2. Delete image from storage (if exists)
+      if (postToDelete.imagePath) {
+        const imageFileRef = storageRef(storage, postToDelete.imagePath);
+        await deleteObject(imageFileRef).catch(storageError => {
+          // Log storage error but continue deleting Firestore doc
+          console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
+          toast({ title: "Storage Warning", description: "Could not delete image file, but post will be deleted.", variant: "default", duration: 5000 });
+        });
+      }
+      // Add similar logic for videoPath if implemented
+
+      // 3. Delete the post document
+      await deleteDoc(postRef);
+
+      toast({ title: "Post Deleted", description: "Your post has been successfully deleted." });
+      // UI will update via onSnapshot, or filter locally:
+      // setPosts(prevPosts => prevPosts.filter(p => p.id !== postToDelete.id));
+    } catch (error: any) {
+      console.error("Error deleting post:", error);
+      toast({ title: "Deletion Failed", description: error.message || "Could not delete post.", variant: "destructive" });
+    } finally {
+      setIsDeletingPost(false);
+      setIsDeleteDialogOpen(false);
+      setPostToDelete(null);
+    }
+  };
 
 
   const PostSkeleton = () => (
@@ -324,7 +397,6 @@ export default function FeedPage() {
         </div>
 
         <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
-
         
         <Card className="mb-8">
           <CardHeader>
@@ -382,10 +454,10 @@ export default function FeedPage() {
             stories={currentUserStories}
             author={selectedStoryAuthor}
             loadingStories={loadingCurrentUserStories}
+            onDeleteStory={handleDeleteRequest} // Pass delete handler
             />
         )}
 
-        
         <div className="space-y-8">
           {loadingPosts && (
             <> <PostSkeleton /> <PostSkeleton /> </>
@@ -410,7 +482,6 @@ export default function FeedPage() {
                 ? (post.caption.substring(0, 30) + (post.caption.length > 30 ? '...' : '')) 
                 : (post.imageUrl ? 'your image' : (post.videoUrl ? 'your video' : 'your post'));
 
-
             return (
               <Card key={post.id} className="overflow-hidden shadow-lg">
                 <CardHeader className="p-4">
@@ -428,6 +499,22 @@ export default function FeedPage() {
                         {post.createdAt ? formatDistanceToNow(post.createdAt, { addSuffix: true }) : 'just now'}
                       </p>
                     </div>
+                     {isCurrentUserPost && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="ml-auto h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">More options</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Post
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -504,7 +591,25 @@ export default function FeedPage() {
           })}
         </div>
       </div>
+      {postToDelete && (
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete this {postToDelete.isStory ? 'story' : 'post'} and all its comments.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPostToDelete(null)} disabled={isDeletingPost}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeletePost} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingPost}>
+                {isDeletingPost ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </MainLayout>
   );
 }
-    

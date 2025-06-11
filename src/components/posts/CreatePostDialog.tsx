@@ -18,7 +18,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch'; // Added Switch
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
@@ -46,7 +46,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [isStory, setIsStory] = useState(false); // State for the story switch
+  const [isStory, setIsStory] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -79,7 +79,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
     setSelectedFile(null);
     setPreviewUrl(null);
     setUploadProgress(null);
-    setIsStory(false); // Reset story switch
+    setIsStory(false);
   };
 
   const handleDialogClose = (isOpen: boolean) => {
@@ -99,22 +99,18 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       return;
     }
 
-    // If it's a story, an image might be preferred or required by your product logic.
-    // For now, we allow stories with or without images, similar to posts.
-    // if (isStory && !selectedFile) {
-    //   toast({ title: "Story requires an image", description: "Please select an image for your story.", variant: "destructive"});
-    //   return;
-    // }
-
     setLoading(true);
     setUploadProgress(0);
 
     try {
       let imageUrl: string | null = null;
+      let imagePath: string | null = null;
 
       if (selectedFile) {
         const uniqueFileName = `${Date.now()}-${selectedFile.name}`;
-        const fileRef = storageRef(storage, `post_images/${user.uid}/${uniqueFileName}`);
+        const filePath = `post_images/${user.uid}/${uniqueFileName}`;
+        const fileRef = storageRef(storage, filePath);
+        imagePath = filePath; // Store the path for deletion
         const uploadTask = uploadBytesResumable(fileRef, selectedFile);
 
         await new Promise<void>((resolve, reject) => {
@@ -141,12 +137,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
             }
           );
         });
-        if (!imageUrl && selectedFile) { // Ensure imageUrl is set if a file was supposed to be uploaded
+        if (!imageUrl && selectedFile) { 
           throw new Error("Image upload completed but failed to get URL.");
         }
       }
       
-      setUploadProgress(selectedFile ? 100 : null); // Only show 100% if a file was processed
+      setUploadProgress(selectedFile ? 100 : null);
 
       const postData: PostDocument = {
         userId: user.uid,
@@ -154,13 +150,14 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         userAvatarUrl: user.photoURL || null,
         caption: data.caption,
         imageUrl: imageUrl,
-        videoUrl: null,
+        imagePath: imagePath, // Save the imagePath
+        videoUrl: null, 
         likesCount: 0,
         likedBy: [], 
         commentsCount: 0,
         createdAt: serverTimestamp(),
         dataAiHint: selectedFile ? 'user uploaded content' : undefined,
-        isStory: isStory, // Add the isStory flag
+        isStory: isStory,
       };
 
       await addDoc(collection(db, 'posts'), postData);

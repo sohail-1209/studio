@@ -9,18 +9,35 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
-import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext'; // Renamed to avoid conflict
+import { db, storage } from '@/lib/firebase';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { ref as storageRef, deleteObject } from 'firebase/storage';
+import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext';
 import type { Post } from '@/types/post';
 import { useAuth } from '@/hooks/useAuth';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-// Define a local UserProfile type that extends the one from AuthContext if needed
+
 interface UserProfile extends AuthContextUserProfile {
   coverPhotoURL?: string;
   followersCount?: number;
@@ -42,13 +59,17 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
 
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
+
   const isOwnProfile = currentUser?.uid === userId;
 
   useEffect(() => {
     if (userId) {
       setLoadingProfile(true);
       const profileRef = doc(db, 'profiles', userId);
-      getDoc(profileRef).then(docSnap => {
+      const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => { // Use onSnapshot for real-time updates
         if (docSnap.exists()) {
           setProfile(docSnap.data() as UserProfile);
         } else {
@@ -56,48 +77,50 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           toast({ title: "Profile not found", variant: "destructive" });
           setProfile(null); 
         }
-      }).catch(error => {
+        setLoadingProfile(false);
+      }, (error) => {
         console.error("Error fetching profile:", error);
         toast({ title: "Error fetching profile", description: error.message, variant: "destructive" });
-      }).finally(() => {
         setLoadingProfile(false);
       });
 
+
       setLoadingPosts(true);
-      // Simplified query: Fetch all posts by userId, order by createdAt.
-      // Filtering for 'isStory != true' will happen client-side.
       const postsQuery = query(
         collection(db, 'posts'),
         where('userId', '==', userId),
+        where('isStory', '!=', true),
         orderBy('createdAt', 'desc')
       );
 
-      getDocs(postsQuery).then(querySnapshot => {
-        const userContent = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: (doc.data().createdAt as Timestamp).toDate ? (doc.data().createdAt as Timestamp).toDate() : new Date()
+      const unsubscribePosts = onSnapshot(postsQuery, (querySnapshot) => {
+        const userPosts = querySnapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+          createdAt: (docSnap.data().createdAt as Timestamp)?.toDate ? (docSnap.data().createdAt as Timestamp).toDate() : new Date(),
+          imagePath: docSnap.data().imagePath || null,
         } as Post));
-        
-        // Filter out stories on the client-side
-        const regularPosts = userContent.filter(post => post.isStory !== true);
-        setPosts(regularPosts);
-
-      }).catch(error => {
+        setPosts(userPosts);
+        setLoadingPosts(false);
+      }, (error) => {
         console.error("Error fetching posts:", error);
         if (error.code === 'failed-precondition') {
              toast({ 
                 title: "Error Fetching Posts", 
-                description: "A database index might be required for this query (typically on userId and createdAt). Please check Firebase console logs for a link to create it.", 
+                description: "A database index might be required for this query. Please check Firebase console.", 
                 variant: "destructive",
                 duration: 10000
             });
         } else {
             toast({ title: "Error fetching posts", description: error.message, variant: "destructive" });
         }
-      }).finally(() => {
         setLoadingPosts(false);
       });
+      
+      return () => { // Cleanup snapshots
+        unsubscribeProfile();
+        unsubscribePosts();
+      };
     }
   }, [userId, toast]);
 
@@ -141,31 +164,75 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       setIsMessaging(false);
     }
   };
+
+  const handleDeleteRequest = (post: Post) => {
+    setPostToDelete(post);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeletePost = async () => {
+    if (!postToDelete || !currentUser || postToDelete.userId !== currentUser.uid) {
+      toast({ title: "Error", description: "Cannot delete this post.", variant: "destructive" });
+      setIsDeleteDialogOpen(false);
+      setPostToDelete(null);
+      return;
+    }
+    setIsDeletingPost(true);
+    try {
+      const postRef = doc(db, 'posts', postToDelete.id);
+      
+      const commentsRef = collection(postRef, 'comments');
+      const commentsSnapshot = await getDocs(commentsRef);
+      const batch = writeBatch(db);
+      commentsSnapshot.docs.forEach(commentDoc => {
+        batch.delete(commentDoc.ref);
+      });
+      await batch.commit();
+
+      if (postToDelete.imagePath) {
+        const imageFileRef = storageRef(storage, postToDelete.imagePath);
+        await deleteObject(imageFileRef).catch(storageError => {
+          console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
+        });
+      }
+
+      await deleteDoc(postRef);
+      toast({ title: "Post Deleted", description: "Your post has been successfully deleted." });
+      // UI updates via onSnapshot
+    } catch (error: any) {
+      console.error("Error deleting post:", error);
+      toast({ title: "Deletion Failed", description: error.message || "Could not delete post.", variant: "destructive" });
+    } finally {
+      setIsDeletingPost(false);
+      setIsDeleteDialogOpen(false);
+      setPostToDelete(null);
+    }
+  };
   
   const ProfileSkeleton = () => (
     <Card className="overflow-hidden shadow-lg">
       <CardHeader className="bg-muted/30 p-0">
-        <Skeleton className="h-48 w-full" /> {/* Cover photo skeleton */}
+        <Skeleton className="h-48 w-full" />
         <div className="absolute -bottom-16 left-8">
-          <Skeleton className="h-32 w-32 rounded-full border-4 border-card" /> {/* Avatar skeleton */}
+          <Skeleton className="h-32 w-32 rounded-full border-4 border-card" />
         </div>
         <div className="pt-20 px-8 pb-6 flex justify-between items-end">
           <div>
-            <Skeleton className="h-9 w-48 mb-2" /> {/* Name skeleton */}
-            <Skeleton className="h-4 w-32" /> {/* Username skeleton */}
+            <Skeleton className="h-9 w-48 mb-2" />
+            <Skeleton className="h-4 w-32" />
           </div>
           <div className="flex space-x-2">
-            <Skeleton className="h-10 w-24" /> {/* Button skeleton */}
+            <Skeleton className="h-10 w-24" />
           </div>
         </div>
       </CardHeader>
       <CardContent className="p-8">
-        <Skeleton className="h-5 w-3/4 mb-2" /> {/* Bio line 1 skeleton */}
-        <Skeleton className="h-5 w-1/2 mb-6" /> {/* Bio line 2 skeleton */}
+        <Skeleton className="h-5 w-3/4 mb-2" />
+        <Skeleton className="h-5 w-1/2 mb-6" />
         <div className="flex space-x-6 text-sm text-muted-foreground mb-8">
-          <Skeleton className="h-5 w-16" /> {/* Posts count skeleton */}
-          <Skeleton className="h-5 w-20" /> {/* Followers count skeleton */}
-          <Skeleton className="h-5 w-20" /> {/* Following count skeleton */}
+          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-5 w-20" />
+          <Skeleton className="h-5 w-20" />
         </div>
         <Tabs defaultValue="posts" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
@@ -212,10 +279,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   }
 
   const handleProfileUpdate = (updatedProfile: UserProfile) => {
-    setProfile(updatedProfile);
-    // Optionally, trigger a reload of the auth user if fundamental details changed
-    // This is more for immediate reflection if AuthContext doesn't pick it up fast enough.
-    // reloadUser(); 
+    setProfile(updatedProfile); // Local state update, onSnapshot will catch DB changes
+    reloadUser(); // Reload auth user context if needed
   };
 
 
@@ -302,7 +367,21 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                           data-ai-hint={post.dataAiHint || "user content"}
                           className="transition-transform duration-300 group-hover:scale-105"
                         />
-                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-2">
+                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-2">
+                            {isOwnProfile && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="absolute top-1 right-1 text-white hover:bg-white/20 hover:text-white h-8 w-8">
+                                    <MoreHorizontal className="h-5 w-5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                          </div>
                       </div>
                     ))}
@@ -338,6 +417,25 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           userProfile={profile}
           onProfileUpdate={handleProfileUpdate}
         />
+      )}
+       {postToDelete && (
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete this {postToDelete.isStory ? 'story' : 'post'} and all its comments.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPostToDelete(null)} disabled={isDeletingPost}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeletePost} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingPost}>
+                {isDeletingPost ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </MainLayout>
   );
