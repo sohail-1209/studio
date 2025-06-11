@@ -4,29 +4,28 @@
 
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Compass, Image as ImageIcon } from 'lucide-react';
-import type { Metadata } from 'next';
+import { Compass, Image as ImageIcon, Search as SearchIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, Timestamp, getDocs } from 'firebase/firestore';
 import type { Post } from '@/types/post';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
-// Metadata should be defined at the top level for server components,
-// or handled dynamically for client components if needed.
-// For now, let's keep it static as this page's core purpose is fixed.
-// export const metadata: Metadata = { // Static metadata is better in layout or page if possible
-//   title: 'Explore - NExCHAT',
-//   description: 'Discover new content and users on NExCHAT.',
-// };
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
 
 
 export default function ExplorePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchUid, setSearchUid] = useState('');
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchExplorePosts = async () => {
@@ -55,14 +54,31 @@ export default function ExplorePage() {
         setPosts(fetchedPosts);
       } catch (error) {
         console.error("Error fetching explore posts:", error);
-        // Optionally, show a toast message to the user
+        toast({
+          title: "Error Fetching Content",
+          description: "Could not load explore content. Please try again later.",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchExplorePosts();
-  }, []);
+  }, [toast]);
+
+  const handleSearchByUid = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (searchUid.trim()) {
+      router.push(`/profile/${searchUid.trim()}`);
+    } else {
+      toast({
+        title: "Empty UID",
+        description: "Please enter a User ID to search.",
+        variant: "default",
+      });
+    }
+  };
 
   const PostGridSkeleton = () => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-4">
@@ -83,6 +99,27 @@ export default function ExplorePage() {
             </div>
           </CardHeader>
           <CardContent>
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-foreground mb-2">Find a User by ID</h3>
+              <form onSubmit={handleSearchByUid} className="flex items-center space-x-2">
+                <Input
+                  type="text"
+                  placeholder="Enter User ID (UID)..."
+                  value={searchUid}
+                  onChange={(e) => setSearchUid(e.target.value)}
+                  className="flex-grow"
+                />
+                <Button type="submit">
+                  <SearchIcon className="mr-2 h-4 w-4" /> View Profile
+                </Button>
+              </form>
+              <p className="text-xs text-muted-foreground mt-1">
+                Tip: User IDs are long alphanumeric strings (e.g., XyZ123abc...).
+              </p>
+            </div>
+            <Separator className="my-6" />
+
+            <h3 className="text-lg font-semibold text-foreground mb-4">Discover Posts</h3>
             {loading && <PostGridSkeleton />}
             {!loading && posts.length === 0 && (
               <div className="py-12 text-center">
