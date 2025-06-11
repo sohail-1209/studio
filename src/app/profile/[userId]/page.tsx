@@ -404,7 +404,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   };
 
   const ProfileSkeleton = () => (
-    <Card className="overflow-hidden shadow-lg w-full max-w-4xl mx-auto">
+    <Card className="overflow-hidden shadow-lg w-full">
       <CardHeader className="bg-muted/30 p-0">
         <Skeleton className="h-48 w-full" />
         <div className="absolute -bottom-16 left-8">
@@ -450,7 +450,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   if (loadingProfile || !userId) {
     return (
       <MainLayout>
-        <div>
+        <div className="w-full">
           <ProfileSkeleton />
         </div>
       </MainLayout>
@@ -460,8 +460,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   if (!profile) {
      return (
       <MainLayout>
-        <div className="text-center">
-          <Card className="w-full max-w-4xl mx-auto">
+        <div className="text-center w-full">
+          <Card className="w-full">
             <CardContent className="p-12">
               <h2 className="text-2xl font-semibold">Profile Not Found</h2>
               <p className="text-muted-foreground">The user profile you are looking for does not exist or could not be loaded.</p>
@@ -502,8 +502,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   return (
     <MainLayout>
-      <div>
-        <Card className="overflow-hidden shadow-lg w-full max-w-4xl mx-auto">
+      <div className="w-full">
+        <Card className="overflow-hidden shadow-lg w-full">
           <CardHeader className="bg-muted/30 p-0">
             <div className="relative h-48 w-full md:h-64">
               <Image

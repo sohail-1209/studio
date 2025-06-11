@@ -10,15 +10,16 @@ import { useEffect } from 'react';
 import { Spinner } from '@/components/shared/Spinner';
 import {
   SidebarProvider,
-  Sidebar, // shadcn/ui Sidebar for desktop
-  SidebarInset, // For desktop content margin
-  useSidebar, // To get isMobile, openMobile, setOpenMobile
-  SidebarTrigger, // Import SidebarTrigger
+  Sidebar, 
+  SidebarInset, 
+  useSidebar, 
+  SidebarTrigger, 
 } from '@/components/ui/sidebar';
-import { Sheet, SheetContent } from '@/components/ui/sheet'; // shadcn/ui Sheet for mobile
-import { Button } from '@/components/ui/button'; // For the trigger button
-import { PanelLeft } from 'lucide-react'; // For the trigger icon
-import { Logo } from '@/components/shared/Logo'; // For mobile header
+import { Sheet, SheetContent } from '@/components/ui/sheet'; 
+import { Button } from '@/components/ui/button'; 
+import { PanelLeft } from 'lucide-react'; 
+import { Logo } from '@/components/shared/Logo'; 
+import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -27,7 +28,7 @@ interface MainLayoutProps {
 function LayoutContent({ children }: MainLayoutProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { isMobile, openMobile, setOpenMobile } = useSidebar(); // Removed toggleSidebar as it's in SidebarTrigger
+  const { isMobile, openMobile, setOpenMobile } = useSidebar(); 
 
   useEffect(() => {
     if (!loading && !user) {
@@ -51,19 +52,14 @@ function LayoutContent({ children }: MainLayoutProps) {
     <div className="flex min-h-screen bg-background">
       {isMobile ? (
         <>
-          {/* Mobile: Sheet for full sidebar, triggered from AppSidebar in icon strip mode */}
           <Sheet open={openMobile} onOpenChange={setOpenMobile}>
             <SheetContent side="left" className="w-[var(--sidebar-width-mobile)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
-              {/* AppSidebar for mobile sheet content, always shows labels */}
               <AppSidebar isForMobileSheet={true} />
             </SheetContent>
           </Sheet>
           
-          {/* Mobile: Main Content Area */}
           <div className="flex flex-1 flex-col">
-            {/* Mobile Header */}
             <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sm:px-6">
-              {/* SidebarTrigger now correctly uses asChild for the Button */}
               <SidebarTrigger asChild>
                 <Button variant="outline" size="icon" className="h-8 w-8">
                   <PanelLeft className="h-5 w-5" />
@@ -75,8 +71,8 @@ function LayoutContent({ children }: MainLayoutProps) {
               </div>
             </header>
             <main className="flex-1 overflow-y-auto">
-              {/* Increased horizontal padding for mobile content */}
-              <div className="px-6 py-4"> 
+              {/* Apply padding and max-width constraints here for mobile and desktop */}
+              <div className="w-full p-4 md:max-w-7xl md:mx-auto md:p-6">
                 {children}
               </div>
             </main>
@@ -84,19 +80,18 @@ function LayoutContent({ children }: MainLayoutProps) {
         </>
       ) : (
         <>
-          {/* Desktop: Collapsible Sidebar using shadcn/ui <Sidebar> */}
           <Sidebar
             collapsible="icon"
             variant="sidebar"
             side="left"
             className="border-sidebar-border bg-sidebar text-sidebar-foreground"
           >
-            <AppSidebar /> {/* Renders standard desktop sidebar */}
+            <AppSidebar /> 
           </Sidebar>
-          {/* Desktop: Main Content Area with Inset for auto margin adjustments */}
           <SidebarInset>
             <main className="flex-1 overflow-y-auto">
-              <div className="p-4 md:p-6"> {/* Padding applied to inner div */}
+               {/* Apply padding and max-width constraints here for desktop */}
+              <div className="w-full p-4 md:max-w-7xl md:mx-auto md:p-6">
                 {children}
               </div>
             </main>
@@ -110,7 +105,7 @@ function LayoutContent({ children }: MainLayoutProps) {
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
-    <SidebarProvider defaultOpen={true}> {/* Ensure defaultOpen is suitable for desktop */}
+    <SidebarProvider defaultOpen={true}> 
       <LayoutContent>{children}</LayoutContent>
     </SidebarProvider>
   )

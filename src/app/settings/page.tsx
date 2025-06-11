@@ -201,8 +201,8 @@ export default function SettingsPage() {
 
   return (
     <MainLayout>
-      <div>
-        <Card className="shadow-lg w-full max-w-3xl mx-auto">
+      <div className="w-full">
+        <Card className="shadow-lg w-full">
           <CardHeader>
             <div className="flex items-center space-x-3">
               <SettingsIcon className="h-7 w-7 text-primary" />

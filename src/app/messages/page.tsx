@@ -113,8 +113,8 @@ export default function MessagesPage() {
 
   return (
     <MainLayout>
-      <div className="h-[calc(100vh-theme(spacing.24))]">
-        <Card className="h-full flex flex-col shadow-lg w-full max-w-4xl mx-auto">
+      <div className="h-[calc(100vh-theme(spacing.24))] w-full">
+        <Card className="h-full flex flex-col shadow-lg w-full">
           <CardHeader className="border-b">
             <div className="flex items-center justify-between">
               <CardTitle className="font-headline text-2xl">Messages</CardTitle>

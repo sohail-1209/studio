@@ -188,8 +188,8 @@ export default function NotificationsPage() {
 
   return (
     <MainLayout>
-      <div>
-        <Card className="shadow-lg w-full max-w-2xl mx-auto">
+      <div className="w-full">
+        <Card className="shadow-lg w-full">
           <CardHeader className="flex flex-row items-center justify-between border-b">
             <div className="flex items-center space-x-3">
               <Bell className="h-6 w-6 text-primary" />
