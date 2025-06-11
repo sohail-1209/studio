@@ -2,20 +2,20 @@
 // src/app/profile/[userId]/page.tsx
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
+import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot } from 'firebase/firestore';
-import { ref as storageRef, deleteObject } from 'firebase/storage';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit } from 'firebase/firestore';
 import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext';
 import type { Post } from '@/types/post';
+import type { FollowRequest, FollowRequestDocument } from '@/types/follow';
 import { useAuth } from '@/hooks/useAuth';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -44,6 +44,8 @@ interface UserProfile extends AuthContextUserProfile {
   followingCount?: number;
 }
 
+type FollowStatus = 'not_following' | 'pending_them' | 'pending_me' | 'following' | 'follow_back';
+
 
 export default function UserProfilePage({ params: paramsPromise }: { params: { userId: string } }) {
   const params = use(paramsPromise); 
@@ -58,6 +60,10 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
+  const [isProcessingFollow, setIsProcessingFollow] = useState(false);
+  const [followStatus, setFollowStatus] = useState<FollowStatus>('not_following');
+  const [existingRequestId, setExistingRequestId] = useState<string | null>(null);
+
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
@@ -65,11 +71,68 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   const isOwnProfile = currentUser?.uid === userId;
 
+  const checkFollowStatus = useCallback(async () => {
+    if (!currentUser || !userId || isOwnProfile) {
+      setFollowStatus('not_following'); // Or some other appropriate status for own profile
+      return;
+    }
+    setIsProcessingFollow(true);
+    // Check for existing request from current user to profile user
+    const qSent = query(
+      collection(db, 'followRequests'),
+      where('requesterId', '==', currentUser.uid),
+      where('recipientId', '==', userId),
+      limit(1)
+    );
+    const sentSnapshot = await getDocs(qSent);
+
+    if (!sentSnapshot.empty) {
+      const request = sentSnapshot.docs[0].data() as FollowRequestDocument;
+      setExistingRequestId(sentSnapshot.docs[0].id);
+      if (request.status === 'pending') {
+        setFollowStatus('pending_them');
+      } else if (request.status === 'accepted') {
+        setFollowStatus('following');
+      } else {
+        setFollowStatus('not_following'); // e.g. declined
+      }
+      setIsProcessingFollow(false);
+      return;
+    }
+    
+    setExistingRequestId(null); // No request from current user
+
+    // Check for existing request from profile user to current user
+    const qReceived = query(
+        collection(db, 'followRequests'),
+        where('requesterId', '==', userId),
+        where('recipientId', '==', currentUser.uid),
+        limit(1)
+    );
+    const receivedSnapshot = await getDocs(qReceived);
+    if(!receivedSnapshot.empty) {
+        const request = receivedSnapshot.docs[0].data() as FollowRequestDocument;
+        if (request.status === 'pending') {
+            setFollowStatus('pending_me'); // They sent a request to current user
+        } else if (request.status === 'accepted') {
+            // They follow current user, current user might not be following back yet
+            setFollowStatus('follow_back'); 
+        } else {
+            setFollowStatus('not_following');
+        }
+    } else {
+        setFollowStatus('not_following');
+    }
+
+    setIsProcessingFollow(false);
+  }, [currentUser, userId, isOwnProfile]);
+
+
   useEffect(() => {
     if (userId) {
       setLoadingProfile(true);
       const profileRef = doc(db, 'profiles', userId);
-      const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => { // Use onSnapshot for real-time updates
+      const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => { 
         if (docSnap.exists()) {
           setProfile(docSnap.data() as UserProfile);
         } else {
@@ -84,9 +147,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingProfile(false);
       });
 
-
       setLoadingPosts(true);
-      // Simplified query: fetch all user content (posts & stories), then filter client-side
       const postsQuery = query(
         collection(db, 'posts'),
         where('userId', '==', userId),
@@ -109,7 +170,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         if (error.code === 'failed-precondition') {
              toast({ 
                 title: "Error Fetching User Posts", 
-                description: "A database index might be required. Please check Firebase console for (userId ASC, createdAt DESC) on 'posts' collection.", 
+                description: "A database index might be required. Please check Firebase console.", 
                 variant: "destructive",
                 duration: 10000
             });
@@ -119,17 +180,57 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingPosts(false);
       });
       
-      return () => { // Cleanup snapshots
+      // Check follow status when profile user or current user changes
+      if (currentUser && userId) {
+        checkFollowStatus();
+      }
+      
+      return () => { 
         unsubscribeProfile();
         unsubscribePosts();
       };
     }
-  }, [userId, toast]);
+  }, [userId, toast, currentUser, checkFollowStatus]);
+
+  const handleFollowRequest = async () => {
+    if (!currentUser || !profile || isOwnProfile || isProcessingFollow || followStatus === 'pending_them' || followStatus === 'following') return;
+
+    setIsProcessingFollow(true);
+    try {
+      const newRequest: FollowRequestDocument = {
+        requesterId: currentUser.uid,
+        requesterDisplayName: currentUser.displayName,
+        requesterAvatarUrl: currentUser.photoURL,
+        recipientId: profile.uid,
+        recipientDisplayName: profile.displayName,
+        recipientAvatarUrl: profile.photoURL,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const docRef = await addDoc(collection(db, 'followRequests'), newRequest);
+      setFollowStatus('pending_them');
+      setExistingRequestId(docRef.id);
+      toast({ title: "Follow Request Sent", description: `Your request to follow ${profile.displayName || 'this user'} has been sent.` });
+    } catch (error: any) {
+      console.error("Error sending follow request:", error);
+      toast({ title: "Request Error", description: error.message || "Could not send follow request.", variant: "destructive" });
+    } finally {
+      setIsProcessingFollow(false);
+    }
+  };
+
 
   const handleMessageUser = async () => {
-    if (!currentUser || !profile || currentUser.uid === profile.uid) return;
-    setIsMessaging(true);
+    if (!currentUser || !profile || currentUser.uid === profile.uid || isMessaging) return;
+    
+    // For now, disable messaging if not explicitly following. This logic will be expanded.
+    if (followStatus !== 'following' && followStatus !== 'follow_back') { // Simplified check for now
+        toast({ title: "Cannot Message", description: `You need to be mutually following to message ${profile.displayName || 'this user'}.`, variant: "default" });
+        return;
+    }
 
+    setIsMessaging(true);
     const chatId = [currentUser.uid, profile.uid].sort().join('_');
     const chatDocRef = doc(db, 'chats', chatId);
 
@@ -200,7 +301,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
       await deleteDoc(postRef);
       toast({ title: "Post Deleted", description: "Your post has been successfully deleted." });
-      // UI updates via onSnapshot
     } catch (error: any) {
       console.error("Error deleting post:", error);
       toast({ title: "Deletion Failed", description: error.message || "Could not delete post.", variant: "destructive" });
@@ -225,6 +325,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           </div>
           <div className="flex space-x-2">
             <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-28" />
           </div>
         </div>
       </CardHeader>
@@ -254,7 +355,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     </Card>
   );
 
-
   if (loadingProfile || !userId) {
     return (
       <MainLayout>
@@ -281,10 +381,30 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   }
 
   const handleProfileUpdate = (updatedProfile: UserProfile) => {
-    setProfile(updatedProfile); // Local state update, onSnapshot will catch DB changes
-    reloadUser(); // Reload auth user context if needed
+    setProfile(updatedProfile); 
+    reloadUser(); 
   };
 
+  const FollowButton = () => {
+    if (isProcessingFollow) {
+      return <Button disabled><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
+    }
+    switch (followStatus) {
+      case 'pending_them':
+        return <Button variant="outline" disabled><Clock className="mr-2 h-4 w-4" />Requested</Button>;
+      case 'following':
+        return <Button variant="outline"><UserCheck className="mr-2 h-4 w-4" />Following</Button>; // TODO: Add Unfollow
+      case 'pending_me': // Profile user sent current user a request
+        return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>; // TODO: This should be "Accept Request" later
+      case 'follow_back': // Profile user follows current user, current user does not yet.
+         return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>;
+      case 'not_following':
+      default:
+        return <Button onClick={handleFollowRequest}><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
+    }
+  };
+  
+  const canMessage = followStatus === 'following' || followStatus === 'follow_back'; // Simplified condition
 
   return (
     <MainLayout>
@@ -317,14 +437,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
                 ) : (
                   <>
-                    <Button><UserPlus className="mr-2 h-4 w-4" />Follow</Button>
-                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging}>
+                    <FollowButton />
+                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage}>
                       {isMessaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
                       Message
                     </Button>
                   </>
                 )}
-                <Button variant="ghost" size="icon"><MoreHorizontal /></Button>
+                {/* <Button variant="ghost" size="icon"><MoreHorizontal /></Button> */}
               </div>
             </div>
           </CardHeader>
