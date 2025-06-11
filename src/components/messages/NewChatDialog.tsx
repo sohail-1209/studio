@@ -66,11 +66,12 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
   }, [open, currentUser, toast]);
 
   const filteredUsers = useMemo(() => {
-    if (!searchTerm) return allUsers;
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    if (!lowerSearchTerm) return allUsers;
     return allUsers.filter(
       (u) =>
-        u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.username?.toLowerCase().includes(searchTerm.toLowerCase())
+        u.displayName?.toLowerCase().startsWith(lowerSearchTerm) ||
+        u.username?.toLowerCase().startsWith(lowerSearchTerm)
     );
   }, [allUsers, searchTerm]);
 
@@ -203,7 +204,7 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
         <div className="relative mt-2 mb-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search users..."
+            placeholder="Search users by name or username..."
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -219,7 +220,7 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           )}
           {!loadingUsers && filteredUsers.length === 0 && (
             <p className="text-center text-muted-foreground py-4">
-              {searchTerm ? "No users match your search." : "No users found."}
+              {searchTerm ? "No users match your search." : "No users found to start a new chat."}
             </p>
           )}
           {!loadingUsers && filteredUsers.map((u) => (
