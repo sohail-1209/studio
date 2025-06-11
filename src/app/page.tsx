@@ -1,3 +1,4 @@
+
 // src/app/page.tsx (Feed Page)
 'use client';
 
@@ -25,7 +26,7 @@ export default function FeedPage() {
   const [isCreatePostDialogOpen, setIsCreatePostDialogOpen] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const { user } = useAuth();
+  const { user } = useAuth(); // Get the currently authenticated user
   const { toast } = useToast();
 
   const [isLiking, setIsLiking] = useState<{[postId: string]: boolean}>({});
@@ -260,19 +261,27 @@ export default function FeedPage() {
           )}
           {!loadingPosts && posts.map((post, index) => {
             const isLikedByCurrentUser = post.likedBy && user ? post.likedBy.includes(user.uid) : false;
+            
+            // Determine avatar source and display name based on whether it's the current user's post
+            const isCurrentUserPost = post.userId === user?.uid;
+            const avatarUrl = isCurrentUserPost ? user?.photoURL : post.userAvatarUrl;
+            const avatarAlt = isCurrentUserPost ? (user?.displayName || 'Your avatar') : (post.userDisplayName || 'User avatar');
+            const avatarFallbackInitial = (isCurrentUserPost ? (user?.displayName || 'U') : (post.userDisplayName || 'U')).charAt(0).toUpperCase();
+            const postAuthorDisplayName = isCurrentUserPost ? (user?.displayName || 'You') : (post.userDisplayName || 'Anonymous User');
+
             return (
               <Card key={post.id} className="overflow-hidden shadow-lg">
                 <CardHeader className="p-4">
                   <div className="flex items-center space-x-3">
                     <Avatar>
-                       {post.userAvatarUrl ? (
-                        <Image src={post.userAvatarUrl} alt={post.userDisplayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
+                      {avatarUrl ? (
+                        <Image src={avatarUrl} alt={avatarAlt} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
                       ) : (
-                        <AvatarFallback>{(post.userDisplayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>{avatarFallbackInitial}</AvatarFallback>
                       )}
                     </Avatar>
                     <div>
-                      <p className="font-semibold text-foreground">{post.userDisplayName || 'Anonymous User'}</p>
+                      <p className="font-semibold text-foreground">{postAuthorDisplayName}</p>
                       <p className="text-xs text-muted-foreground">
                         {post.createdAt ? formatDistanceToNow(post.createdAt, { addSuffix: true }) : 'just now'}
                       </p>
@@ -353,3 +362,5 @@ export default function FeedPage() {
     </MainLayout>
   );
 }
+
+    
