@@ -8,7 +8,7 @@ interface LogoProps {
   textSize?: string;
 }
 
-export function Logo({ className, iconSize = 28, textSize = "text-2xl" }: LogoProps) {
+export function Logo({ className, iconSize = 36, textSize = "text-2xl" }: LogoProps) { // Increased default iconSize
   return (
     <Link href="/" className={`flex items-center gap-2 text-logoText ${className}`}>
       <Image
@@ -17,6 +17,7 @@ export function Logo({ className, iconSize = 28, textSize = "text-2xl" }: LogoPr
         width={iconSize}
         height={iconSize}
         priority 
+        className="rounded-full" // Added rounded-full for a circular appearance
       />
       <span className={`font-headline font-bold ${textSize}`}>NExCHAT</span>
     </Link>
