@@ -58,8 +58,10 @@ function LayoutContent({ children }: MainLayoutProps) {
             </SheetContent>
           </Sheet>
           {/* Mobile: Main Content Area, offset by the icon strip */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-6" style={{ marginLeft: 'var(--sidebar-width-icon)' }}>
-            {children}
+          <main className="flex-1 overflow-y-auto" style={{ marginLeft: 'var(--sidebar-width-icon)' }}>
+            <div className="mx-auto max-w-md p-4"> {/* Content narrower and centered on mobile */}
+              {children}
+            </div>
           </main>
         </>
       ) : (
@@ -75,8 +77,10 @@ function LayoutContent({ children }: MainLayoutProps) {
           </Sidebar>
           {/* Desktop: Main Content Area with Inset for auto margin adjustments */}
           <SidebarInset>
-            <main className="flex-1 overflow-y-auto p-4 md:p-6">
-              {children}
+            <main className="flex-1 overflow-y-auto">
+              <div className="p-4 md:p-6"> {/* Padding applied to inner div */}
+                {children}
+              </div>
             </main>
           </SidebarInset>
         </>
@@ -93,3 +97,4 @@ export function MainLayout({ children }: MainLayoutProps) {
     </SidebarProvider>
   )
 }
+
