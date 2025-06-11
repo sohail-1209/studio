@@ -375,10 +375,39 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                           className="rounded max-w-full h-auto object-contain" 
                           data-ai-hint={msg.dataAiHint || "chat image"} 
                         />
-                         {msg.text && <p className="text-sm whitespace-pre-wrap px-0.5">{msg.text}</p>}
+                         {msg.text ? (
+                            <p className="text-sm whitespace-pre-wrap px-0.5">
+                              {msg.text}
+                              <span className={cn(
+                                "ml-1.5 text-xs",
+                                msg.senderId === user?.uid ? "text-primary-foreground/70" : "text-muted-foreground/80"
+                              )}>
+                                {' '}{msg.timestamp ? format(msg.timestamp, 'p') : ''}
+                              </span>
+                            </p>
+                          ) : (
+                            <p 
+                              className={cn(
+                                "mt-1 text-xs text-right", 
+                                msg.senderId === user?.uid ? "text-primary-foreground/80" : "text-muted-foreground"
+                              )}
+                            >
+                              {msg.timestamp ? format(msg.timestamp, 'p') : ''}
+                            </p>
+                          )}
                       </div>
                     ) : (
-                       msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                       msg.text && (
+                        <p className="text-sm whitespace-pre-wrap">
+                          {msg.text}
+                          <span className={cn(
+                            "ml-1.5 text-xs",
+                            msg.senderId === user?.uid ? "text-primary-foreground/70" : "text-muted-foreground/80"
+                          )}>
+                            {' '}{msg.timestamp ? format(msg.timestamp, 'p') : ''}
+                          </span>
+                        </p>
+                       )
                     )}
                      {msg.senderId === user?.uid && (
                         <Button
@@ -392,14 +421,6 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                           {isDeletingMessage && messageToDelete?.id === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={12} />}
                         </Button>
                       )}
-                    <p 
-                      className={cn(
-                        "mt-1.5 text-xs text-right", 
-                        msg.senderId === user?.uid ? "text-primary-foreground/80" : "text-muted-foreground"
-                      )}
-                    >
-                      {msg.timestamp ? format(msg.timestamp, 'p') : ''}
-                    </p>
                   </div>
                 </div>
               ))}
