@@ -72,7 +72,6 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const [isDeleteMessageDialogOpen, setIsDeleteMessageDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<ChatMessage | null>(null);
   const [isDeletingMessage, setIsDeletingMessage] = useState(false);
-  const [isInitiatingCall, setIsInitiatingCall] = useState(false);
 
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -113,8 +112,6 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
             }
           });
         } else {
-           // This case might occur if chatData.userIds doesn't produce an otherUserId (e.g. self-chat, or bad data)
-           // Or if it's intended as a group chat without specific partner profile logic yet.
            setChatPartnerProfile({ displayName: 'Chat Details Error', photoURL: `https://placehold.co/40x40.png?text=E` });
            console.warn("ChatPage: Could not determine chat partner from chat document:", chatData);
         }
@@ -315,68 +312,16 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     }
   };
 
-  const handleInitiateCall = async (callType: 'audio' | 'video') => {
-    // More specific checks before proceeding
-    if (!user) {
-      toast({ title: "Authentication Error", description: "You must be logged in to initiate a call.", variant: "destructive" });
-      console.error("Call initiation failed: User not authenticated.");
+  const handleInitiateCall = (callType: 'audio' | 'video') => {
+    if (!user || !chatPartnerProfile) {
+      toast({ title: "Error", description: "Cannot initiate call. User or partner info missing.", variant: "destructive" });
       return;
     }
-    if (!chatPartnerId) {
-      toast({ title: "Chat Partner Error", description: "Chat partner ID is not available. Cannot initiate call.", variant: "destructive" });
-      console.error("Call initiation failed: chatPartnerId is null or undefined.");
-      return;
-    }
-    if (!chatPartnerProfile) {
-      toast({ title: "Chat Partner Error", description: "Chat partner profile is not available. Cannot initiate call.", variant: "destructive" });
-      console.error("Call initiation failed: chatPartnerProfile is null or undefined.");
-      return;
-    }
-     if (!chatId) {
-      toast({ title: "Chat Error", description: "Current chat ID is missing. Cannot initiate call.", variant: "destructive" });
-      console.error("Call initiation failed: chatId is null or undefined.");
-      return;
-    }
-    if (isInitiatingCall) {
-        // This state should ideally prevent the button from being clicked again,
-        // but this is a safeguard.
-        console.log("Call initiation already in progress.");
-        return;
-    }
-
-    setIsInitiatingCall(true);
-    try {
-      const callAttemptsRef = collection(db, 'callAttempts');
-      const callData = {
-        callerId: user.uid,
-        callerName: user.displayName || 'Unknown Caller',
-        calleeId: chatPartnerId, // Ensured non-null by checks above
-        calleeName: chatPartnerProfile.displayName || 'Unknown Recipient', // Fallback
-        chatId: chatId, // Ensured non-null
-        callType: callType,
-        status: 'initiating',
-        timestamp: serverTimestamp(),
-      };
-      
-      console.log("Attempting to add call document:", callData);
-      await addDoc(callAttemptsRef, callData);
-
-      toast({
-        title: `Simulated ${callType} Call Initiated`,
-        description: `Attempting to call ${chatPartnerProfile.displayName || 'your chat partner'}... (This is a simulation and will not actually connect or notify the other user yet.)`,
-        duration: 7000,
-      });
-
-    } catch (error: any) {
-      console.error(`Error initiating ${callType} call. Raw error:`, error);
-      toast({
-        title: "Call Initiation Failed",
-        description: `Could not simulate ${callType} call. ${error.message || 'An unexpected error occurred. Check console for details.'}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsInitiatingCall(false);
-    }
+    toast({
+      title: `${callType === 'audio' ? 'Voice' : 'Video'} Call`,
+      description: `This feature is coming soon! You'll be able to ${callType} call ${chatPartnerProfile.displayName || 'your chat partner'}.`,
+      duration: 5000,
+    });
   };
 
 
@@ -387,7 +332,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     </div>
   );
 
-  const callButtonsDisabled = isInitiatingCall || !chatPartnerId || !chatPartnerProfile;
+  const callButtonsDisabled = !chatPartnerId || !chatPartnerProfile;
 
   return (
     <MainLayout>
@@ -415,10 +360,10 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
           </div>
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="icon" title="Voice Call" onClick={() => handleInitiateCall('audio')} disabled={callButtonsDisabled}>
-              {isInitiatingCall ? <Loader2 className="h-5 w-5 animate-spin" /> : <Phone className="h-5 w-5" />}
+              <Phone className="h-5 w-5" />
             </Button>
             <Button variant="ghost" size="icon" title="Video Call" onClick={() => handleInitiateCall('video')} disabled={callButtonsDisabled}>
-              {isInitiatingCall ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" />}
+              <Video className="h-5 w-5" />
             </Button>
           </div>
         </header>
@@ -453,7 +398,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                           alt="Sent image" 
                           width={250} 
                           height={250} 
-                          className="rounded max-w-full h-auto object-contain border border-border/5" 
+                          className="rounded max-w-full h-auto object-contain border border-border/20" 
                           data-ai-hint={msg.dataAiHint || "chat image"} 
                         />
                          {msg.text ? (
