@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Paperclip, Send, Phone, Video, Smile, XCircle, UploadCloud } from 'lucide-react';
+import { ArrowLeft, Paperclip, Send, Phone, Video, Smile, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, use, useRef, ChangeEvent } from 'react';
@@ -34,6 +34,10 @@ import { Spinner } from '@/components/shared/Spinner';
 import Image from 'next/image';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
+import { Theme } from 'emoji-picker-react';
+
 
 export default function ChatPage({ params: paramsPromise }: { params: { chatId: string } }) {
   const params = use(paramsPromise);
@@ -46,18 +50,19 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false); // Placeholder
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto" }); // Changed to auto for faster scroll on new messages
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages]);
 
 
@@ -130,7 +135,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       }
       setSelectedFile(file);
       setFilePreviewUrl(URL.createObjectURL(file));
-      setNewMessage(''); // Clear text input when a file is selected
+      setNewMessage(''); 
     }
   };
 
@@ -138,8 +143,13 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     setSelectedFile(null);
     setFilePreviewUrl(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // Reset file input
+      fileInputRef.current.value = ""; 
     }
+  };
+
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    setNewMessage((prevMessage) => prevMessage + emojiData.emoji);
+    // setIsEmojiPickerOpen(false); // Optionally close picker on emoji select
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -188,7 +198,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                 messageData.imageUrl = downloadURL;
                 messageData.imagePath = filePath;
                 messageData.fileType = selectedFile.type;
-                messageData.text = newMessage.trim() || null; // Allow caption with image
+                messageData.text = newMessage.trim() || null; 
+                messageData.dataAiHint = "chat image";
                 resolve();
               } catch (urlError) {
                 reject(urlError);
@@ -274,7 +285,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                   <div className={cn("max-w-xs rounded-lg p-1 lg:max-w-md shadow", msg.senderId === user?.uid ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>
                     {msg.imageUrl ? (
                       <div className="p-2">
-                        <Image src={msg.imageUrl} alt="Sent image" width={250} height={250} className="rounded-md max-w-full h-auto object-contain" data-ai-hint="chat image" />
+                        <Image src={msg.imageUrl} alt="Sent image" width={250} height={250} className="rounded-md max-w-full h-auto object-contain" data-ai-hint={msg.dataAiHint || "chat image"} />
                          {msg.text && <p className="text-sm whitespace-pre-wrap pt-2">{msg.text}</p>}
                       </div>
                     ) : (
@@ -314,9 +325,23 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
             </div>
           )}
           <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" type="button" title="Emoji (coming soon)" onClick={() => toast({title: "Emoji Picker", description: "Coming soon!"})}>
-              <Smile className="h-5 w-5 text-muted-foreground" />
-            </Button>
+            <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" type="button" title="Emoji">
+                  <Smile className="h-5 w-5 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 border-0">
+                <EmojiPicker 
+                  onEmojiClick={handleEmojiClick} 
+                  autoFocusSearch={false}
+                  height={350}
+                  width="100%"
+                  theme={Theme.AUTO}
+                  lazyLoadEmojis
+                />
+              </PopoverContent>
+            </Popover>
             <Button variant="ghost" size="icon" type="button" onClick={() => fileInputRef.current?.click()} disabled={sendingMessage}>
               <Paperclip className="h-5 w-5 text-muted-foreground" />
             </Button>
