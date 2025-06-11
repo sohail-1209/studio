@@ -4,7 +4,7 @@
 
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Compass, Image as ImageIcon, Search as SearchIcon } from 'lucide-react';
+import { Compass, Image as ImageIcon, Search as SearchIcon, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState, FormEvent } from 'react';
@@ -23,7 +23,8 @@ import { Separator } from '@/components/ui/separator';
 export default function ExplorePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchUid, setSearchUid] = useState('');
+  const [searchUsername, setSearchUsername] = useState(''); // Changed from searchUid
+  const [isSearchingUser, setIsSearchingUser] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -67,20 +68,56 @@ export default function ExplorePage() {
     fetchExplorePosts();
   }, [toast]);
 
-  const handleSearchByUid = (e: FormEvent<HTMLFormElement>) => {
+  const handleSearchByUsername = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const trimmedUid = searchUid.trim(); // Use a local variable for the trimmed UID
+    const trimmedUsername = searchUsername.trim();
 
-    if (trimmedUid) {
-      router.push(`/profile/${trimmedUid}`);
-    } else {
+    if (!trimmedUsername) {
       toast({
-        title: "Empty UID",
-        description: "Please enter a User ID to search.",
+        title: "Empty Username",
+        description: "Please enter a username to search.",
         variant: "default",
       });
+      return;
     }
-    setSearchUid(''); // Clear the input field after any submission attempt
+
+    setIsSearchingUser(true);
+    try {
+      const profilesRef = collection(db, 'profiles');
+      const q = query(profilesRef, where('username', '==', trimmedUsername), limit(1));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        toast({
+          title: "User Not Found",
+          description: `No user found with the username "${trimmedUsername}".`,
+          variant: "default",
+        });
+      } else {
+        const userDoc = querySnapshot.docs[0];
+        const userId = userDoc.id; // The document ID is the UID
+        router.push(`/profile/${userId}`);
+      }
+    } catch (error: any) {
+      console.error("Error searching for user by username:", error);
+      if (error.code === 'failed-precondition') {
+        toast({
+          title: "Search Error",
+          description: "Could not perform search. A database index might be missing for usernames. Please contact support or check Firebase console.",
+          variant: "destructive",
+          duration: 7000,
+        });
+      } else {
+        toast({
+          title: "Search Error",
+          description: "An error occurred while searching for the user.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsSearchingUser(false);
+      setSearchUsername(''); 
+    }
   };
 
   const PostGridSkeleton = () => (
@@ -103,21 +140,23 @@ export default function ExplorePage() {
           </CardHeader>
           <CardContent>
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-foreground mb-2">Find a User by ID</h3>
-              <form onSubmit={handleSearchByUid} className="flex items-center space-x-2">
+              <h3 className="text-lg font-semibold text-foreground mb-2">Find a User by Username</h3>
+              <form onSubmit={handleSearchByUsername} className="flex items-center space-x-2">
                 <Input
                   type="text"
-                  placeholder="Enter User ID (UID)..."
-                  value={searchUid}
-                  onChange={(e) => setSearchUid(e.target.value)}
+                  placeholder="Enter Username..."
+                  value={searchUsername}
+                  onChange={(e) => setSearchUsername(e.target.value)}
                   className="flex-grow"
+                  disabled={isSearchingUser}
                 />
-                <Button type="submit">
-                  <SearchIcon className="mr-2 h-4 w-4" /> View Profile
+                <Button type="submit" disabled={isSearchingUser}>
+                  {isSearchingUser ? <UserIcon className="mr-2 h-4 w-4 animate-pulse" /> : <SearchIcon className="mr-2 h-4 w-4" />}
+                   View Profile
                 </Button>
               </form>
               <p className="text-xs text-muted-foreground mt-1">
-                Tip: User IDs are long alphanumeric strings (e.g., XyZ123abc...).
+                Tip: Usernames are typically chosen by users (e.g., cool_user_123).
               </p>
             </div>
             <Separator className="my-6" />
