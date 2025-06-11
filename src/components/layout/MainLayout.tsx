@@ -27,7 +27,7 @@ interface MainLayoutProps {
 function LayoutContent({ children }: MainLayoutProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { isMobile, openMobile, setOpenMobile, toggleSidebar } = useSidebar();
+  const { isMobile, openMobile, setOpenMobile } = useSidebar(); // Removed toggleSidebar as it's in SidebarTrigger
 
   useEffect(() => {
     if (!loading && !user) {
@@ -54,6 +54,7 @@ function LayoutContent({ children }: MainLayoutProps) {
           {/* Mobile: Sheet for full sidebar, triggered from AppSidebar in icon strip mode */}
           <Sheet open={openMobile} onOpenChange={setOpenMobile}>
             <SheetContent side="left" className="w-[var(--sidebar-width-mobile)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
+              {/* AppSidebar for mobile sheet content, always shows labels */}
               <AppSidebar isForMobileSheet={true} />
             </SheetContent>
           </Sheet>
@@ -61,7 +62,8 @@ function LayoutContent({ children }: MainLayoutProps) {
           {/* Mobile: Main Content Area */}
           <div className="flex flex-1 flex-col">
             {/* Mobile Header */}
-            <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sm:px-6 md:hidden">
+            <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 sm:px-6">
+              {/* SidebarTrigger now correctly uses asChild for the Button */}
               <SidebarTrigger asChild>
                 <Button variant="outline" size="icon" className="h-8 w-8">
                   <PanelLeft className="h-5 w-5" />
@@ -73,7 +75,8 @@ function LayoutContent({ children }: MainLayoutProps) {
               </div>
             </header>
             <main className="flex-1 overflow-y-auto">
-              <div className="p-4">
+              {/* Increased horizontal padding for mobile content */}
+              <div className="px-6 py-4"> 
                 {children}
               </div>
             </main>
@@ -107,9 +110,8 @@ function LayoutContent({ children }: MainLayoutProps) {
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={true}> {/* Ensure defaultOpen is suitable for desktop */}
       <LayoutContent>{children}</LayoutContent>
     </SidebarProvider>
   )
 }
-
