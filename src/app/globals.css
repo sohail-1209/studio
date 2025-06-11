@@ -9,44 +9,44 @@ body {
 
 @layer base {
   :root {
-    --background: 270 50% 97%; /* #F5F0F9 Light Lavender - unchanged */
-    --foreground: 260 20% 25%; /* #332E40 Dark Desaturated Indigo - unchanged */
+    --background: 220 30% 97%; /* Very Light Cool Gray/Blue */
+    --foreground: 220 20% 20%; /* Dark Cool Gray/Blue */
 
-    --card: 0 0% 100%; /* White - unchanged */
-    --card-foreground: 260 20% 25%; /* unchanged */
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 220 20% 20%; /* Dark Cool Gray/Blue */
 
-    --popover: 0 0% 100%; /* unchanged */
-    --popover-foreground: 260 20% 25%; /* unchanged */
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 220 20% 20%; /* Dark Cool Gray/Blue */
 
-    --primary: 170 60% 40%; /* Teal */
+    --primary: 210 60% 45%; /* Professional Blue */
     --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 170 50% 90%; /* Light Teal tint */
-    --secondary-foreground: 170 60% 30%; /* Darker Teal for text on secondary */
+    --secondary: 210 50% 90%; /* Light Blue tint */
+    --secondary-foreground: 210 60% 30%; /* Darker Blue for text on secondary */
 
-    --muted: 270 30% 93%; /* #ECE8F6 Very light lavender gray - can keep this or make it teal-ish gray */
-    --muted-foreground: 260 20% 45%; /* #615A75 Muted text color - can keep this */
+    --muted: 220 25% 94%; /* Light Gray/Blue */
+    --muted-foreground: 220 15% 45%; /* Muted text color */
 
-    --accent: 339 81% 66%; /* #F06292 Pink - unchanged */
-    --accent-foreground: 0 0% 100%; /* White - unchanged */
+    --accent: 35 70% 55%; /* Muted Gold/Amber */
+    --accent-foreground: 0 0% 100%; /* White */
 
-    --destructive: 0 84.2% 60.2%; /* unchanged */
-    --destructive-foreground: 0 0% 98%; /* unchanged */
+    --destructive: 0 84.2% 60.2%; /* Standard Red - unchanged */
+    --destructive-foreground: 0 0% 98%; /* Standard Light Gray - unchanged */
 
-    --border: 170 40% 85%; /* Light Teal/Gray border */
-    --input: 170 40% 88%; /* Slightly lighter Teal/Gray input */
-    --ring: 170 60% 40%; /* Teal for rings (matches new primary) */
+    --border: 210 30% 88%; /* Light Blue/Gray border */
+    --input: 210 30% 92%; /* Slightly lighter Blue/Gray input */
+    --ring: 210 60% 45%; /* Matches primary */
 
     --radius: 0.5rem; /* unchanged */
 
     /* Custom sidebar colors */
-    --sidebar-background: 170 50% 94%; /* Very light teal */
-    --sidebar-foreground: 260 20% 25%; /* Same as main foreground - unchanged */
-    --sidebar-border: 170 40% 85%; /* Light teal border */
-    --sidebar-active: 170 60% 40%; /* Teal for active items (matches new primary) */
-    --sidebar-active-foreground: 0 0% 100%; /* White text for active items - unchanged */
-    --sidebar-hover: 170 50% 88%; /* Lighter Teal for hover */
-    --sidebar-hover-foreground: 260 20% 20%; /* Darker text on hover - unchanged */
+    --sidebar-background: 220 20% 95%; /* Very Light Cool Gray */
+    --sidebar-foreground: 220 20% 20%; /* Dark Cool Gray/Blue */
+    --sidebar-border: 210 30% 88%; /* Light Blue/Gray border */
+    --sidebar-active: 210 60% 45%; /* Matches primary */
+    --sidebar-active-foreground: 0 0% 100%; /* White */
+    --sidebar-hover: 210 50% 88%; /* Lighter Blue for hover */
+    --sidebar-hover-foreground: 220 20% 15%; /* Darker Cool Gray/Blue on hover */
 
     --chart-1: 12 76% 61%; /* unchanged */
     --chart-2: 173 58% 39%; /* unchanged */
@@ -54,47 +54,47 @@ body {
     --chart-4: 43 74% 66%; /* unchanged */
     --chart-5: 27 87% 67%; /* unchanged */
 
-    --logo-text-color: 170 60% 40%; /* Teal for light mode (already set) */
+    --logo-text-color: 210 60% 40%; /* Slightly darker variant of primary for logo */
   }
 
   .dark {
-    --background: 260 20% 10%; /* Dark indigo/charcoal - unchanged for now, focus on primary elements */
-    --foreground: 270 30% 90%; /* Light lavender gray text - unchanged */
+    --background: 220 20% 12%; /* Dark Cool Blue/Gray */
+    --foreground: 220 25% 90%; /* Light Gray/Blue text */
 
-    --card: 260 20% 15%; /* unchanged */
-    --card-foreground: 270 30% 90%; /* unchanged */
+    --card: 220 20% 18%; /* Slightly Lighter Dark Blue/Gray */
+    --card-foreground: 220 25% 90%; /* Light Gray/Blue text */
 
-    --popover: 260 20% 15%; /* unchanged */
-    --popover-foreground: 270 30% 90%; /* unchanged */
+    --popover: 220 20% 18%; /* Slightly Lighter Dark Blue/Gray */
+    --popover-foreground: 220 25% 90%; /* Light Gray/Blue text */
 
-    --primary: 170 60% 50%; /* Slightly lighter Teal for dark mode */
-    --primary-foreground: 0 0% 100%; /* White - unchanged */
+    --primary: 210 70% 60%; /* Brighter Blue for dark mode */
+    --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 170 50% 25%; /* Darker shade for secondary bg in teal */
-    --secondary-foreground: 170 30% 85%; /* Light teal text for secondary */
+    --secondary: 210 40% 25%; /* Darker shade for secondary bg in blue */
+    --secondary-foreground: 210 30% 85%; /* Light blue text for secondary */
 
-    --muted: 260 20% 20%; /* unchanged */
-    --muted-foreground: 270 20% 60%; /* unchanged */
+    --muted: 220 15% 22%; /* Darker Gray/Blue */
+    --muted-foreground: 220 20% 65%; /* Muted text color */
 
-    --accent: 339 70% 70%; /* Slightly adjusted Pink for dark mode - unchanged */
-    --accent-foreground: 0 0% 10%; /* unchanged */
+    --accent: 35 75% 65%; /* Slightly brighter Gold/Amber for dark mode */
+    --accent-foreground: 0 0% 100%; /* White */
 
-    --destructive: 0 70% 50%; /* unchanged */
-    --destructive-foreground: 0 0% 98%; /* unchanged */
+    --destructive: 0 62.8% 50.6%; /* Standard Red for dark - unchanged */
+    --destructive-foreground: 0 0% 98%; /* Standard Light Gray for dark - unchanged */
 
-    --border: 170 30% 30%; /* Dark teal/gray border */
-    --input: 170 30% 35%; /* Dark teal/gray input */
-    --ring: 170 60% 50%; /* Teal for rings (matches new dark primary) */
+    --border: 210 25% 35%; /* Dark Blue/Gray border */
+    --input: 210 25% 40%; /* Dark Blue/Gray input */
+    --ring: 210 70% 60%; /* Matches dark primary */
     
-    --sidebar-background: 170 40% 12%; /* Very dark teal */
-    --sidebar-foreground: 270 30% 90%; /* Light lavender gray text - unchanged */
-    --sidebar-border: 170 30% 30%; /* Dark teal/gray border */
-    --sidebar-active: 170 60% 50%; /* Teal for active items (matches new dark primary) */
-    --sidebar-active-foreground: 0 0% 100%; /* White text for active items - unchanged */
-    --sidebar-hover: 170 40% 25%; /* Darker teal for hover */
-    --sidebar-hover-foreground: 270 30% 95%; /* Lightest text on hover - unchanged */
+    --sidebar-background: 220 25% 15%; /* Darker Cool Gray for sidebar */
+    --sidebar-foreground: 220 25% 90%; /* Light Gray/Blue text */
+    --sidebar-border: 210 25% 35%; /* Dark Blue/Gray border */
+    --sidebar-active: 210 70% 60%; /* Matches dark primary */
+    --sidebar-active-foreground: 0 0% 100%; /* White */
+    --sidebar-hover: 210 35% 28%; /* Darker Blue for hover */
+    --sidebar-hover-foreground: 220 25% 95%; /* Lightest text on hover */
 
-    --logo-text-color: 170 60% 50%; /* Slightly lighter Teal for dark mode (already set) */
+    --logo-text-color: 210 70% 65%; /* Brighter variant of primary for dark mode logo */
   }
 }
 
