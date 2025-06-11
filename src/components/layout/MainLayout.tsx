@@ -15,7 +15,7 @@ import {
   useSidebar, 
   SidebarTrigger, 
 } from '@/components/ui/sidebar';
-import { Sheet, SheetContent } from '@/components/ui/sheet'; 
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'; 
 import { Button } from '@/components/ui/button'; 
 import { PanelLeft } from 'lucide-react'; 
 import { Logo } from '@/components/shared/Logo'; 
@@ -54,6 +54,9 @@ function LayoutContent({ children }: MainLayoutProps) {
         <>
           <Sheet open={openMobile} onOpenChange={setOpenMobile}>
             <SheetContent side="left" className="w-[var(--sidebar-width-mobile)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
+              <SheetHeader className="sr-only"> {/* Visually hidden header for accessibility */}
+                <SheetTitle>Navigation Menu</SheetTitle>
+              </SheetHeader>
               <AppSidebar isForMobileSheet={true} />
             </SheetContent>
           </Sheet>
@@ -71,8 +74,10 @@ function LayoutContent({ children }: MainLayoutProps) {
               </div>
             </header>
             <main className="flex-1 overflow-y-auto">
-              {/* Apply padding and max-width constraints here for mobile and desktop */}
-              <div className="w-full p-4 md:max-w-7xl md:mx-auto md:p-6">
+              <div className={cn(
+                "w-full", 
+                isMobile ? "px-6 py-4" : "p-4 md:p-6 md:max-w-7xl md:mx-auto" 
+              )}>
                 {children}
               </div>
             </main>
@@ -90,7 +95,6 @@ function LayoutContent({ children }: MainLayoutProps) {
           </Sidebar>
           <SidebarInset>
             <main className="flex-1 overflow-y-auto">
-               {/* Apply padding and max-width constraints here for desktop */}
               <div className="w-full p-4 md:max-w-7xl md:mx-auto md:p-6">
                 {children}
               </div>
@@ -110,3 +114,4 @@ export function MainLayout({ children }: MainLayoutProps) {
     </SidebarProvider>
   )
 }
+
