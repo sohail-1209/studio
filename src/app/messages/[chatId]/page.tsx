@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Paperclip, Send, Phone, Video, Smile } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 
 // Placeholder messages
 const sampleMessages = [
@@ -22,7 +22,8 @@ const sampleMessages = [
   { id: '7', sender: 'other', image: 'https://placehold.co/300x200.png', time: '10:10 AM', avatar: 'https://placehold.co/40x40.png?text=O', aiHint: "funny cat" },
 ];
 
-export default function ChatPage({ params }: { params: { chatId: string } }) {
+export default function ChatPage({ params: paramsPromise }: { params: { chatId: string } }) {
+  const params = use(paramsPromise);
   const { chatId } = params;
   const [chatPartner, setChatPartner] = useState({ name: "User " + chatId.substring(0,5), avatar: `https://placehold.co/40x40.png?text=${chatId.charAt(0).toUpperCase()}` });
   const [messages, setMessages] = useState(sampleMessages);
