@@ -85,6 +85,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setExistingRequestId(null);
 
     try {
+      // Check if current user has sent a request to the profile user
       const qSent = query(
         collection(db, 'followRequests'),
         where('requesterId', '==', currentUser.uid),
@@ -97,43 +98,46 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         const request = sentSnapshot.docs[0].data() as FollowRequestDocument;
         const requestId = sentSnapshot.docs[0].id;
         if (request.status === 'pending') {
-          setFollowStatus('pending_them'); // Current user sent a pending request to profile user
+          setFollowStatus('pending_them'); 
           setExistingRequestId(requestId); 
         } else if (request.status === 'accepted') {
-          setFollowStatus('following'); // Current user is following profile user
+          setFollowStatus('following'); 
           setExistingRequestId(requestId);
-        } else { // 'declined' or other states, treat as not_following for button logic
+        } else { 
           setFollowStatus('not_following');
         }
         setIsProcessingFollow(false);
         return;
       }
 
+      // Check if profile user has sent a request to the current user
       const qReceived = query(
         collection(db, 'followRequests'),
-        where('requesterId', '==', userId), // Profile user is requester
-        where('recipientId', '==', currentUser.uid), // Current user is recipient
+        where('requesterId', '==', userId), 
+        where('recipientId', '==', currentUser.uid), 
         limit(1)
       );
       const receivedSnapshot = await getDocs(qReceived);
+
       if (!receivedSnapshot.empty) {
         const request = receivedSnapshot.docs[0].data() as FollowRequestDocument;
-        // const requestId = receivedSnapshot.docs[0].id; // ID of request sent by profile user
         if (request.status === 'pending') {
-          setFollowStatus('pending_me'); // Profile user sent a pending request to current user
-          // setExistingRequestId(requestId); // Not needed for 'pending_me' from current user's perspective for *their* actions
+          setFollowStatus('pending_me'); 
         } else if (request.status === 'accepted') {
-          setFollowStatus('follow_back'); // Profile user follows current user (and current user might not be following them back yet)
-          // setExistingRequestId(requestId); // Not generally needed for "Follow Back" action which creates a new request
+          // Profile user follows current user, but current user might not be following back yet.
+          // We still need to check if current user initiated a follow that got accepted.
+          // The previous check for qSent would have caught 'following'.
+          // So if we reach here with an accepted qReceived, it means current user is not 'following'.
+          setFollowStatus('follow_back');
         } else {
           setFollowStatus('not_following');
         }
       } else {
-        setFollowStatus('not_following'); // No requests in either direction
+        setFollowStatus('not_following'); 
       }
     } catch (error: any) {
         console.error("Error checking follow status:", error);
-        toast({ title: "Error", description: `Could not check follow status: ${error.message}`, variant: "destructive"});
+        toast({ title: "Network Error", description: `Could not check follow status: ${error.message || 'Please try again.'}`, variant: "destructive"});
         setFollowStatus('not_following'); 
     } finally {
         setIsProcessingFollow(false);
@@ -258,11 +262,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setIsProcessingFollow(true);
     try {
         const requestRef = doc(db, 'followRequests', existingRequestId);
-        await deleteDoc(requestRef); // This deletes the request document
-
-        // Optionally: Delete the notification sent to the recipient if desired, though rules might prevent this.
-        // For now, the notification will become "stale".
-        // Consider adding a cloud function to clean up stale notifications or handle this deletion server-side.
+        await deleteDoc(requestRef); 
 
         setFollowStatus('not_following');
         setExistingRequestId(null);
@@ -285,27 +285,24 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', existingRequestId);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-    const targetUserProfileRef = doc(db, 'profiles', profile.uid); 
+    // We will NOT attempt to update the target user's followersCount from the client due to permissions.
+    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); 
 
     try {
       batch.delete(followRequestRef); 
       batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-      // Attempt to update target's followersCount. THIS MAY FAIL if rules don't allow current user to write to target's profile.
-      // Secure updates to another user's profile fields should ideally be done via Cloud Functions.
-      batch.update(targetUserProfileRef, { followersCount: increment(-1) }); 
+      // REMOVED: batch.update(targetUserProfileRef, { followersCount: increment(-1) }); 
 
       await batch.commit();
 
       setFollowStatus('not_following');
       setExistingRequestId(null);
       toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName || 'this user'}.` });
-      // reloadUser(); // Optionally reload local user data if counts are critical for immediate display from AuthContext
-    } catch (error: any) {
+    } catch (error: any)
+     {
       console.error("Error unfollowing user:", error);
-      toast({ title: "Unfollow Error", description: error.message || "Could not unfollow user. Some counts might be out of sync.", variant: "destructive" });
-      // If the batch fails, counts might be inconsistent. A more robust solution would use Cloud Functions.
-      // For now, we optimistically update the UI status.
-      // Re-check status to reflect partial success/failure if needed.
+      toast({ title: "Unfollow Error", description: error.message || "Could not unfollow user.", variant: "destructive" });
+      // Re-check status to reflect potential partial success/failure if needed.
       checkFollowStatus();
     } finally {
       setIsProcessingFollow(false);
@@ -316,9 +313,11 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const handleMessageUser = async () => {
     if (!currentUser || !profile || currentUser.uid === profile.uid || isMessaging) return;
     
+    // Allow messaging if 'following' (current user follows profile user) or 'follow_back' (profile user follows current user).
+    // This means at least one-way follow exists. Mutual following is ideal but this is simpler.
     const canActuallyMessage = followStatus === 'following' || followStatus === 'follow_back';
     if (!canActuallyMessage) {
-        toast({ title: "Cannot Message", description: `You need to be mutually following or you following them to message ${profile.displayName || 'this user'}.`, variant: "default" });
+        toast({ title: "Cannot Message", description: `You need to be connected to message ${profile.displayName || 'this user'}.`, variant: "default" });
         return;
     }
 
@@ -385,6 +384,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       await batch.commit();
 
       if (postToDelete.imagePath) {
+        const { ref: storageRef, deleteObject } = await import('firebase/storage'); // Dynamic import
         const imageFileRef = storageRef(storage, postToDelete.imagePath);
         await deleteObject(imageFileRef).catch(storageError => {
           console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
