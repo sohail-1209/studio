@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -19,6 +20,7 @@ export default {
       fontFamily: {
         body: ['PT Sans', 'sans-serif'],
         headline: ['Poppins', 'sans-serif'],
+        logo: ['Tangerine', 'cursive'], // Added Tangerine for the logo
         code: ['monospace'],
       },
       colors: {
@@ -71,7 +73,7 @@ export default {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
-        logoText: 'hsl(var(--logo-text-color))', // Added new logo text color
+        logoText: 'hsl(var(--logo-text-color))', 
       },
       borderRadius: {
         lg: 'var(--radius)',

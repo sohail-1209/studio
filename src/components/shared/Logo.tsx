@@ -9,7 +9,7 @@ interface LogoProps {
   textSize?: string;
 }
 
-export function Logo({ className, iconSize = 54, textSize = "text-2xl" }: LogoProps) { // Default iconSize increased to 54
+export function Logo({ className, iconSize = 54, textSize = "text-4xl" }: LogoProps) { 
   return (
     <Link href="/" className={`flex items-center gap-2 text-logoText ${className}`}>
       <Image
@@ -20,7 +20,7 @@ export function Logo({ className, iconSize = 54, textSize = "text-2xl" }: LogoPr
         priority 
         className="rounded-full"
       />
-      <span className={`font-headline font-bold ${textSize}`}>Synora</span>
+      <span className={`font-logo font-bold ${textSize}`}>Synora</span>
     </Link>
   );
 }
