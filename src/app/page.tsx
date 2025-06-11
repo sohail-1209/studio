@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
 import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit } from 'firebase/firestore';
 import type { Post } from '@/types/post';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,24 +22,34 @@ import { CommentInput } from '@/components/posts/CommentInput';
 import { CommentList } from '@/components/posts/CommentList';
 import { Separator } from '@/components/ui/separator';
 
+interface StoryUserData {
+  userId: string;
+  displayName: string | null;
+  photoURL: string | null;
+  dataAiHint?: string;
+}
+
 export default function FeedPage() {
   const [isCreatePostDialogOpen, setIsCreatePostDialogOpen] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const { user } = useAuth(); // Get the currently authenticated user
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const [isLiking, setIsLiking] = useState<{[postId: string]: boolean}>({});
   const [showComments, setShowComments] = useState<{[postId: string]: boolean}>({});
 
+  const [storiesData, setStoriesData] = useState<StoryUserData[]>([]);
+  const [loadingStories, setLoadingStories] = useState(true);
 
   useEffect(() => {
+    // Fetch Posts
     const postsCollection = collection(db, 'posts');
-    const q = query(postsCollection, orderBy('createdAt', 'desc'));
+    const qPosts = query(postsCollection, orderBy('createdAt', 'desc'));
 
     setLoadingPosts(true);
-    const unsubscribe = onSnapshot(
-      q,
+    const unsubscribePosts = onSnapshot(
+      qPosts,
       (snapshot) => {
         const fetchedPosts = snapshot.docs.map((docSnapshot) => {
           const data = docSnapshot.data();
@@ -66,7 +76,34 @@ export default function FeedPage() {
       }
     );
 
-    return () => unsubscribe();
+    // Fetch Stories Data (derived from recent posts)
+    setLoadingStories(true);
+    const qStories = query(postsCollection, orderBy('createdAt', 'desc'), firestoreLimit(15));
+    const unsubscribeStories = onSnapshot(qStories, (snapshot) => {
+      const uniqueUsersMap = new Map<string, StoryUserData>();
+      snapshot.docs.forEach(docSnapshot => {
+        const post = docSnapshot.data() as PostDocument;
+        if (post.userId && !uniqueUsersMap.has(post.userId)) {
+          uniqueUsersMap.set(post.userId, {
+            userId: post.userId,
+            displayName: post.userDisplayName,
+            photoURL: post.userAvatarUrl,
+            dataAiHint: "portrait person", // Generic hint for story avatars
+          });
+        }
+      });
+      setStoriesData(Array.from(uniqueUsersMap.values()).slice(0, 7)); // Display up to 7 stories
+      setLoadingStories(false);
+    }, (error) => {
+      console.error('Error fetching stories data:', error);
+      setLoadingStories(false);
+      // Optional: toast for stories error
+    });
+
+    return () => {
+      unsubscribePosts();
+      unsubscribeStories();
+    };
   }, [toast]);
 
   const handleLikePost = async (postId: string, currentPost: Post) => {
@@ -117,7 +154,7 @@ export default function FeedPage() {
     const shareData = {
       title: `Check out this post on NExCHAT by ${post.userDisplayName || 'a user'}!`,
       text: post.caption || 'An interesting post from NExCHAT.',
-      url: window.location.origin + `/post/${post.id}`, // Assuming post detail pages exist or will exist
+      url: window.location.origin + `/post/${post.id}`, 
     };
 
     if (navigator.share) {
@@ -195,9 +232,8 @@ export default function FeedPage() {
             <Skeleton className="h-8 w-16" />
           </div>
         </div>
-        {/* Placeholder for comment section skeleton */}
         <div className="border-t p-4">
-            <Skeleton className="h-10 w-full mb-3" /> {/* Comment input skeleton */}
+            <Skeleton className="h-10 w-full mb-3" />
             <div className="space-y-2">
                 <Skeleton className="h-8 w-4/5" />
                 <Skeleton className="h-8 w-3/5" />
@@ -205,6 +241,13 @@ export default function FeedPage() {
         </div>
       </CardContent>
     </Card>
+  );
+
+  const StorySkeleton = () => (
+    <div className="flex flex-col items-center space-y-1">
+      <Skeleton className="h-16 w-16 rounded-full" />
+      <Skeleton className="mt-1 h-3 w-12" />
+    </div>
   );
 
 
@@ -226,21 +269,40 @@ export default function FeedPage() {
             <CardTitle className="font-headline text-xl">Stories</CardTitle>
           </CardHeader>
           <CardContent className="flex space-x-4 overflow-x-auto p-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex flex-col items-center space-y-1">
-                <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5">
-                  <Image
-                    src={`https://placehold.co/64x64.png/7E57C2/FFFFFF?text=U${i + 1}`}
-                    alt={`User ${i + 1} story`}
-                    width={64}
-                    height={64}
-                    className="rounded-full"
-                    data-ai-hint="portrait person"
-                  />
-                </Avatar>
-                <span className="text-xs text-muted-foreground">User {i + 1}</span>
-              </div>
-            ))}
+            {loadingStories && (
+              [...Array(5)].map((_, i) => <StorySkeleton key={`story-skel-${i}`} />)
+            )}
+            {!loadingStories && storiesData.length === 0 && (
+              <p className="text-sm text-muted-foreground">No stories to show right now.</p>
+            )}
+            {!loadingStories && storiesData.map((storyUser) => {
+              const isCurrentUserStory = storyUser.userId === user?.uid;
+              const storyAvatarUrl = isCurrentUserStory ? user?.photoURL || storyUser.photoURL : storyUser.photoURL;
+              const storyDisplayName = isCurrentUserStory ? user?.displayName || storyUser.displayName : storyUser.displayName;
+              const storyAvatarFallback = (storyDisplayName || 'U').charAt(0).toUpperCase();
+              
+              return (
+                <div key={storyUser.userId} className="flex flex-col items-center space-y-1 cursor-pointer">
+                  <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5">
+                    {storyAvatarUrl ? (
+                      <Image
+                        src={storyAvatarUrl}
+                        alt={`${storyDisplayName || 'User'}'s story`}
+                        width={64}
+                        height={64}
+                        className="rounded-full"
+                        data-ai-hint={storyUser.dataAiHint || "portrait person"}
+                      />
+                    ) : (
+                      <AvatarFallback>{storyAvatarFallback}</AvatarFallback>
+                    )}
+                  </Avatar>
+                  <span className="text-xs text-muted-foreground truncate w-16 text-center">
+                    {storyDisplayName || 'User'}
+                  </span>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -260,14 +322,12 @@ export default function FeedPage() {
             </Card>
           )}
           {!loadingPosts && posts.map((post, index) => {
-            const isLikedByCurrentUser = post.likedBy && user ? post.likedBy.includes(user.uid) : false;
-            
-            // Determine avatar source and display name based on whether it's the current user's post
             const isCurrentUserPost = post.userId === user?.uid;
             const avatarUrl = isCurrentUserPost ? user?.photoURL : post.userAvatarUrl;
             const avatarAlt = isCurrentUserPost ? (user?.displayName || 'Your avatar') : (post.userDisplayName || 'User avatar');
             const avatarFallbackInitial = (isCurrentUserPost ? (user?.displayName || 'U') : (post.userDisplayName || 'U')).charAt(0).toUpperCase();
             const postAuthorDisplayName = isCurrentUserPost ? (user?.displayName || 'You') : (post.userDisplayName || 'Anonymous User');
+            const isLikedByCurrentUser = post.likedBy && user ? post.likedBy.includes(user.uid) : false;
 
             return (
               <Card key={post.id} className="overflow-hidden shadow-lg">
@@ -297,12 +357,11 @@ export default function FeedPage() {
                         fill 
                         style={{objectFit: 'cover'}} 
                         data-ai-hint={post.dataAiHint || "user content"}
-                        priority={index === 0} // Add priority to the first image
+                        priority={index < 2} // Prioritize loading for first few images
                       />
                     </div>
                   )}
                   {post.videoUrl && (
-                    // Assuming videoUrl is a placeholder image for a video
                     <div className="relative aspect-video w-full bg-black flex items-center justify-center">
                        <Image 
                          src={post.videoUrl} 
@@ -362,5 +421,5 @@ export default function FeedPage() {
     </MainLayout>
   );
 }
-
     
+
