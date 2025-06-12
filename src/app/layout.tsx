@@ -49,7 +49,7 @@ export default function RootLayout({
         <InitializeTheme />
         <meta name="theme-color" content="#588558" /> {/* Updated theme color to match primary */}
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="https://placehold.co/192x192.png?text=S" /> {/* Updated apple-touch-icon */}
+        <link rel="apple-touch-icon" href="https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png" /> {/* Updated apple-touch-icon */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
