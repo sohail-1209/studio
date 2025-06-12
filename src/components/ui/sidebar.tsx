@@ -24,13 +24,13 @@ const SIDEBAR_WIDTH_MOBILE = "var(--sidebar-width-mobile, 16rem)"
 
 
 type SidebarContextType = {
-  state: "expanded" 
-  open: true 
-  setOpen: (open: boolean) => void 
-  openMobile: boolean 
-  setOpenMobile: (open: boolean) => void 
-  isMobile: false 
-  toggleSidebar: () => void 
+  state: "expanded"
+  open: true
+  setOpen: (open: boolean) => void
+  openMobile: boolean
+  setOpenMobile: (open: boolean) => void
+  isMobile: false
+  toggleSidebar: () => void
 }
 
 const SidebarContext = React.createContext<SidebarContextType | null>(null)
@@ -46,8 +46,8 @@ function useSidebar() {
 const SidebarProvider = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
-    open: true 
-    onOpenChange: (open: boolean) => void 
+    open: boolean // Changed from 'true' to 'boolean' for correctness, though we force it
+    onOpenChange: (open: boolean) => void
   }
 >(
   (
@@ -55,16 +55,18 @@ const SidebarProvider = React.forwardRef<
       className,
       style,
       children,
+      open, // Destructure open
+      onOpenChange, // Destructure onOpenChange
       // Props related to cookies, responsiveness, and toggling are removed or hardcoded
-      ...props
+      ...props // Now, 'props' will not contain 'open' or 'onOpenChange'
     },
     ref
   ) => {
-    
+
     const contextValue = React.useMemo<SidebarContextType>(
       () => ({
         state: "expanded", // Always expanded
-        open: true,        // Always open
+        open: true,        // Always open (as per current forced state)
         setOpen: () => {}, // No-op
         isMobile: false,   // Always desktop context for now
         openMobile: false, // Mobile sheet not used
@@ -91,7 +93,7 @@ const SidebarProvider = React.forwardRef<
               className
             )}
             ref={ref}
-            {...props}
+            {...props} // onOpenChange and open are no longer spread here
           >
             {children}
           </div>
@@ -119,9 +121,9 @@ const Sidebar = React.forwardRef<
       <aside
         ref={ref}
         className={cn(
-          "flex flex-col h-screen sticky top-0 z-50", 
-          "!bg-red-500 text-white", 
-          "!w-64 flex-shrink-0 border-r-4 border-black", 
+          "flex flex-col h-screen sticky top-0 z-50",
+          "!bg-red-500 text-white",
+          "!w-64 flex-shrink-0 border-r-4 border-black",
           className
         )}
         data-state={"expanded"} // Hardcoded as it's always expanded in this debug state
@@ -192,7 +194,7 @@ const SidebarInset = React.forwardRef<
       ref={ref}
       className={cn(
         "flex-1 flex flex-col overflow-y-auto",
-        "!bg-blue-500", 
+        "!bg-blue-500",
         className
       )}
       {...props}
@@ -229,7 +231,7 @@ const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-3", className)} 
+      className={cn("flex flex-col gap-2 p-3", className)}
       {...props}
     />
   )
@@ -411,7 +413,7 @@ const SidebarMenuButton = React.forwardRef<
       isActive = false,
       variant = "default",
       size = "default",
-      tooltip, 
+      tooltip,
       className,
       children,
       ...props
@@ -539,14 +541,14 @@ const SidebarMenuSubItem = React.forwardRef<
 SidebarMenuSubItem.displayName = "SidebarMenuSubItem"
 
 const SidebarMenuSubButton = React.forwardRef<
-  HTMLAnchorElement, 
-  React.ComponentProps<"a"> & { 
+  HTMLAnchorElement,
+  React.ComponentProps<"a"> & {
     asChild?: boolean
     size?: "sm" | "default"
     isActive?: boolean
   }
 >(({ asChild = false, size = "default", isActive, className, ...props }, ref) => {
-  const Comp = asChild ? Slot : "a" 
+  const Comp = asChild ? Slot : "a"
   return (
     <Comp
       ref={ref}
