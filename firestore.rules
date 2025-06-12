@@ -19,14 +19,16 @@ service cloud.firestore {
     }
 
     function isAcceptedFollower(profileOwnerId, requesterId) {
+      // Correctly construct the followDocId
+      let followDocId = requesterId + '_' + profileOwnerId;
       // Checks if a 'followRequests' document exists where the requester is following the profileOwner
       // and the status is 'accepted'.
       // Ensures the document being checked corresponds to the correct requester and recipient.
       return request.auth != null && requesterId == request.auth.uid && // Requester must be the authenticated user
-             exists(/databases/$(database)/documents/followRequests/$(requesterId)_$(profileOwnerId)) &&
-             get(/databases/$(database)/documents/followRequests/$(requesterId)_$(profileOwnerId)).data.status == 'accepted' &&
-             get(/databases/$(database)/documents/followRequests/$(requesterId)_$(profileOwnerId)).data.requesterId == requesterId &&
-             get(/databases/$(database)/documents/followRequests/$(requesterId)_$(profileOwnerId)).data.recipientId == profileOwnerId;
+             exists(/databases/$(database)/documents/followRequests/$(followDocId)) &&
+             get(/databases/$(database)/documents/followRequests/$(followDocId)).data.status == 'accepted' &&
+             get(/databases/$(database)/documents/followRequests/$(followDocId)).data.requesterId == requesterId &&
+             get(/databases/$(database)/documents/followRequests/$(followDocId)).data.recipientId == profileOwnerId;
     }
     // End of Helper Functions
 
@@ -89,7 +91,6 @@ service cloud.firestore {
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
                        ) ||
                        // Requester updating their own request to 'accepted' if target is public (e.g., profile switched from private to public)
-                       // This is less common, usually a new 'accepted' request is created if re-following a public profile.
                        (
                          request.auth.uid == resource.data.requesterId &&
                          isProfileEffectivelyPublic(resource.data.recipientId) &&
@@ -149,7 +150,6 @@ service cloud.firestore {
                         (request.auth.uid == resource.data.userId &&
                          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['likesCount', 'likedBy', 'commentsCount', 'userId', 'createdAt', 'authorIsPrivate'])) ||
                         // Anyone authenticated can update like/comment counters (usually via increments)
-                        // This is a simplified rule; ideally increments are validated more strictly.
                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'commentsCount']))
                       );
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
@@ -168,7 +168,6 @@ service cloud.firestore {
 
     // Profiles collection
     match /profiles/{userId} {
-      // MODIFIED: Allow reading public profiles by anyone, and any profile by authenticated users.
       allow read: if
         (isProfileEffectivelyPublic(userId)) || // Anyone can read a public profile
         (request.auth != null);                 // Authenticated users can read any profile (including private ones, e.g. for DMs)
