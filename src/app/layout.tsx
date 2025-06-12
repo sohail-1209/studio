@@ -1,4 +1,3 @@
-
 // src/app/layout.tsx
 
 import type { Metadata } from 'next';
@@ -12,7 +11,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#588558' },
-    { media: '(prefers-color-scheme: dark)', color: '#588558' }, // Ensure this is appropriate for dark theme
+    { media: '(prefers-color-scheme: dark)', color: '#588558' },
   ],
   icons: {
     icon: 'https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png',
@@ -38,7 +37,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="overflow-y-scroll">
-      <head><InitializeTheme /><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Tangerine:wght@700&display=swap" rel="stylesheet"/>
+      <head>
+        <InitializeTheme />
+        {/* Font links temporarily removed for debugging hydration error */}
+        {/* <link rel="preconnect" href="https://fonts.googleapis.com"/> */}
+        {/* <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/> */}
+        {/* <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"/> */}
+        {/* <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet"/> */}
+        {/* <link href="https://fonts.googleapis.com/css2?family=Tangerine:wght@700&display=swap" rel="stylesheet"/> */}
       </head>
       <body className="font-body antialiased">
         <AuthProvider>
