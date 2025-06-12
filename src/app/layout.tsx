@@ -5,8 +5,9 @@ import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Synora',
+  title: 'NExCHAT',
   description: 'Connect, Share, and Chat.',
+  manifest: '/manifest.json', // Added manifest link for PWA
 };
 
 // Script to set initial theme to prevent FOUC (Flash of Unstyled Content)
@@ -42,6 +43,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <InitializeTheme />
+        <meta name="theme-color" content="#7E57C2" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -57,4 +61,3 @@ export default function RootLayout({
     </html>
   );
 }
-
