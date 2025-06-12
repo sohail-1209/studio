@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card'; // Still needed for header part if we keep it styled
+// Card and CardContent removed for diagnostic
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
@@ -163,7 +163,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingProfile(false);
       });
       
-      // Keep posts logic commented out for diagnostic
+      // Diagnostic: Keep posts logic static for now
       // setPosts([]); 
       // setLoadingPosts(false);
 
@@ -178,6 +178,37 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       checkFollowStatus();
     }
   }, [profile, currentUser, isOwnProfile, checkFollowStatus]);
+
+  // useEffect(() => { // Diagnostic: Commented out post fetching
+  //   if (userId) {
+  //     // setLoadingPosts(true); // Commented out
+  //     // const postsColRef = collection(db, 'posts');
+  //     // const q = query(
+  //     //   postsColRef,
+  //     //   where('userId', '==', userId),
+  //     //   where('isStory', '!=', true), // Exclude stories from profile posts tab
+  //     //   orderBy('createdAt', 'desc')
+  //     // );
+  //     // const unsubscribePosts = onSnapshot(q, (snapshot) => {
+  //     //   const fetchedPosts = snapshot.docs.map((docSnap) => ({
+  //     //     id: docSnap.id,
+  //     //     ...docSnap.data(),
+  //     //     createdAt: (docSnap.data().createdAt as Timestamp).toDate(),
+  //     //   })) as Post[];
+  //     //   setPosts(fetchedPosts);
+  //     //   setLoadingPosts(false);
+  //     // }, (error) => {
+  //     //   console.error("Error fetching user posts:", error);
+  //     //   toast({ title: "Error fetching posts", description: error.message, variant: "destructive" });
+  //     //   setLoadingPosts(false);
+  //     // });
+  //     // return () => unsubscribePosts();
+
+  //     // Diagnostic: Immediately set posts to empty and loading to false
+  //      setPosts([]);
+  //      setLoadingPosts(false);
+  //   }
+  // }, [userId, toast]);
 
 
   const handleFollowToggle = async () => {
@@ -208,18 +239,22 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         const newRequestData = {
             requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
             recipientId: profile.uid, recipientDisplayName: profile.displayName, recipientAvatarUrl: profile.photoURL,
-            status: 'accepted',
+            status: 'accepted', // Assuming public profiles auto-accept, or a simplified follow for now
             createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         };
         batch.set(followRequestRef, newRequestData);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
         batch.update(targetUserProfileRef, { followersCount: increment(1) });
 
+        // Create notification for the target user
         const notificationRef = doc(collection(db, 'notifications'));
         const notificationData = {
-            recipientId: profile.uid, actorId: currentUser.uid, actorDisplayName: currentUser.displayName, actorAvatarUrl: currentUser.photoURL,
-            type: 'follow_accept',
-            originalFollowRequestId: newFollowDocId,
+            recipientId: profile.uid, // The user being followed
+            actorId: currentUser.uid, // The user who initiated the follow
+            actorDisplayName: currentUser.displayName,
+            actorAvatarUrl: currentUser.photoURL,
+            type: 'follow_accept', // Changed from 'follow_request' for direct follow
+            originalFollowRequestId: newFollowDocId, // Reference the follow document
             isRead: false,
             createdAt: serverTimestamp()
         };
@@ -230,7 +265,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setExistingFollowDocId(newFollowDocId);
         toast({ title: "Followed", description: `You are now following ${profile.displayName}.` });
       }
-      await reloadUser();
+      // Reload user data to reflect changes in counts for both users if possible
+      await reloadUser(); // Reloads current user's auth context data
+      // Fetch and set the target profile's updated data
       const updatedTargetProfileSnap = await getDoc(targetUserProfileRef);
       if (updatedTargetProfileSnap.exists()) {
         setProfile(updatedTargetProfileSnap.data() as UserProfile);
@@ -239,6 +276,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     } catch (error: any) {
       console.error("Error in handleFollowToggle:", error);
       toast({ title: "Operation Failed", description: error.message || "Could not perform follow/unfollow action.", variant: "destructive" });
+      // Re-check status if operation failed to ensure UI consistency
       await checkFollowStatus();
     } finally {
       setIsProcessingFollow(false);
@@ -258,6 +296,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       if (chatSnap.exists()) {
         router.push(`/messages/${chatId}`);
       } else {
+        // Create new chat session
         const newChatData = {
           userIds: [currentUser.uid, profile.uid],
           userDetails: {
@@ -272,7 +311,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           },
           lastMessageText: null,
           lastMessageSenderId: null,
-          lastMessageTimestamp: null,
+          lastMessageTimestamp: null, // Will be set by first message or can be serverTimestamp() here
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         };
@@ -303,6 +342,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     try {
       const postRef = doc(db, 'posts', postToDelete.id);
 
+      // Delete comments subcollection
       const commentsRef = collection(postRef, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
       const commentBatch = writeBatch(db);
@@ -311,13 +351,19 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       });
       await commentBatch.commit();
 
+      // Delete image from storage (if exists)
       if (postToDelete.imagePath) {
-        // const imageFileRef = storageRef(storage, postToDelete.imagePath);
+        // const imageFileRef = storageRef(storage, postToDelete.imagePath); // Corrected function name
         // await deleteObject(imageFileRef).catch(storageError => {
         // console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
+        // // toast({ title: "Storage Warning", description: "Could not delete image file, but post will be deleted.", variant: "default", duration: 5000 });
         // });
       }
+      // Delete the post document
       await deleteDoc(postRef);
+
+      // Update local state (this might be handled by onSnapshot if listening to posts)
+      // setPosts(prevPosts => prevPosts.filter(p => p.id !== postToDelete.id));
       toast({ title: "Post Deleted", description: "Your post has been successfully deleted." });
     } catch (error: any) {
       console.error("Error deleting post:", error);
@@ -329,16 +375,16 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     }
   };
 
+  // Simplified Skeleton for diagnostic, actual skeleton removed from main render path
   const ProfileSkeleton = () => (
-    // This Card is only for skeleton, won't be used in the simplified layout for actual profile
-    <Card className="overflow-hidden shadow-lg w-full">
-      <CardHeader className="bg-muted/30 p-0 relative">
+    <div className="w-full">
+      <div className="bg-muted/30 p-0 relative border-b border-border">
         <Skeleton className="h-48 md:h-64 w-full" />
-        <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6">
-          <Skeleton className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-card" />
+        <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
+          <Skeleton className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-background shadow-lg" />
         </div>
-      </CardHeader>
-      <CardContent className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6">
+      </div>
+      <div className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6 bg-background">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
           <div className="mb-3 sm:mb-0">
             <Skeleton className="h-8 w-40 mb-1.5" />
@@ -356,13 +402,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           <Skeleton className="h-5 w-20" />
           <Skeleton className="h-5 w-20" />
         </div>
-        <Tabs defaultValue="posts" className="w-full">
+         <Tabs defaultValue="posts" className="w-full">
           <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
             <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
             <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
             <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
           </TabsList>
-          <TabsContent value="posts" className="mt-6 w-full min-w-0">
+          <TabsContent value="posts" className="mt-6 w-full min-w-0 overflow-y-auto">
              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full min-w-0">
                 {[...Array(6)].map((_, i) => (
                   <Skeleton key={i} className="aspect-square rounded-md min-w-0" />
@@ -370,9 +416,10 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
              </div>
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
+
 
   if (loadingProfile || !userId) {
     return (
@@ -388,12 +435,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
      return (
       <MainLayout>
         <div className="text-center w-full">
-            <Card className="w-full shadow-lg h-full flex flex-col items-center justify-center">
-              <CardContent className="p-12">
+            <div className="w-full shadow-lg h-full flex flex-col items-center justify-center bg-card rounded-lg"> {/* Added bg-card and rounded-lg */}
+              <div className="p-12"> {/* Added padding */}
                 <h2 className="text-2xl font-semibold">Profile Not Found</h2>
                 <p className="text-muted-foreground">The user profile you are looking for does not exist or could not be loaded.</p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
       </MainLayout>
     );
@@ -402,30 +449,35 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const handleProfileUpdate = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
     if (currentUser && updatedProfile.uid === currentUser.uid) {
-        reloadUser();
+        reloadUser(); // This reloads the AuthContext's user
     }
   };
 
  const FollowButtonComponent = () => {
+    // If profile is private and not yet accepted, show 'Requested'
+    // This part needs follow request status logic if implementing private profiles fully
+
     if (isProcessingFollow) {
         return <Button disabled className="w-full sm:w-auto"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
     }
     switch (followStatus) {
         case 'following':
             return <Button variant="outline" onClick={handleFollowToggle} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
+        // case 'requested': // For private profiles
+        //     return <Button variant="outline" onClick={handleCancelFollowRequest} className="w-full sm:w-auto"><Clock className="mr-2 h-4 w-4" />Requested</Button>;
         case 'not_following':
         default:
             return <Button onClick={handleFollowToggle} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
     }
  };
 
-  const canMessage = !isOwnProfile;
+  const canMessage = !isOwnProfile; // && (followStatus === 'following' || !profile.isPrivate); // Add logic for private profiles if needed
 
 
   return (
     <MainLayout>
       <div className="w-full">
-          {/* Profile Header Section - No Card wrapper */}
+          {/* Profile Header Section - Removed Card wrapper */}
           <div className="bg-muted/20 p-0 relative border-b border-border">
             <div className="relative h-48 w-full md:h-64">
               <Image
@@ -446,7 +498,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             </div>
           </div>
           
-          <div className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6 bg-background"> {/* Background for content below cover */}
+          <div className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6 bg-background">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
               <div className="mb-3 sm:mb-0">
                 <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
@@ -470,27 +522,51 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
 
             <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
-              {/* Posts count remains 0 due to diagnostic changes */}
-              <span className="text-foreground font-medium"><strong>{0}</strong> Posts</span>
+              <span className="text-foreground font-medium"><strong>{0}</strong> Posts</span> {/* Posts count remains 0 due to diagnostic changes */}
               <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
               <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
             </div>
           </div>
 
-          {/* Tabs Section - No Card or CardContent wrapper */}
+          {/* Tabs Section - Removed Card or CardContent wrapper */}
           <Tabs defaultValue="posts" className="w-full px-4 sm:px-6 pb-6 bg-background">
             <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
               <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
               <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
               <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
             </TabsList>
-            <TabsContent value="posts" className="mt-6 w-full min-w-0 overflow-y-auto">
+            <TabsContent value="posts" className="mt-6 w-full min-w-0 overflow-y-auto" forceMount>
+              {/* {loadingPosts && <LoadingPostsPlaceholder />}
+              {!loadingPosts && posts.length === 0 && <NoPostsPlaceholder />}
+              {!loadingPosts && posts.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full min-w-0">
+                  {posts.map((post) => (
+                    <div key={post.id} className="relative aspect-square group min-w-0">
+                       <Image src={post.imageUrl || "https://placehold.co/300x300.png"} alt={post.caption || "User post"} fill style={{objectFit:"cover"}} className="rounded-md" data-ai-hint="user content" />
+                       {isOwnProfile && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 bg-black/40 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                              <MoreHorizontal size={16} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                       )}
+                    </div>
+                  ))}
+                </div>
+              )} */}
               <NoPostsPlaceholder />
             </TabsContent>
-            <TabsContent value="media" className="mt-6 w-full min-w-0 overflow-y-auto">
+            <TabsContent value="media" className="mt-6 w-full min-w-0 overflow-y-auto" forceMount>
               <NoMediaPlaceholder />
             </TabsContent>
-            <TabsContent value="likes" className="mt-6 w-full min-w-0 overflow-y-auto">
+            <TabsContent value="likes" className="mt-6 w-full min-w-0 overflow-y-auto" forceMount>
                 <NoLikesPlaceholder />
             </TabsContent>
           </Tabs>
