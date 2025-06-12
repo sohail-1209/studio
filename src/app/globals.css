@@ -4,33 +4,38 @@
 @tailwind utilities;
 
 @layer base {
-  html, body, #__next { /* Target #__next as well */
+  html {
+    width: 100%;
+    overflow-x: hidden !important;
+    overflow-y: scroll !important; /* CRITICAL: Force scrollbar to stabilize viewport width */
+    box-sizing: border-box;
     padding: 0 !important;
     margin: 0 !important;
-    width: 100% !important;
-    min-width: 100% !important; /* Ensure it doesn't shrink from content */
-    max-width: 100% !important; /* Ensure it doesn't expand beyond viewport due to content */
-    overflow-x: hidden !important; /* Force no horizontal scroll */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  html {
-    overflow-y: scroll !important; /* Force vertical scrollbar, with !important */
-    box-sizing: border-box;
-  }
-  *, *:before, *:after { /* Apply border-box to all elements */
+  *, *::before, *::after {
     box-sizing: inherit;
   }
 
   body {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0 !important;
+    padding: 0 !important;
     font-family: var(--font-body), sans-serif;
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    min-height: 100vh;
-    /* width: 100%; /* Already handled by the html, body, #__next rule */
-    position: relative; /* Can help with stacking contexts and layout stability */
-    line-height: 1.5; /* Added a sensible default line-height */
+    line-height: 1.5;
+    position: relative; /* For potential absolute positioning contexts within */
+  }
+
+  #__next { /* The root div Next.js uses */
+    width: 100%;
+    min-height: 100vh; /* Ensure #__next also spans full height */
+    display: flex; /* Can help stabilize child layouts */
+    flex-direction: column; /* If MainLayout is a primary child taking up space */
   }
 
   :root {

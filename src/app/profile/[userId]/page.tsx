@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card'; // Still needed for header part if we keep it styled
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
@@ -48,44 +48,44 @@ type FollowStatus = 'not_following' | 'following';
 
 
 const LoadingPostsPlaceholder = () => (
- <div className="py-12 text-center w-full">
-    <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
-    <p className="mt-4 text-lg font-semibold text-foreground">Loading Posts...</p>
-    <p className="mt-1 text-sm text-muted-foreground">
-      Please wait a moment.
-    </p>
-  </div>
-);
-
-const NoMediaPlaceholder = () => (
   <div className="py-12 text-center w-full">
-    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-    <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
-    <p className="mt-1 text-sm text-muted-foreground">
-      This user hasn&apos;t shared any media yet.
-    </p>
-  </div>
-);
-
-const NoLikesPlaceholder = () => (
-  <div className="py-12 text-center w-full">
-    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-    <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>
-    <p className="mt-1 text-sm text-muted-foreground">
-        This user hasn&apos;t liked any posts yet.
-    </p>
-  </div>
-);
-
-const NoPostsPlaceholder = () => (
-  <div className="py-12 text-center w-full">
-    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-    <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
-    <p className="mt-1 text-sm text-muted-foreground">
-      This user hasn&apos;t shared any posts.
-    </p>
-  </div>
-);
+     <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
+     <p className="mt-4 text-lg font-semibold text-foreground">Loading Posts...</p>
+     <p className="mt-1 text-sm text-muted-foreground">
+       Please wait a moment.
+     </p>
+   </div>
+ );
+ 
+ const NoMediaPlaceholder = () => (
+   <div className="py-12 text-center w-full">
+     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+     <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
+     <p className="mt-1 text-sm text-muted-foreground">
+       This user hasn&apos;t shared any media yet.
+     </p>
+   </div>
+ );
+ 
+ const NoLikesPlaceholder = () => (
+   <div className="py-12 text-center w-full">
+     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+     <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>
+     <p className="mt-1 text-sm text-muted-foreground">
+         This user hasn&apos;t liked any posts yet.
+     </p>
+   </div>
+ );
+ 
+ const NoPostsPlaceholder = () => (
+   <div className="py-12 text-center w-full">
+     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+     <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
+     <p className="mt-1 text-sm text-muted-foreground">
+       This user hasn&apos;t shared any posts.
+     </p>
+   </div>
+ );
 
 
 export default function UserProfilePage({ params: paramsPromise }: { params: { userId: string } }) {
@@ -96,8 +96,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  // const [posts, setPosts] = useState<Post[]>([]); // Commented out for diagnostic
-  // const [loadingPosts, setLoadingPosts] = useState(true); // Commented out for diagnostic
+  // const [posts, setPosts] = useState<Post[]>([]); // Commented out for diagnosis
+  // const [loadingPosts, setLoadingPosts] = useState(true); // Commented out for diagnosis
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
@@ -163,8 +163,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingProfile(false);
       });
       
-      // DIAGNOSTIC: Make Posts tab static
-      // setPosts([]);
+      // Keep posts logic commented out for diagnostic
+      // setPosts([]); 
       // setLoadingPosts(false);
 
       return () => {
@@ -312,10 +312,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       await commentBatch.commit();
 
       if (postToDelete.imagePath) {
-        // const imageFileRef = storageRef(storage, postToDelete.imagePath); // storageRef is from firebase/storage
+        // const imageFileRef = storageRef(storage, postToDelete.imagePath);
         // await deleteObject(imageFileRef).catch(storageError => {
         // console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
-        // toast({ title: "Storage Warning", description: "Could not delete image file, but post will be deleted.", variant: "default", duration: 5000 });
         // });
       }
       await deleteDoc(postRef);
@@ -331,6 +330,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   };
 
   const ProfileSkeleton = () => (
+    // This Card is only for skeleton, won't be used in the simplified layout for actual profile
     <Card className="overflow-hidden shadow-lg w-full">
       <CardHeader className="bg-muted/30 p-0 relative">
         <Skeleton className="h-48 md:h-64 w-full" />
@@ -425,76 +425,76 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   return (
     <MainLayout>
       <div className="w-full">
-          <Card className="overflow-hidden shadow-lg w-full flex flex-col">
-            <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
-              <div className="relative h-48 w-full md:h-64">
-                <Image
-                  src={profile.coverPhotoURL || "https://placehold.co/1200x400.png"}
-                  alt={`${profile.displayName || 'User'}'s cover photo`}
-                  fill
-                  style={{objectFit: 'cover'}}
-                  data-ai-hint="abstract background landscape"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  priority
-                />
-                <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
-                  <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-card shadow-lg">
-                    <AvatarImage src={profile.photoURL || `https://placehold.co/128x128.png?text=${(profile.displayName || 'U').charAt(0)}`} alt={profile.displayName || 'User'} data-ai-hint="profile picture" />
-                    <AvatarFallback className="text-4xl sm:text-5xl">{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                </div>
+          {/* Profile Header Section - No Card wrapper */}
+          <div className="bg-muted/20 p-0 relative border-b border-border">
+            <div className="relative h-48 w-full md:h-64">
+              <Image
+                src={profile.coverPhotoURL || "https://placehold.co/1200x400.png"}
+                alt={`${profile.displayName || 'User'}'s cover photo`}
+                fill
+                style={{objectFit: 'cover'}}
+                data-ai-hint="abstract background landscape"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                priority
+              />
+              <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
+                <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-background shadow-lg">
+                  <AvatarImage src={profile.photoURL || `https://placehold.co/128x128.png?text=${(profile.displayName || 'U').charAt(0)}`} alt={profile.displayName || 'User'} data-ai-hint="profile picture" />
+                  <AvatarFallback className="text-4xl sm:text-5xl">{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
               </div>
-            </CardHeader>
-            <CardContent className="flex-1 pt-16 sm:pt-20 px-4 sm:px-6 pb-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
-                <div className="mb-3 sm:mb-0">
-                  <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
-                  <p className="text-sm text-muted-foreground">@{profile.username || profile.uid.substring(0,8)}</p>
-                </div>
-                <div className="flex flex-col space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-                  {isOwnProfile ? (
-                    <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto"><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
-                  ) : (
-                    <>
-                      <FollowButtonComponent />
-                      <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full sm:w-auto">
-                        {isMessaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
-                        Message
-                      </Button>
-                    </>
-                  )}
-                </div>
+            </div>
+          </div>
+          
+          <div className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6 bg-background"> {/* Background for content below cover */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
+              <div className="mb-3 sm:mb-0">
+                <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
+                <p className="text-sm text-muted-foreground">@{profile.username || profile.uid.substring(0,8)}</p>
               </div>
-
-              <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
-
-              <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
-                <span className="text-foreground font-medium"><strong>{0}</strong> Posts</span>
-                <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
-                <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
+              <div className="flex flex-col space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                {isOwnProfile ? (
+                  <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto"><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
+                ) : (
+                  <>
+                    <FollowButtonComponent />
+                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full sm:w-auto">
+                      {isMessaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
+                      Message
+                    </Button>
+                  </>
+                )}
               </div>
+            </div>
 
-              <Tabs defaultValue="posts" className="w-full">
-                <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
-                  <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
-                  <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
-                  <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
-                </TabsList>
-                <TabsContent
-                  value="posts"
-                  className="mt-6 w-full min-w-0 overflow-y-auto"
-                >
-                  <NoPostsPlaceholder />
-                </TabsContent>
-                <TabsContent value="media" className="mt-6 w-full min-w-0 overflow-y-auto">
-                  <NoMediaPlaceholder />
-                </TabsContent>
-                <TabsContent value="likes" className="mt-6 w-full min-w-0 overflow-y-auto">
-                   <NoLikesPlaceholder />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+            <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
+              {/* Posts count remains 0 due to diagnostic changes */}
+              <span className="text-foreground font-medium"><strong>{0}</strong> Posts</span>
+              <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
+              <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
+            </div>
+          </div>
+
+          {/* Tabs Section - No Card or CardContent wrapper */}
+          <Tabs defaultValue="posts" className="w-full px-4 sm:px-6 pb-6 bg-background">
+            <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
+              <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
+              <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
+              <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
+            </TabsList>
+            <TabsContent value="posts" className="mt-6 w-full min-w-0 overflow-y-auto">
+              <NoPostsPlaceholder />
+            </TabsContent>
+            <TabsContent value="media" className="mt-6 w-full min-w-0 overflow-y-auto">
+              <NoMediaPlaceholder />
+            </TabsContent>
+            <TabsContent value="likes" className="mt-6 w-full min-w-0 overflow-y-auto">
+                <NoLikesPlaceholder />
+            </TabsContent>
+          </Tabs>
+
         {isOwnProfile && profile && (
           <EditProfileDialog
             open={isEditDialogOpen}
