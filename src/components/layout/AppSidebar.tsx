@@ -100,11 +100,11 @@ export function AppSidebar() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground p-2">
+      <div className="flex flex-col h-full p-2">
         <SidebarHeader className="p-1 mb-1">
-          <Logo className="!text-white" iconSize={30} textSize="text-2xl" />
+          <Logo iconSize={30} textSize="text-2xl" />
         </SidebarHeader>
-        <SidebarSeparator className="!bg-white/20 my-1" />
+        <SidebarSeparator className="my-1" />
         <SidebarContent className="flex-1">
           <SidebarMenu>
             {[...Array(5)].map((_, i) => (
@@ -112,7 +112,7 @@ export function AppSidebar() {
             ))}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarSeparator className="!bg-white/20 my-1" />
+        <SidebarSeparator className="my-1" />
         <SidebarFooter className="p-1">
           <SidebarMenuSkeleton showIcon />
         </SidebarFooter>
@@ -121,11 +121,11 @@ export function AppSidebar() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground p-2">
+    <div className="flex flex-col h-full p-2">
       <SidebarHeader className="p-1 mb-1">
-         <Logo className="!text-white" iconSize={30} textSize="text-2xl" />
+         <Logo iconSize={30} textSize="text-2xl" />
       </SidebarHeader>
-      <SidebarSeparator className="!bg-white/20 my-1" />
+      <SidebarSeparator className="my-1" />
 
       <SidebarContent className="flex-1">
         <SidebarMenu>
@@ -145,9 +145,8 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={isActive}
-                    className="!text-white hover:!bg-white/20 data-[active=true]:!bg-white/30 data-[active=true]:font-semibold"
                   >
-                    <span className="flex items-center gap-2.5 w-full"> {/* Ensure full width and consistent gap */}
+                    <span className="flex items-center gap-2.5 w-full">
                       <item.icon />
                       <span>{item.label}</span>
                     </span>
@@ -158,18 +157,18 @@ export function AppSidebar() {
           })}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarSeparator className="!bg-white/20 my-1" />
+      <SidebarSeparator className="my-1" />
       <SidebarFooter className="p-1 space-y-1">
         <SidebarMenu>
           <SidebarMenuItem>
-              <SidebarMenuButton onClick={toggleTheme} className="!text-white hover:!bg-white/20 w-full">
+              <SidebarMenuButton onClick={toggleTheme} className="w-full">
                 {currentTheme === 'light' ? <Moon /> : <Sun />}
                 <span>Switch to {currentTheme === 'light' ? 'Dark' : 'Light'}</span>
               </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <Link href="/settings" passHref>
-              <SidebarMenuButton asChild isActive={pathname === '/settings'} className="!text-white hover:!bg-white/20 data-[active=true]:!bg-white/30 data-[active=true]:font-semibold">
+              <SidebarMenuButton asChild isActive={pathname === '/settings'}>
                 <span className="flex items-center gap-2.5 w-full">
                   <Settings /><span>Settings</span>
                 </span>
@@ -178,24 +177,24 @@ export function AppSidebar() {
           </SidebarMenuItem>
           {user && (
               <SidebarMenuItem>
-                <Link href={`/profile/${user.uid}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/20 cursor-pointer w-full">
+                <Link href={`/profile/${user.uid}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sidebar-hover cursor-pointer w-full text-sidebar-foreground hover:text-sidebar-hover-foreground">
                   <Avatar className="h-8 w-8">
                     {user.photoURL ? (
                       <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
                     ) : (
-                      <AvatarFallback className="bg-white/30 text-white">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                      <AvatarFallback className="bg-muted text-muted-foreground">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                     )}
                   </Avatar>
-                  <div className="text-xs !text-white overflow-hidden">
+                  <div className="text-xs overflow-hidden">
                     <p className="font-semibold truncate">{user.displayName || 'User'}</p>
-                    {user.username && <p className="text-white/70 truncate">@{user.username}</p>}
+                    {user.username && <p className="text-sidebar-foreground/70 truncate">@{user.username}</p>}
                   </div>
                 </Link>
             </SidebarMenuItem>
           )}
           {user && (
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={logout} className="w-full !text-white hover:!bg-red-700/50 hover:!text-white">
+              <SidebarMenuButton onClick={logout} className="w-full hover:!bg-destructive/10 hover:!text-destructive">
                 <LogOut />
                 <span>Logout</span>
               </SidebarMenuButton>
