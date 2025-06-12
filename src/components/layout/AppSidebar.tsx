@@ -30,18 +30,13 @@ const navItems = [
 ];
 
 
-interface AppSidebarProps {
-  /** True if this instance of AppSidebar is being rendered inside the mobile Sheet */
-  isForMobileSheet?: boolean;
-}
-
-export function AppSidebar({ isForMobileSheet = false }: AppSidebarProps) {
+export function AppSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const {
-    open: isDesktopExpanded, 
+    open: isDesktopExpanded,
     isMobile,
-    toggleSidebar 
+    toggleSidebar
   } = useSidebar();
 
   const isActive = (href: string) => {
@@ -49,9 +44,9 @@ export function AppSidebar({ isForMobileSheet = false }: AppSidebarProps) {
     if (href.includes('/profile/')) return pathname === href || pathname.startsWith(`${href}/`);
     return pathname.startsWith(href);
   };
-  
+
   // Labels are shown if: on desktop and expanded OR if it's the mobile sheet content.
-  const showLabels = (!isMobile && isDesktopExpanded) || (isMobile && isForMobileSheet);
+  const showLabels = (!isMobile && isDesktopExpanded) || isMobile;
   // Tooltips are shown if: on desktop and collapsed.
   const showTooltips = !isMobile && !isDesktopExpanded;
 
@@ -59,7 +54,7 @@ export function AppSidebar({ isForMobileSheet = false }: AppSidebarProps) {
     <>
       <SidebarHeader className="p-3">
         <div className="flex h-10 items-center justify-between">
-          {showLabels || (isMobile && isForMobileSheet) ? ( // Show full logo if labels are shown, or if it's the mobile sheet
+          {showLabels ? ( // Show full logo if labels are shown (desktop expanded or mobile sheet)
             <Logo iconSize={28} textSize="text-xl" className="gap-2 ml-1" />
           ) : ( // Otherwise, show icon-only logo (for desktop collapsed)
             <Link href="/" className="flex items-center justify-center w-full h-full">
@@ -74,12 +69,12 @@ export function AppSidebar({ isForMobileSheet = false }: AppSidebarProps) {
             </Link>
           )}
           {/* Toggle button for desktop sidebar collapse/expand. Hidden on mobile as sheet has its own trigger. */}
-          {!isMobile && ( 
+          {!isMobile && (
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={toggleSidebar} 
+              onClick={toggleSidebar}
             >
               <PanelLeft />
               <span className="sr-only">Toggle Sidebar</span>
@@ -97,7 +92,7 @@ export function AppSidebar({ isForMobileSheet = false }: AppSidebarProps) {
                 <SidebarMenuButton
                   asChild
                   size="default"
-                  isActive={isActive(item.href)} 
+                  isActive={isActive(item.href)}
                   tooltip={showTooltips ? { content: item.tooltip, side: "right", align: "center", className: "ml-1" } : undefined}
                   className="justify-start h-9 px-2.5 text-sm"
                 >
@@ -148,10 +143,10 @@ export function AppSidebar({ isForMobileSheet = false }: AppSidebarProps) {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
-                asChild={false} 
+                asChild={false}
                 size="default"
                 onClick={() => {
-                   logout(); 
+                   logout();
                 }}
                 tooltip={showTooltips ? { content: "Logout", side: "right", align: "center", className: "ml-1" } : undefined}
                 className="justify-start h-9 px-2.5 text-sm w-full"
@@ -166,4 +161,3 @@ export function AppSidebar({ isForMobileSheet = false }: AppSidebarProps) {
     </>
   );
 }
-

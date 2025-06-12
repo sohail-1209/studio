@@ -57,7 +57,7 @@ function LayoutContent({ children }: MainLayoutProps) {
                <SheetHeader className="sr-only">
                 <SheetTitle>Navigation Menu</SheetTitle>
               </SheetHeader>
-              <AppSidebar isForMobileSheet={true} />
+              <AppSidebar />
             </SheetContent>
           </Sheet>
 
@@ -74,7 +74,11 @@ function LayoutContent({ children }: MainLayoutProps) {
               </div>
             </header>
             <main className="flex-1 overflow-y-auto">
-              <div className="w-full px-4 py-4 sm:px-6">
+              <div className={cn(
+                "w-full",
+                "px-4 py-4 sm:px-6", // Mobile and small tablet padding
+                "md:px-6 lg:px-8" // Desktop padding (adjusted for consistency with max-width approach)
+              )}>
                 {children}
               </div>
             </main>
@@ -92,7 +96,12 @@ function LayoutContent({ children }: MainLayoutProps) {
           </Sidebar>
           <SidebarInset>
             <main className="flex-1 overflow-y-auto">
-              <div className="w-full p-4 md:p-6 lg:max-w-7xl lg:mx-auto">
+               <div className={cn(
+                "w-full",
+                "p-4", // Base padding
+                "md:p-6", // Medium screen padding
+                "lg:max-w-7xl lg:mx-auto" // Large screen constraints
+              )}>
                 {children}
               </div>
             </main>
@@ -111,4 +120,3 @@ export function MainLayout({ children }: MainLayoutProps) {
     </SidebarProvider>
   )
 }
-
