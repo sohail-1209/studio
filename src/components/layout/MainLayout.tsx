@@ -3,7 +3,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { AppSidebar } from './AppSidebar';
+import { AppSidebar } from './AppSidebar'; // Simplified AppSidebar
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -12,7 +12,7 @@ import {
   SidebarProvider,
   Sidebar as UISidebar, 
   SidebarInset,
-} from '@/components/ui/sidebar';
+} from '@/components/ui/sidebar'; // Using the forcefully styled Sidebar and SidebarInset
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -42,15 +42,15 @@ function LayoutContent({ children }: MainLayoutProps) {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <UISidebar> 
-        <AppSidebar />
+    <div className="flex min-h-screen"> {/* Root flex container */}
+      <UISidebar> {/* This is the <aside> with !bg-red-500 !w-64 etc. */}
+        <AppSidebar /> {/* This is the very simplified content for the red sidebar */}
       </UISidebar>
-      <SidebarInset> 
-        {/* This div wraps the actual page content and gets the blue debug background */}
+      <SidebarInset> {/* This is the div with !bg-blue-500 and flex-1 */}
+        {/* The direct child of SidebarInset gets the padding and max-width for content */}
         <div
-          className="flex-1 w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8"
-          // The !bg-blue-500 is now applied in SidebarInset directly
+          className="w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8" 
+          // The blue background is now directly on SidebarInset from ui/sidebar.tsx
         >
           {children}
         </div>
@@ -60,11 +60,10 @@ function LayoutContent({ children }: MainLayoutProps) {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
+  // SidebarProvider forces an "open" and "desktop" state for the sidebar context
   return (
-    <SidebarProvider open={true} onOpenChange={() => { /* no-op for fixed sidebar */ }}>
+    <SidebarProvider open={true} onOpenChange={() => { /* no-op */ }}>
       <LayoutContent>{children}</LayoutContent>
     </SidebarProvider>
   );
 }
-
-    

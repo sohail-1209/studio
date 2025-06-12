@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const SIDEBAR_WIDTH = "var(--sidebar-width, 16rem)" // Kept for reference, but overridden below for debug
+const SIDEBAR_WIDTH = "var(--sidebar-width, 16rem)"
 const SIDEBAR_WIDTH_ICON = "var(--sidebar-width-icon, 3.75rem)"
 const SIDEBAR_WIDTH_MOBILE = "var(--sidebar-width-mobile, 16rem)"
 
@@ -55,6 +55,7 @@ const SidebarProvider = React.forwardRef<
       className,
       style,
       children,
+      // Props related to cookies, responsiveness, and toggling are removed or hardcoded
       ...props
     },
     ref
@@ -62,13 +63,13 @@ const SidebarProvider = React.forwardRef<
     
     const contextValue = React.useMemo<SidebarContextType>(
       () => ({
-        state: "expanded",
-        open: true,
-        setOpen: () => {}, 
-        isMobile: false,
-        openMobile: false,
-        setOpenMobile: () => {}, 
-        toggleSidebar: () => {}, 
+        state: "expanded", // Always expanded
+        open: true,        // Always open
+        setOpen: () => {}, // No-op
+        isMobile: false,   // Always desktop context for now
+        openMobile: false, // Mobile sheet not used
+        setOpenMobile: () => {}, // No-op
+        toggleSidebar: () => {}, // No-op
       }),
       []
     );
@@ -113,23 +114,24 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
+    // Forceful debug styles: bright red background, fixed width, black border, high z-index, no shrinking.
     return (
       <aside
         ref={ref}
         className={cn(
           "flex flex-col h-screen sticky top-0 z-50", 
-          "!bg-red-500 text-white", // Forceful red background, white text for debug
-          "!w-64 flex-shrink-0 border-r-4 border-black", // Forceful width, flex-shrink, and thick black border
+          "!bg-red-500 text-white", 
+          "!w-64 flex-shrink-0 border-r-4 border-black", 
           className
         )}
-        data-state={"expanded"} 
+        data-state={"expanded"} // Hardcoded as it's always expanded in this debug state
         {...props}
       >
         <div
           data-sidebar="sidebar-inner-content"
           className="flex h-full w-full flex-col overflow-hidden"
         >
-          {children}
+          {children} {/* Ensure children (AppSidebar) are rendered here */}
         </div>
       </aside>
     )
@@ -142,30 +144,7 @@ const SidebarTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, children, asChild, ...props }, ref) => {
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (onClick) {
-      onClick(event);
-    }
-  };
-
-  if (asChild) {
-    if (!React.isValidElement(children)) {
-      return null;
-    }
-    const childElement = React.Children.only(children) as React.ReactElement<React.ButtonHTMLAttributes<HTMLButtonElement>>;
-    return React.cloneElement(childElement, {
-      ref,
-      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (childElement.props.onClick) {
-          childElement.props.onClick(e);
-        }
-        handleClick(e);
-      },
-      className: cn(childElement.props.className, className),
-      ...props,
-    });
-  }
-
+  // Simplified: Trigger is hidden as sidebar is always open
   return (
     <Button
       ref={ref}
@@ -173,9 +152,8 @@ const SidebarTrigger = React.forwardRef<
       variant="ghost"
       size="icon"
       className={cn("h-7 w-7", className)}
-      onClick={handleClick}
+      style={{ display: 'none' }} // Hidden for now
       {...props}
-      style={{ display: 'none' }} 
     >
       <PanelLeft />
       <span className="sr-only">Toggle Sidebar</span>
@@ -189,6 +167,7 @@ const SidebarRail = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button">
 >(({ className, ...props }, ref) => {
+  // Rail is hidden as sidebar is always open and not resizable in this debug state
   return (
     <button
       ref={ref}
@@ -196,13 +175,7 @@ const SidebarRail = React.forwardRef<
       aria-label="Toggle Sidebar"
       tabIndex={-1}
       title="Toggle Sidebar"
-      className={cn(
-        "absolute inset-y-0 z-20 w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-border flex",
-        "[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize",
-        "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
-        className
-      )}
-      style={{ display: 'none' }} 
+      className={cn("hidden", className)} // Hidden for now
       {...props}
     />
   )
@@ -213,12 +186,13 @@ const SidebarInset = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div">
 >(({ className, children, ...props }, ref) => {
+  // Forceful debug style: bright blue background
   return (
     <div
       ref={ref}
       className={cn(
         "flex-1 flex flex-col overflow-y-auto",
-        "!bg-blue-500", // Forceful blue background for main content area
+        "!bg-blue-500", 
         className
       )}
       {...props}
@@ -238,7 +212,7 @@ const SidebarInput = React.forwardRef<
       ref={ref}
       data-sidebar="input"
       className={cn(
-        "h-8 w-full bg-background shadow-none focus-visible:ring-1 focus-visible:ring-ring",
+        "h-8 w-full bg-background shadow-none focus-visible:ring-1 focus-visible:ring-ring text-foreground placeholder:text-muted-foreground", // Ensure text is visible
         className
       )}
       {...props}
@@ -285,7 +259,7 @@ const SidebarSeparator = React.forwardRef<
     <Separator
       ref={ref}
       data-sidebar="separator"
-      className={cn("mx-2 w-auto bg-sidebar-border/50", className)}
+      className={cn("mx-2 w-auto bg-white/30", className)} // Adjusted for red background
       {...props}
     />
   )
@@ -335,7 +309,7 @@ const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar="group-label"
       className={cn(
-        "duration-200 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-muted-foreground outline-none ring-ring transition-[margin,opacity] ease-linear focus-visible:ring-1 [&>svg]:size-4 [&>svg]:shrink-0",
+        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-white/70 outline-none ring-ring focus-visible:ring-1 [&>svg]:size-4 [&>svg]:shrink-0", // Text white/70 for red bg
         className
       )}
       {...props}
@@ -354,7 +328,7 @@ const SidebarGroupAction = React.forwardRef<
       ref={ref}
       data-sidebar="group-action"
       className={cn(
-        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-muted-foreground outline-none ring-ring transition-transform hover:bg-accent hover:text-accent-foreground focus-visible:ring-1 [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-white/70 outline-none ring-ring transition-transform hover:bg-white/20 hover:text-white focus-visible:ring-1 [&>svg]:size-4 [&>svg]:shrink-0",
         "after:absolute after:-inset-2 after:md:hidden",
         className
       )}
@@ -404,7 +378,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-ring transition-[width,height,padding] hover:bg-white/10 focus-visible:ring-1 active:bg-white/20 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white/20 data-[active=true]:font-medium data-[state=open]:hover:bg-white/10",
+  "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-ring transition-[width,height,padding] hover:bg-white/20 focus-visible:ring-1 active:bg-white/30 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white/30 data-[active=true]:font-medium data-[state=open]:hover:bg-white/20",
   {
     variants: {
       variant: {
@@ -445,13 +419,14 @@ const SidebarMenuButton = React.forwardRef<
     ref
   ) => {
     const Comp = asChild ? Slot : "button"
+    // Tooltip logic removed as sidebar is always expanded in this debug state
     return (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        data-sidebar-state={"expanded"} 
+        data-sidebar-state={"expanded"} // Always expanded
         className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
         {...props}
       >
@@ -470,15 +445,14 @@ const SidebarMenuAction = React.forwardRef<
   }
 >(({ className, asChild = false, showOnHover = false, ...props }, ref) => {
   const Comp = asChild ? Slot : "button"
+  // Simplified as sidebar is always expanded
   return (
     <Comp
       ref={ref}
       data-sidebar="menu-action"
       className={cn(
-        "absolute right-1 top-1/2 -translate-y-1/2 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-muted-foreground outline-none ring-ring transition-transform hover:bg-accent hover:text-accent-foreground focus-visible:ring-1 peer-hover/menu-button:text-accent-foreground [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute right-1 top-1/2 -translate-y-1/2 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-white/70 outline-none ring-ring transition-transform hover:bg-white/20 hover:text-white focus-visible:ring-1 peer-hover/menu-button:text-white [&>svg]:size-4 [&>svg]:shrink-0",
         "after:absolute after:-inset-2 after:md:hidden",
-        showOnHover &&
-          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-accent-foreground md:opacity-0",
         className
       )}
       {...props}
@@ -496,8 +470,7 @@ const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar="menu-badge"
     className={cn(
-      "absolute right-1 top-1/2 -translate-y-1/2 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-foreground select-none pointer-events-none",
-      "peer-hover/menu-button:text-accent-foreground peer-data-[active=true]/menu-button:text-accent-foreground",
+      "ml-auto flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-background bg-white select-none pointer-events-none", // Ensure badge text is visible
       className
     )}
     {...props}
@@ -524,12 +497,12 @@ const SidebarMenuSkeleton = React.forwardRef<
     >
       {showIcon && (
         <Skeleton
-          className="size-4 rounded-sm shrink-0"
+          className="size-4 rounded-sm shrink-0 bg-white/30" // Adjusted for red bg
           data-sidebar="menu-skeleton-icon"
         />
       )}
       <Skeleton
-        className="h-4 flex-1 max-w-[--skeleton-width]"
+        className="h-4 flex-1 max-w-[--skeleton-width] bg-white/30" // Adjusted for red bg
         data-sidebar="menu-skeleton-text"
         style={
           {
@@ -551,7 +524,7 @@ const SidebarMenuSub = React.forwardRef<
     ref={ref}
     data-sidebar="menu-sub"
     className={cn(
-      "mx-[calc(theme(spacing.2)_+_9px)] flex min-w-0 translate-x-px flex-col gap-0.5 border-l border-border py-0.5 pl-2.5",
+      "mx-[calc(theme(spacing.2)_+_9px)] flex min-w-0 translate-x-px flex-col gap-0.5 border-l border-white/30 py-0.5 pl-2.5", // Adjusted for red bg
       className
     )}
     {...props}
@@ -581,8 +554,8 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-foreground outline-none ring-ring hover:bg-accent hover:text-accent-foreground focus-visible:ring-1 active:bg-accent active:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-accent-foreground",
-        "data-[active=true]:bg-accent data-[active=true]:text-accent-foreground",
+        "flex min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-white outline-none ring-ring hover:bg-white/20 hover:text-white focus-visible:ring-1 active:bg-white/30 active:text-white disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-white", // Text white for red bg
+        "data-[active=true]:bg-white/30 data-[active=true]:text-white",
         size === "sm" && "h-8 text-xs",
         size === "default" && "h-9 text-sm",
         className
@@ -619,5 +592,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
-    
