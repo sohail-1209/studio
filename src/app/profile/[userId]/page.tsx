@@ -470,8 +470,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 </TabsList>
                 <TabsContent value="posts" className="mt-6 w-full">
                   {loadingPosts && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full min-w-0">
-                      {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md min-w-0" />)}
+                    // Show a placeholder identical to "No Media" placeholder during loading for consistent height
+                    <div className="py-12 text-center w-full">
+                      <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
+                      <p className="mt-4 text-lg font-semibold text-foreground">Loading Posts...</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Please wait a moment.
+                      </p>
                     </div>
                   )}
                   
