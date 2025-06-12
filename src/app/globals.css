@@ -40,12 +40,14 @@ body {
     --radius: 0.65rem; /* Slightly increased radius */
 
     /* Custom sidebar colors */
-    /* DEBUG: Forcing highly visible sidebar colors */
     --sidebar-background: 0 100% 50%; /* Bright Red for Debug */
     --sidebar-foreground: 0 0% 100%; /* White text for Debug */
     --sidebar-text-debug-color: 0 0% 100%; /* White text for AppSidebar content */
     --sidebar-border: 45 20% 70%; /* Darker red border for debug */
     
+    /* ADD THIS FOR MAIN CONTENT DEBUG */
+    --main-content-debug-background: 240 100% 50%; /* Bright Blue for Debug */
+
     --sidebar-active: 90 45% 58%; /* Accent Green for active items */
     --sidebar-active-foreground: 0 0% 100%; /* White */
     --sidebar-hover: 45 25% 91%;
@@ -95,11 +97,13 @@ body {
     --ring: 120 38% 72%; /* Brighter sage accent for focus rings */
 
     /* Custom sidebar colors for dark mode */
-    /* DEBUG: Forcing highly visible sidebar colors */
     --sidebar-background: 0 100% 50%; /* Bright Red for Debug */
     --sidebar-foreground: 0 0% 100%; /* White text for Debug */
     --sidebar-text-debug-color: 0 0% 100%; /* White text for AppSidebar content */
     --sidebar-border: 0 80% 40%; /* Darker red border for debug */
+    
+    /* ADD THIS FOR MAIN CONTENT DEBUG - DARK MODE */
+    --main-content-debug-background: 240 80% 40%; /* Slightly Darker Bright Blue for Debug */
     
     --sidebar-active: 90 48% 68%; /* Accent Green for dark mode */
     --sidebar-active-foreground: 120 10% 13%; /* Dark text on active */
