@@ -5,14 +5,15 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
+// Updated to reflect the project details indicated by console errors (nexchat-drm3y)
 const firebaseConfig = {
-  apiKey: "AIzaSyAhZUuorc5eNTM-Ui1biqfzJ4lPJD1RXgY",
-  authDomain: "nexchat-1209.firebaseapp.com",
-  projectId: "nexchat-1209",
-  storageBucket: "nexchat-1209.firebasestorage.app", // Ensured .firebasestorage.app
-  messagingSenderId: "250710574899",
-  appId: "1:250710574899:web:8ccb02f7c7c084444fa046",
-  measurementId: "G-F25ETFXBFX"
+  apiKey: "AIzaSyDsw6ox_fmME37xw9qQhmv6MJW53CD7O68", // From console errors
+  authDomain: "nexchat-drm3y.firebaseapp.com",    // Derived from projectId
+  projectId: "nexchat-drm3y",                     // From console errors
+  storageBucket: "nexchat-drm3y.appspot.com", // Common pattern, verify this in your Firebase console for nexchat-drm3y
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID_FOR_NEXCHAT_DRM3Y", // Update this from Firebase console
+  appId: "YOUR_APP_ID_FOR_NEXCHAT_DRM3Y",                         // Update this from Firebase console
+  measurementId: "YOUR_MEASUREMENT_ID_FOR_NEXCHAT_DRM3Y"          // Update this from Firebase console
 };
 
 // Initialize Firebase
@@ -22,4 +23,3 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 export { app, auth, db, storage };
-
