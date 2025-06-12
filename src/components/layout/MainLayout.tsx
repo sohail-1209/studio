@@ -10,33 +10,34 @@ import { useEffect } from 'react';
 import { Spinner } from '@/components/shared/Spinner';
 import {
   SidebarProvider,
-  Sidebar,
+  Sidebar as UISidebar,
   SidebarInset,
-  useSidebar,
-  SidebarTrigger,
+  // useSidebar, // Temporarily remove useSidebar for forced desktop
+  // SidebarTrigger, // Not needed for forced desktop
 } from '@/components/ui/sidebar';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { PanelLeft } from 'lucide-react';
-import { Logo } from '@/components/shared/Logo';
-import { cn } from '@/lib/utils';
+// Mobile-specific imports are commented out for this debugging step
+// import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+// import { Button } from '@/components/ui/button';
+// import { PanelLeft } from 'lucide-react';
+// import { Logo } from '@/components/shared/Logo';
+// import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
 function LayoutContent({ children }: MainLayoutProps) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  // const { isMobile, openMobile, setOpenMobile } = useSidebar(); // Temporarily removed
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Spinner size={48} />
@@ -49,49 +50,19 @@ function LayoutContent({ children }: MainLayoutProps) {
     return null;
   }
 
-  if (isMobile) {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 shadow-sm backdrop-blur-sm sm:px-6">
-          <SidebarTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-              <PanelLeft className="h-5 w-5" />
-              <span className="sr-only">Toggle Menu</span>
-            </Button>
-          </SidebarTrigger>
-          <div className="ml-auto">
-            <Logo iconSize={24} textSize="text-lg" />
-          </div>
-        </header>
-        <Sheet open={openMobile} onOpenChange={setOpenMobile}>
-          <SheetContent side="left" className="w-[var(--sidebar-width-mobile)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Navigation Menu</SheetTitle>
-            </SheetHeader>
-            <AppSidebar />
-          </SheetContent>
-        </Sheet>
-        <main className="flex-1 overflow-y-auto">
-          <div className="px-4 py-6 sm:px-6 w-full">
-            {children}
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Desktop Layout
+  // FORCED DESKTOP LAYOUT FOR DEBUGGING
+  // This structure will be attempted on all screen sizes.
+  // The UISidebar component itself has `hidden md:flex` so it should only show on medium screens and up.
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar> {/* This is the actual desktop sidebar UI element */}
-        <AppSidebar /> {/* The content of the sidebar */}
-      </Sidebar>
-      <SidebarInset> {/* This is the main content area wrapper */}
-        <main className="flex-1 overflow-y-auto"> {/* Added main tag for semantics */}
-          <div className="w-full max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8"> {/* Content padding and max-width */}
-            {children}
-          </div>
-        </main>
+    <div className="flex min-h-screen bg-background"> {/* Root flex container for desktop */}
+      <UISidebar> {/* Desktop sidebar component from ui/sidebar.tsx */}
+        <AppSidebar /> {/* Actual navigation links and user profile section */}
+      </UISidebar>
+      <SidebarInset> {/* Main content wrapper from ui/sidebar.tsx, takes remaining space */}
+        {/* Inner wrapper for consistent padding and max-width of the content itself */}
+        <div className="w-full max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+          {children}
+        </div>
       </SidebarInset>
     </div>
   );
@@ -100,8 +71,11 @@ function LayoutContent({ children }: MainLayoutProps) {
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
+    // Force SidebarProvider to think it's always open for desktop for this test
+    // The 'open' state in SidebarContext will be true.
     <SidebarProvider defaultOpen={true}>
       <LayoutContent>{children}</LayoutContent>
     </SidebarProvider>
-  )
+  );
 }
+
