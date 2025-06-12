@@ -59,23 +59,14 @@ export default function ExplorePage() {
       setLoadingRecentPosts(true);
       try {
         const postsColRef = collection(db, 'posts');
-        // Fetch posts that are not stories AND (authorIsPrivate is false OR authorIsPrivate is not set)
-        // Firestore limitation: Cannot query for "not false" or "null or false" easily.
-        // The most straightforward query is for `authorIsPrivate == false`.
-        // Posts without `authorIsPrivate` (older posts) will be missed by this query.
-        // A more complex solution would be needed to include them or migrate old data.
-        // For now, prioritize showing explicitly public posts.
         const q = query(
           postsColRef,
           where('isStory', '!=', true),
-          where('authorIsPrivate', '==', false), // Only fetch posts from public accounts
+          where('authorIsPrivate', '==', false), 
           orderBy('createdAt', 'desc'),
           limit(24)
         );
-        // If you also want to include posts where authorIsPrivate is not set (older posts):
-        // This would require two separate queries and merging results, or a more complex data model.
-        // For simplicity, we'll stick to `authorIsPrivate == false` for now.
-
+        
         const querySnapshot = await getDocs(q);
         const fetchedPosts = querySnapshot.docs
           .map((doc) => {
@@ -86,24 +77,33 @@ export default function ExplorePage() {
               createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
             } as Post;
           })
-          .filter(post => post.imageUrl); // Ensure post has an image to display
+          .filter(post => post.imageUrl); 
 
         setPosts(fetchedPosts);
         console.log("ExplorePage: Fetched recent posts (public only):", fetchedPosts.length);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching explore posts:", error);
-        toast({
-          title: "Error Fetching Content",
-          description: "Could not load explore content. Please try again later.",
-          variant: "destructive",
-        });
+        if (error.code === 'failed-precondition') {
+          toast({
+            title: "Error Fetching Explore Content",
+            description: "A database index might be required for explore posts. Please check the Firebase console for a link to create it.",
+            variant: "destructive",
+            duration: 10000,
+          });
+        } else {
+          toast({
+            title: "Error Fetching Content",
+            description: "Could not load explore content. Please try again later.",
+            variant: "destructive",
+          });
+        }
       } finally {
         setLoadingRecentPosts(false);
       }
     };
 
     fetchExplorePosts();
-  }, [toast, currentUser]); // currentUser might be used later for more complex filtering
+  }, [toast, currentUser]);
 
   const handleExactUsernameSearch = async (e?: FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
@@ -203,7 +203,7 @@ export default function ExplorePage() {
     } finally {
       setLoadingSuggestions(false);
     }
-  }, []); // Removed toast from dependencies as it's stable
+  }, []); 
 
   const debouncedFetchUserSuggestions = useMemo(() => {
     console.log("ExplorePage: Creating new debouncedFetchUserSuggestions function.");

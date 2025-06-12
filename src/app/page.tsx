@@ -102,13 +102,13 @@ export default function FeedPage() {
         setPosts(fetchedPosts);
         setLoadingPosts(false);
       },
-      (error) => {
+      (error: any) => {
         console.error('Error fetching posts:', error);
         setLoadingPosts(false);
         if (error.code === 'failed-precondition') {
            toast({
               title: "Error Fetching Feed Posts",
-              description: "A database index might be required. Please check Firebase console.",
+              description: "A database index might be required. Please check the Firebase console for a link to create the missing index.",
               variant: "destructive",
               duration: 10000
           });
@@ -130,11 +130,6 @@ export default function FeedPage() {
       postsCollectionRef,
       where('isStory', '==', true),
       where('createdAt', '>=', twentyFourHoursAgoTimestamp),
-      // For stories, we might still want to show stories from private accounts the user *follows*,
-      // but that's complex. For now, showing all recent stories, privacy relies on individual story access rules.
-      // Or filter by authorIsPrivate == false here too for simplicity in the reel.
-      // For now, let's keep it simple and rely on navigation to StoryViewer handling actual story content.
-      // A more advanced reel would filter based on followed private users.
       orderBy('createdAt', 'desc'),
       firestoreLimit(20)
     );
@@ -154,21 +149,30 @@ export default function FeedPage() {
       });
       setStoriesData(Array.from(uniqueUsersMap.values()).slice(0, 7));
       setLoadingStoriesReel(false);
-    }, (error) => {
+    }, (error: any) => {
       console.error('Error fetching stories data for reel:', error);
       setLoadingStoriesReel(false);
-      toast({
+      if (error.code === 'failed-precondition') {
+        toast({
+          title: 'Error Fetching Stories Reel',
+          description: 'A database index might be required for stories. Please check Firebase console.',
+          variant: 'destructive',
+          duration: 10000,
+        });
+      } else {
+        toast({
           title: 'Error Fetching Stories',
           description: 'Could not load stories reel. Please try again later.',
           variant: 'destructive',
         });
+      }
     });
 
     return () => {
       unsubscribePosts();
       unsubscribeStoriesReel();
     };
-  }, [toast, user?.uid]); // Added user.uid as dependency for stories reel filtering
+  }, [toast, user?.uid]);
 
   const handleLikePost = async (postId: string, currentPost: Post) => {
     if (!user) {
