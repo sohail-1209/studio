@@ -1,4 +1,3 @@
-
 // src/app/profile/[userId]/page.tsx
 'use client';
 
@@ -15,8 +14,6 @@ import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment } from 'firebase/firestore';
 import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext'; // Renamed to avoid conflict
 import type { Post } from '@/types/post';
-// import type { FollowRequest, FollowRequestDocument } from '@/types/follow'; // No longer needed as privacy removed
-// import type { NotificationDocument } from '@/types/notification'; // No longer needed for follow_request notif
 import { useAuth } from '@/hooks/useAuth';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -82,8 +79,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     }
 
     setIsProcessingFollow(true);
-    // All profiles are public, so "follow" means a direct "accepted" state.
-    // Check if a followRequests document exists for currentUser -> profileUser with status 'accepted'.
     const followDocId = `${currentUser.uid}_${userId}`;
     const followRequestRef = doc(db, 'followRequests', followDocId);
 
@@ -183,7 +178,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     const targetUserProfileRef = doc(db, 'profiles', profile.uid);
 
     try {
-      if (followStatus === 'following') { // Unfollow action
+      if (followStatus === 'following') { 
         if (existingFollowDocId) {
           const followRequestRef = doc(db, 'followRequests', existingFollowDocId);
           batch.delete(followRequestRef);
@@ -194,10 +189,10 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setFollowStatus('not_following');
         setExistingFollowDocId(null);
         toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName}.` });
-      } else { // Follow action (status always 'accepted' now)
+      } else { 
         const newFollowDocId = `${currentUser.uid}_${profile.uid}`;
         const followRequestRef = doc(db, 'followRequests', newFollowDocId);
-        const newRequestData = { // Removed FollowRequestDocument type as it had private profile logic
+        const newRequestData = { 
             requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
             recipientId: profile.uid, recipientDisplayName: profile.displayName, recipientAvatarUrl: profile.photoURL,
             status: 'accepted', 
@@ -208,9 +203,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         batch.update(targetUserProfileRef, { followersCount: increment(1) });
 
         const notificationRef = doc(collection(db, 'notifications'));
-        const notificationData = { // Removed NotificationDocument type to avoid isPrivate checks
+        const notificationData = { 
             recipientId: profile.uid, actorId: currentUser.uid, actorDisplayName: currentUser.displayName, actorAvatarUrl: currentUser.photoURL,
-            type: 'follow_accept', // Changed from 'follow_request' to 'follow_accept' for direct follow
+            type: 'follow_accept', 
             originalFollowRequestId: newFollowDocId, 
             isRead: false,
             createdAt: serverTimestamp()
@@ -350,10 +345,10 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           <Skeleton className="h-5 w-20" />
         </div>
         <Tabs defaultValue="posts" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="posts">Posts</TabsTrigger>
-            <TabsTrigger value="media">Media</TabsTrigger>
-            <TabsTrigger value="likes">Likes</TabsTrigger>
+          <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
+            <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
+            <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
+            <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
           </TabsList>
           <TabsContent value="posts" className="mt-6 w-full">
              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full">
@@ -481,7 +476,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   )}
                   
                   {!loadingPosts && posts.length === 0 && (
-                    <div className="py-12 text-center">
+                    <div className="py-12 text-center w-full">
                       <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                       <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -490,36 +485,45 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     </div>
                   )}
                   {!loadingPosts && posts.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full">
-                      {posts.map(post => (
-                        <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
-                          <Image
-                            src={post.imageUrl || "https://placehold.co/300x300.png?text=Post"}
-                            alt={post.caption || `Post by ${profile.displayName}`}
-                            fill
-                            style={{objectFit: 'contain'}}
-                            data-ai-hint={post.dataAiHint || "user content"}
-                            className="transition-transform duration-300 group-hover:scale-105"
-                          />
-                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-start p-2">
-                              {isOwnProfile && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="absolute top-1.5 right-1.5 text-white/80 hover:bg-white/20 hover:text-white h-7 w-7 z-10">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                           </div>
-                        </div>
-                      ))}
+                    // TEMPORARY DIAGNOSTIC: Replace grid with placeholder
+                    <div className="py-12 text-center w-full">
+                      <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                      <p className="mt-4 text-lg font-semibold text-foreground">Diagnostic Placeholder for Posts</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        This is a temporary view to check container width.
+                      </p>
                     </div>
+                    // ORIGINAL GRID:
+                    // <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full">
+                    //   {posts.map(post => (
+                    //     <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
+                    //       <Image
+                    //         src={post.imageUrl || "https://placehold.co/300x300.png?text=Post"}
+                    //         alt={post.caption || `Post by ${profile.displayName}`}
+                    //         fill
+                    //         style={{objectFit: 'contain'}}
+                    //         data-ai-hint={post.dataAiHint || "user content"}
+                    //         className="transition-transform duration-300 group-hover:scale-105"
+                    //       />
+                    //        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-start p-2">
+                    //           {isOwnProfile && (
+                    //             <DropdownMenu>
+                    //               <DropdownMenuTrigger asChild>
+                    //                 <Button variant="ghost" size="icon" className="absolute top-1.5 right-1.5 text-white/80 hover:bg-white/20 hover:text-white h-7 w-7 z-10">
+                    //                   <MoreHorizontal className="h-4 w-4" />
+                    //                 </Button>
+                    //               </DropdownMenuTrigger>
+                    //               <DropdownMenuContent align="end">
+                    //                 <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                    //                   <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    //                 </DropdownMenuItem>
+                    //               </DropdownMenuContent>
+                    //             </DropdownMenu>
+                    //           )}
+                    //        </div>
+                    //     </div>
+                    //   ))}
+                    // </div>
                   )}
                 </TabsContent>
                 <TabsContent value="media" className="mt-6 w-full">
