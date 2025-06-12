@@ -1,3 +1,4 @@
+
 // src/app/layout.tsx
 
 import type { Metadata } from 'next';
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#588558' },
-    { media: '(prefers-color-scheme: dark)', color: '#588558' },
+    { media: '(prefers-color-scheme: dark)', color: '#588558' }, // Using the same for dark for now
   ],
   icons: {
     icon: 'https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png',
@@ -21,6 +22,7 @@ export const metadata: Metadata = {
 };
 
 // Script to set initial theme to prevent FOUC (Flash of Unstyled Content)
+// Temporarily removed InitializeTheme component from <head> for debugging hydration error
 const InitializeTheme = () => (
   <script
     dangerouslySetInnerHTML={{
@@ -38,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="overflow-y-scroll">
       <head>
-        <InitializeTheme />
+        {/* <InitializeTheme /> */}
         {/* Font links temporarily removed for debugging hydration error */}
         {/* <link rel="preconnect" href="https://fonts.googleapis.com"/> */}
         {/* <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/> */}
