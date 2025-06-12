@@ -12,6 +12,8 @@ import {
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarSeparator,
+  SidebarTrigger, // For DESKTOP collapse/expand
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   Home,
@@ -31,14 +33,15 @@ import { usePathname } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 export function AppSidebar() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const [currentTheme, setCurrentTheme] = useState('light');
+  const { state: sidebarState } = useSidebar(); // Get sidebar state for dynamic rendering
 
   useEffect(() => {
-    // Initialize theme based on localStorage
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const systemPrefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -59,12 +62,11 @@ export function AppSidebar() {
       }
     }
 
-    // Listener for system theme changes
     let mediaQuery: MediaQueryList | undefined;
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
         mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const handleChange = (e: MediaQueryListEvent) => {
-          if (!localStorage.getItem('theme')) { // Only if no theme is manually set
+          if (!localStorage.getItem('theme')) {
             const newSystemTheme = e.matches ? 'dark' : 'light';
             setCurrentTheme(newSystemTheme);
             if (typeof document !== 'undefined') {
@@ -75,9 +77,7 @@ export function AppSidebar() {
         mediaQuery.addEventListener('change', handleChange);
         return () => mediaQuery?.removeEventListener('change', handleChange);
     }
-
   }, []);
-
 
   const toggleTheme = () => {
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
@@ -86,7 +86,6 @@ export function AppSidebar() {
     if (typeof document !== 'undefined') {
         document.documentElement.classList.toggle('dark', newTheme === 'dark');
     }
-    // Potentially add a toast notification here if desired
   };
 
   const navItems = [
@@ -94,11 +93,11 @@ export function AppSidebar() {
     { href: '/explore', label: 'Explore', icon: Compass },
     { href: '/messages', label: 'Messages', icon: MessageSquare },
     { href: '/notifications', label: 'Notifications', icon: Bell },
-    { href: '/create', label: 'Create', icon: PlusCircle, mobileOnly: true, className: "md:hidden" },
+    { href: '/create', label: 'Create', icon: PlusCircle, className: "md:hidden" }, // Mobile only create
     { href: `/profile/${user?.uid || ''}`, label: 'Profile', icon: UserCircle, requiresAuth: true },
   ];
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex flex-col h-full p-2">
         <SidebarHeader className="p-1 mb-1">
@@ -120,20 +119,20 @@ export function AppSidebar() {
     );
   }
 
+  const isCollapsed = sidebarState === 'collapsed';
+
   return (
     <div className="flex flex-col h-full p-2">
-      <SidebarHeader className="p-1 mb-1">
-         <Logo iconSize={30} textSize="text-2xl" />
+      <SidebarHeader className={cn("p-1 mb-1 flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
+         <Logo iconSize={30} textSize="text-2xl" className={cn(isCollapsed ? "hidden" : "flex")} />
+         <Logo iconSize={30} textSize="text-2xl" className={cn("!gap-0", isCollapsed ? "flex" : "hidden")} /> {/* Icon only for collapsed */}
+         <SidebarTrigger className="hidden md:flex" /> {/* Desktop collapse trigger, always visible unless mobile */}
       </SidebarHeader>
       <SidebarSeparator className="my-1" />
 
       <SidebarContent className="flex-1">
         <SidebarMenu>
-          {navItems.filter(item => {
-            if (item.requiresAuth && !user) return false;
-            if (item.mobileOnly && typeof window !== 'undefined' && window.innerWidth >= 768) return false; 
-            return true;
-          }).map((item) => {
+          {navItems.filter(item => !(item.requiresAuth && !user)).map((item) => {
             const href = item.label === 'Profile' && user ? `/profile/${user.uid}` : item.href;
             const isActive = pathname === href || (item.label === 'Profile' && user && pathname.startsWith(`/profile/${user.uid}`));
             
@@ -141,15 +140,17 @@ export function AppSidebar() {
 
             return (
               <SidebarMenuItem key={item.label} className={item.className}>
-                <Link href={href} passHref>
+                <Link href={href} passHref legacyBehavior>
                   <SidebarMenuButton
                     asChild
                     isActive={isActive}
+                    tooltip={isCollapsed ? item.label : undefined}
+                    className={cn(isCollapsed && "justify-center")}
                   >
-                    <span className="flex items-center gap-2.5 w-full">
+                    <a> {/* Use <a> tag for proper href with Link legacyBehavior */}
                       <item.icon />
-                      <span>{item.label}</span>
-                    </span>
+                      <span className={cn(isCollapsed && "sr-only md:hidden")}>{item.label}</span>
+                    </a>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -161,42 +162,61 @@ export function AppSidebar() {
       <SidebarFooter className="p-1 space-y-1">
         <SidebarMenu>
           <SidebarMenuItem>
-              <SidebarMenuButton onClick={toggleTheme} className="w-full">
+              <SidebarMenuButton onClick={toggleTheme} className={cn("w-full", isCollapsed && "justify-center")} tooltip={isCollapsed ? (currentTheme === 'light' ? 'Switch to Dark' : 'Switch to Light') : undefined}>
                 {currentTheme === 'light' ? <Moon /> : <Sun />}
-                <span>Switch to {currentTheme === 'light' ? 'Dark' : 'Light'}</span>
+                <span className={cn(isCollapsed && "sr-only md:hidden")}>Switch to {currentTheme === 'light' ? 'Dark' : 'Light'}</span>
               </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <Link href="/settings" passHref>
-              <SidebarMenuButton asChild isActive={pathname === '/settings'}>
-                <span className="flex items-center gap-2.5 w-full">
-                  <Settings /><span>Settings</span>
-                </span>
+            <Link href="/settings" passHref legacyBehavior>
+              <SidebarMenuButton asChild isActive={pathname === '/settings'} className={cn(isCollapsed && "justify-center")} tooltip={isCollapsed ? "Settings" : undefined}>
+                <a>
+                  <Settings />
+                  <span className={cn(isCollapsed && "sr-only md:hidden")}>Settings</span>
+                </a>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
           {user && (
-              <SidebarMenuItem>
-                <Link href={`/profile/${user.uid}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sidebar-hover cursor-pointer w-full text-sidebar-foreground hover:text-sidebar-hover-foreground">
-                  <Avatar className="h-8 w-8">
-                    {user.photoURL ? (
-                      <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
-                    ) : (
-                      <AvatarFallback className="bg-muted text-muted-foreground">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div className="text-xs overflow-hidden">
-                    <p className="font-semibold truncate">{user.displayName || 'User'}</p>
-                    {user.username && <p className="text-sidebar-foreground/70 truncate">@{user.username}</p>}
-                  </div>
-                </Link>
+            <SidebarMenuItem className={cn(isCollapsed && "hidden")}> {/* Hide detailed user info when collapsed */}
+              <Link href={`/profile/${user.uid}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sidebar-hover cursor-pointer w-full text-sidebar-foreground hover:text-sidebar-hover-foreground">
+                <Avatar className="h-8 w-8">
+                  {user.photoURL ? (
+                    <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
+                  ) : (
+                    <AvatarFallback className="bg-muted text-muted-foreground">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                  )}
+                </Avatar>
+                <div className="text-xs overflow-hidden">
+                  <p className="font-semibold truncate">{user.displayName || 'User'}</p>
+                  {user.username && <p className="text-sidebar-foreground/70 truncate">@{user.username}</p>}
+                </div>
+              </Link>
+            </SidebarMenuItem>
+          )}
+          {user && ( // Show compact user avatar for collapsed sidebar
+            <SidebarMenuItem className={cn(!isCollapsed && "hidden")}>
+               <Link href={`/profile/${user.uid}`} passHref legacyBehavior>
+                <SidebarMenuButton asChild className={cn("justify-center h-auto py-1.5")} tooltip={isCollapsed ? "Profile" : undefined}>
+                  <a>
+                    <Avatar className="h-8 w-8">
+                        {user.photoURL ? (
+                            <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
+                        ) : (
+                            <AvatarFallback className="bg-muted text-muted-foreground">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                        )}
+                    </Avatar>
+                    <span className="sr-only md:hidden">Profile</span>
+                  </a>
+                </SidebarMenuButton>
+              </Link>
             </SidebarMenuItem>
           )}
           {user && (
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={logout} className="w-full hover:!bg-destructive/10 hover:!text-destructive">
+              <SidebarMenuButton onClick={logout} className={cn("w-full hover:!bg-destructive/10 hover:!text-destructive", isCollapsed && "justify-center")} tooltip={isCollapsed ? "Logout" : undefined}>
                 <LogOut />
-                <span>Logout</span>
+                <span className={cn(isCollapsed && "sr-only md:hidden")}>Logout</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}

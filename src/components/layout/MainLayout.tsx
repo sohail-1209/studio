@@ -3,16 +3,17 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { AppSidebar } from './AppSidebar'; // Simplified AppSidebar
+import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Spinner } from '@/components/shared/Spinner';
 import {
   SidebarProvider,
-  Sidebar as UISidebar,
+  Sidebar as UISidebar, // Renamed to avoid conflict
   SidebarInset,
-} from '@/components/ui/sidebar'; // Using the forcefully styled Sidebar and SidebarInset
+} from '@/components/ui/sidebar';
+import { MobileHeader } from './MobileHeader'; // New component for mobile header
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -38,30 +39,31 @@ function LayoutContent({ children }: MainLayoutProps) {
   }
 
   if (!user) {
+    // If there's no user, and not loading, onAuthStateChanged should handle redirection.
+    // Returning null here prevents rendering children until redirection happens.
     return null;
   }
 
   return (
-    <div className="flex min-h-screen"> {/* Root flex container */}
-      <UISidebar> {/* Removed inline style and className prop */}
+    <div className="flex min-h-screen">
+      <UISidebar>
         <AppSidebar />
       </UISidebar>
       <SidebarInset>
-        {/* The direct child of SidebarInset gets the padding and max-width for content */}
-        <div
-          className="w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8"
-        >
+        <MobileHeader /> {/* Header for mobile view, contains trigger */}
+        {/* Main content area with padding and max-width */}
+        <main className="w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 pt-20 md:pt-4 lg:pt-6"> {/* Added top padding for mobile header */}
           {children}
-        </div>
+        </main>
       </SidebarInset>
     </div>
   );
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  // SidebarProvider forces an "open" and "desktop" state for the sidebar context
+  // SidebarProvider from components/ui/sidebar handles its own state
   return (
-    <SidebarProvider open={true} onOpenChange={() => { /* no-op */ }}>
+    <SidebarProvider>
       <LayoutContent>{children}</LayoutContent>
     </SidebarProvider>
   );
