@@ -18,7 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
 
 const SIDEBAR_WIDTH = "var(--sidebar-width, 16rem)"
@@ -162,14 +162,13 @@ const MobileSheetSidebar = ({ children }: { children: React.ReactNode }) => {
         <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
             {/* The SheetTrigger is now expected to be in MobileHeader */}
             <SheetContent side="left" className="md:hidden w-[var(--sidebar-width-mobile)] p-0 overflow-y-auto">
-                 {/* We can add a close button inside if needed, or rely on overlay click/swipe */}
+                <SheetHeader>
+                  <SheetTitle className="sr-only">Main Menu</SheetTitle>
+                </SheetHeader>
                 <div className="flex flex-col h-full">
                     {children} {/* AppSidebar content goes here */}
                 </div>
-                 <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground md:hidden">
-                    <X className="h-5 w-5" />
-                    <span className="sr-only">Close</span>
-                </SheetClose>
+                {/* The SheetClose button is part of SheetContent from ui/sheet.tsx, so no need to add it here explicitly */}
             </SheetContent>
         </Sheet>
     );
