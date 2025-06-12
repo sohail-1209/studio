@@ -1,5 +1,17 @@
 
 import type {NextConfig} from 'next';
+import type { PWAConfig } from 'next-pwa';
+
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+  // You can add more PWA options here if needed
+  // fallbacks: {
+  //   document: '/offline', // if you want to fallback to a custom offline page
+  // },
+});
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -25,7 +37,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'toppng.com', // Added new hostname
+        hostname: 'toppng.com', 
         port: '',
         pathname: '/**',
       },
@@ -33,4 +45,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);
