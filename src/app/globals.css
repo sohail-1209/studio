@@ -40,10 +40,10 @@ body {
     --radius: 0.65rem; /* Slightly increased radius */
 
     /* Custom sidebar colors */
-    --sidebar-background: 0 100% 50%; /* Bright Red for Debug */
-    --sidebar-foreground: 0 0% 100%; /* White text for Debug */
-    --sidebar-text-debug-color: 0 0% 100%; /* White text for AppSidebar content */
-    --sidebar-border: 45 20% 70%; /* Darker red border for debug */
+    --sidebar-background: var(--background); /* Match main content background */
+    --sidebar-foreground: var(--foreground); /* Adjust for contrast if needed */
+    --sidebar-text-debug-color: 45 10% 18%; /* Foreground for AppSidebar content */
+    --sidebar-border: var(--border); /* Match general border */
     
     /* ADD THIS FOR MAIN CONTENT DEBUG */
     --main-content-debug-background: 240 100% 50%; /* Bright Blue for Debug */
@@ -97,10 +97,10 @@ body {
     --ring: 120 38% 72%; /* Brighter sage accent for focus rings */
 
     /* Custom sidebar colors for dark mode */
-    --sidebar-background: 0 100% 50%; /* Bright Red for Debug */
-    --sidebar-foreground: 0 0% 100%; /* White text for Debug */
-    --sidebar-text-debug-color: 0 0% 100%; /* White text for AppSidebar content */
-    --sidebar-border: 0 80% 40%; /* Darker red border for debug */
+    --sidebar-background: var(--background); /* Match main content background */
+    --sidebar-foreground: var(--foreground); /* Adjust for contrast if needed */
+    --sidebar-text-debug-color: 45 20% 90%; /* Foreground for AppSidebar content */
+    --sidebar-border: var(--border); /* Match general border */
     
     /* ADD THIS FOR MAIN CONTENT DEBUG - DARK MODE */
     --main-content-debug-background: 240 80% 40%; /* Slightly Darker Bright Blue for Debug */
