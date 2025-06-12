@@ -101,7 +101,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(true); // Will be effectively ignored for rendering in this diagnostic
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
   const [isProcessingFollow, setIsProcessingFollow] = useState(false);
@@ -166,6 +166,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingProfile(false);
       });
 
+      // We are not fetching posts in this diagnostic version to keep the "Posts" tab simple
+      // If actual post fetching is needed, uncomment the logic below
+      /*
       setLoadingPosts(true);
       const postsQuery = query(
         collection(db, 'posts'),
@@ -197,10 +200,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         }
         setLoadingPosts(false);
       });
+      */
+      // For diagnostic:
+      setPosts([]); // Ensure posts array is empty for NoPostsPlaceholder to show
+      setLoadingPosts(false); // Simulate posts loading as complete for the placeholder
 
       return () => {
         unsubscribeProfile();
-        unsubscribePosts();
+        // if (unsubscribePosts) unsubscribePosts(); // If post fetching was active
       };
     }
   }, [userId, toast]);
@@ -457,8 +464,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   return (
     <MainLayout>
-      <div className="w-full"> {/* Removed h-[calc(...)] */}
-          <Card className="overflow-hidden shadow-lg w-full flex flex-col"> {/* Removed h-full */}
+      <div className="w-full">
+          <Card className="overflow-hidden shadow-lg w-full flex flex-col">
             <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
               <div className="relative h-48 w-full md:h-64">
                 <Image
@@ -514,6 +521,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
                 </TabsList>
                 <TabsContent value="posts" className="mt-6 w-full min-w-0">
+                  {/* --- DIAGNOSTIC CHANGE: Always show NoPostsPlaceholder --- */}
+                  <NoPostsPlaceholder />
+                  {/*
                   {loadingPosts && <LoadingPostsPlaceholder />}
                   {!loadingPosts && posts.length === 0 && <NoPostsPlaceholder />}
                   {!loadingPosts && posts.length > 0 && (
@@ -548,6 +558,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                       ))}
                     </div>
                   )}
+                  */}
                 </TabsContent>
                 <TabsContent value="media" className="mt-6 w-full min-w-0">
                   <NoMediaPlaceholder />
