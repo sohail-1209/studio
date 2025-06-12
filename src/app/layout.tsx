@@ -9,16 +9,16 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Synora',
   description: 'Synora - Connect, Share, and Discover.',
-  manifest: '/manifest.json',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#588558' },
-    { media: '(prefers-color-scheme: dark)', color: '#588558' }, // Using the same for dark for now
-  ],
-  icons: {
-    icon: 'https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png',
-    apple: 'https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png',
-  },
-  viewport: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no',
+  // manifest: '/manifest.json', // Temporarily commented out
+  // themeColor: [ // Temporarily commented out
+  //   { media: '(prefers-color-scheme: light)', color: '#588558' },
+  //   { media: '(prefers-color-scheme: dark)', color: '#588558' },
+  // ],
+  // icons: { // Temporarily commented out
+  //   icon: 'https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png',
+  //   apple: 'https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png',
+  // },
+  // viewport: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no', // Temporarily commented out
 };
 
 // Script to set initial theme to prevent FOUC (Flash of Unstyled Content)
@@ -57,3 +57,4 @@ export default function RootLayout({
     </html>
   );
 }
+

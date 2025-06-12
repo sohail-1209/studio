@@ -4,7 +4,7 @@ import type { PWAConfig } from 'next-pwa';
 
 const withPWA = require('next-pwa')({
   dest: 'public',
-  register: true,
+  register: false, // DIAGNOSTIC: Changed from true to false
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
   manifest: {
@@ -64,3 +64,4 @@ const nextConfig: NextConfig = {
 };
 
 export default withPWA(nextConfig);
+
