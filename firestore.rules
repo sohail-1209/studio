@@ -1,136 +1,206 @@
+
+rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user profile is private
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Check if a profile exists and is explicitly private
     function isProfilePrivate(userId) {
       return exists(/databases/$(database)/documents/profiles/$(userId)) &&
              get(/databases/$(database)/documents/profiles/$(userId)).data.isPrivate == true;
     }
 
-    // Helper function to check if a user profile is effectively public
-    // (exists and isPrivate is false, or isPrivate field is missing, or profile doesn't exist)
+    // Check if a profile is effectively public (not private or doesn't exist)
+    // If isPrivate field is missing, or profile doesn't exist, treat as public.
     function isProfileEffectivelyPublic(userId) {
       return !exists(/databases/$(database)/documents/profiles/$(userId)) ||
-             (exists(/databases/$(database)/documents/profiles/$(userId)) &&
-              (get(/databases/$(database)/documents/profiles/$(userId)).data.isPrivate == false ||
-               !('isPrivate' in get(/databases/$(database)/documents/profiles/$(userId)).data)
-              )
-             );
+             (exists(/databases/$(database)/documents/profiles/$(userId)) && 
+              get(/databases/$(database)/documents/profiles/$(userId)).data.isPrivate != true);
     }
 
-    // Helper function to check if current user is an accepted follower of targetUser
+    // Check if the current user is an accepted follower of the target user
     function isAcceptedFollower(targetUserId) {
-      // Ensure request.auth is not null before using request.auth.uid
-      return request.auth != null &&
-             exists(/databases/$(database)/documents/followRequests/$(request.auth.uid + '_' + targetUserId)) &&
-             get(/databases/$(database)/documents/followRequests/$(request.auth.uid + '_' + targetUserId)).data.status == 'accepted';
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(targetUserId)) &&
+             get(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(targetUserId)).data.status == 'accepted';
     }
-
+    
+    // Match for user profiles
     match /profiles/{userId} {
-      allow read: if true; // Profiles are generally public for read
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId &&
-                       (request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['displayName', 'bio', 'photoURL', 'coverPhotoURL', 'username', 'followersCount', 'followingCount', 'isPrivate']));
-      allow delete: if false; // Generally, users shouldn't delete profiles directly
+      allow read: if true; // Anyone can read profiles
+      allow create: if isOwner(userId) && 
+                     request.resource.data.uid == userId &&
+                     (!('followersCount' in request.resource.data) || request.resource.data.followersCount == 0) &&
+                     (!('followingCount' in request.resource.data) || request.resource.data.followingCount == 0) &&
+                     (!('isPrivate' in request.resource.data) || request.resource.data.isPrivate == false);
+      
+      allow update: if isOwner(userId) &&
+                      // Allow owner to update specific fields.
+                      // Counters are typically updated by server functions or other specific rules.
+                      // isPrivate can be updated by owner.
+                      request.resource.data.keys().hasOnly(['displayName', 'username', 'bio', 'photoURL', 'coverPhotoURL', 'followersCount', 'followingCount', 'isPrivate', 'uid', 'email']) &&
+                      request.resource.data.uid == userId &&
+                      request.resource.data.email == resource.data.email && // Email shouldn't change here
+                      // Only allow owner to update their own isPrivate, displayName, username, bio, photoURL, coverPhotoURL.
+                      // For counters, ensure they are only incrementing/decrementing by 1 if done client-side (better handled by functions or specific logic)
+                      // For simplicity in this client-driven example, if owner updates, we allow counter changes:
+                      (request.resource.data.followersCount == resource.data.followersCount + 1 || 
+                       request.resource.data.followersCount == resource.data.followersCount - 1 ||
+                       request.resource.data.followersCount == resource.data.followersCount) &&
+                      (request.resource.data.followingCount == resource.data.followingCount + 1 ||
+                       request.resource.data.followingCount == resource.data.followingCount - 1 ||
+                       request.resource.data.followingCount == resource.data.followingCount);
+
+      allow delete: if isOwner(userId); // Owner can delete their profile
     }
 
+    // Match for posts
     match /posts/{postId} {
-      allow read: if
-        // Post is from a public profile
+      allow read: if 
+        // Post author's profile is public
         isProfileEffectivelyPublic(resource.data.userId) ||
-        // Post is from a private profile, and requester is the author
-        (isProfilePrivate(resource.data.userId) && request.auth != null && request.auth.uid == resource.data.userId) ||
-        // Post is from a private profile, and requester is an accepted follower
-        (isProfilePrivate(resource.data.userId) && request.auth != null && isAcceptedFollower(resource.data.userId));
+        // Current user is the author of the post
+        isOwner(resource.data.userId) ||
+        // Post author's profile is private, AND current user is an accepted follower
+        (isProfilePrivate(resource.data.userId) && isAcceptedFollower(resource.data.userId));
 
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow update: if request.auth != null &&
-                       // Owner can update caption, image, etc.
-                       (request.auth.uid == resource.data.userId &&
-                        request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['caption', 'imageUrl', 'imagePath', 'videoUrl', 'dataAiHint', 'authorIsPrivate'])
-                       ) ||
-                       // Any authenticated user can update likesCount and likedBy (for liking/unliking)
-                       (request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['likesCount', 'likedBy']) &&
-                         // Ensure likedBy is an array if it's being modified
-                         (request.resource.data.likedBy is list || !('likedBy' in request.resource.data.diff(resource.data).affectedKeys())) &&
-                         // Ensure likesCount is a number if it's being modified
-                         (request.resource.data.likesCount is number || !('likesCount' in request.resource.data.diff(resource.data).affectedKeys()))
-                       );
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if isOwner(request.resource.data.userId) &&
+                      request.resource.data.likesCount == 0 &&
+                      request.resource.data.commentsCount == 0 &&
+                      (!('likedBy' in request.resource.data) || request.resource.data.likedBy.size() == 0) &&
+                      request.resource.data.authorIsPrivate == get(/databases/$(database)/documents/profiles/$(request.resource.data.userId)).data.isPrivate;
 
+      allow update: if 
+        // Owner can update caption, image, video, dataAiHint, authorIsPrivate
+        (isOwner(resource.data.userId) &&
+         request.resource.data.keys().hasAll(['caption', 'imageUrl', 'imagePath', 'videoUrl', 'dataAiHint', 'authorIsPrivate']) &&
+         request.resource.data.size() <= 7 && // Ensure no other fields are snuck in for owner updates
+         request.resource.data.userId == resource.data.userId &&
+         request.resource.data.userDisplayName == resource.data.userDisplayName &&
+         request.resource.data.userAvatarUrl == resource.data.userAvatarUrl &&
+         request.resource.data.createdAt == resource.data.createdAt &&
+         request.resource.data.likesCount == resource.data.likesCount && // Owner cannot directly change counts
+         request.resource.data.commentsCount == resource.data.commentsCount &&
+         request.resource.data.likedBy == resource.data.likedBy
+        ) ||
+        // Any authenticated user can update like counts and likedBy array (atomic operations)
+        (isSignedIn() &&
+         request.resource.data.userId == resource.data.userId && // Ensure core post data isn't changed
+         request.resource.data.caption == resource.data.caption &&
+         request.resource.data.imageUrl == resource.data.imageUrl &&
+         request.resource.data.imagePath == resource.data.imagePath &&
+         request.resource.data.authorIsPrivate == resource.data.authorIsPrivate &&
+         // Allow only likesCount and likedBy to change for non-owners
+         (request.resource.data.likesCount == resource.data.likesCount + 1 || request.resource.data.likesCount == resource.data.likesCount - 1) &&
+         (request.resource.data.likedBy.size() == resource.data.likedBy.size() + 1 || request.resource.data.likedBy.size() == resource.data.likedBy.size() - 1) &&
+         request.resource.data.commentsCount == resource.data.commentsCount // Comments count not changed here
+        );
+        
+      allow delete: if isOwner(resource.data.userId);
+
+      // Comments subcollection
       match /comments/{commentId} {
-        allow read: if true; // Comments are public if the post is readable
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-        allow delete: if request.auth != null &&
-                         (request.auth.uid == resource.data.userId || // Comment owner
-                          (exists(/databases/$(database)/documents/posts/$(postId)) && // Ensure post exists before getting its data
-                           request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId) ); // Post owner
+        allow read: if true; // Anyone can read comments on readable posts (post read rule applies first)
+        allow create: if isSignedIn() && 
+                        request.resource.data.userId == request.auth.uid;
+        allow delete: if 
+          (isSignedIn() && request.auth.uid == resource.data.userId) || // Comment owner can delete
+          (isSignedIn() && request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId); // Post owner can delete
       }
     }
 
+    // Match for follow requests
     match /followRequests/{requestId} {
-      allow read: if request.auth != null &&
-                     (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);
+      // TEMPORARY DIAGNOSTIC RULES - REVERT AFTER TESTING
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
 
-      // TEMPORARILY OVERLY PERMISSIVE FOR DEBUGGING
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      // END TEMPORARY DEBUGGING RULES
+      // --- ORIGINAL RULES (commented out for diagnostics) ---
+      // allow read: if isSignedIn() &&
+      //                (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);
 
-      allow delete: if request.auth != null &&
-                       (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);
+      // allow create: if
+      //   isSignedIn() &&
+      //   request.auth.uid == request.resource.data.requesterId &&
+      //   request.resource.data.requesterId != request.resource.data.recipientId &&
+      //   (
+      //     (isProfilePrivate(request.resource.data.recipientId) && request.resource.data.status == 'pending') ||
+      //     (isProfileEffectivelyPublic(request.resource.data.recipientId) && request.resource.data.status == 'accepted')
+      //   );
+      
+      // allow update: if
+      //   isSignedIn() &&
+      //   (
+      //     // Recipient can accept/decline a pending request
+      //     ( request.auth.uid == resource.data.recipientId &&
+      //       resource.data.status == 'pending' &&
+      //       (request.resource.data.status == 'accepted' || request.resource.data.status == 'declined') &&
+      //       request.resource.data.keys().hasOnly(['status', 'updatedAt']) // Only status and timestamp can change
+      //     ) ||
+      //     // Requester can change status to 'accepted' if target is public and current status is not 'accepted' (e.g., re-follow)
+      //     ( request.auth.uid == resource.data.requesterId &&
+      //       isProfileEffectivelyPublic(resource.data.recipientId) &&
+      //       resource.data.status != 'accepted' && // Prevent changing if already accepted by this rule
+      //       request.resource.data.status == 'accepted' &&
+      //       request.resource.data.keys().hasOnly(['status', 'updatedAt'])
+      //     )
+      //   );
+
+      // allow delete: if isSignedIn() &&
+      //                  (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId); // Requester can cancel, recipient can remove (e.g. if unfollowing)
     }
 
+    // Match for notifications
     match /notifications/{notificationId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.recipientId;
-      allow create: if
-        request.auth != null &&
-        request.auth.uid == request.resource.data.actorId && // Actor creates the notification
-        request.auth.uid != request.resource.data.recipientId && // Cannot notify self
-        (
-          // Like or comment notification
-          ( (request.resource.data.type == 'like' || request.resource.data.type == 'comment') &&
-            exists(/databases/$(database)/documents/posts/$(request.resource.data.postId)) &&
-            get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data.userId == request.resource.data.recipientId
-          ) ||
-          // Follow request notification (sent to private profile owner)
-          ( request.resource.data.type == 'follow_request' &&
-            isProfilePrivate(request.resource.data.recipientId) && // Recipient must be private
-            exists(/databases/$(database)/documents/followRequests/$(request.resource.data.followRequestId)) &&
-            get(/databases/$(database)/documents/followRequests/$(request.resource.data.followRequestId)).data.requesterId == request.resource.data.actorId &&
-            get(/databases/$(database)/documents/followRequests/$(request.resource.data.followRequestId)).data.recipientId == request.resource.data.recipientId
-          ) ||
-          // Follow accept notification (sent to original requester)
-          ( request.resource.data.type == 'follow_accept' &&
-            exists(/databases/$(database)/documents/followRequests/$(request.resource.data.originalFollowRequestId)) &&
-            // The actor (who accepted) should be the recipient of the original follow request
-            get(/databases/$(database)/documents/followRequests/$(request.resource.data.originalFollowRequestId)).data.recipientId == request.resource.data.actorId &&
-            // The recipient of this notification should be the requester of the original follow request
-            get(/databases/$(database)/documents/followRequests/$(request.resource.data.originalFollowRequestId)).data.requesterId == request.resource.data.recipientId
-          )
-        );
-      allow update: if request.auth != null && request.auth.uid == resource.data.recipientId &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'actionTaken']);
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.recipientId || request.auth.uid == resource.data.actorId);
+      allow read: if isSignedIn() && request.auth.uid == resource.data.recipientId;
+      
+      // TEMPORARY DIAGNOSTIC RULE - REVERT AFTER TESTING
+      allow create: if isSignedIn();
+      // --- ORIGINAL RULE ---
+      // allow create: if 
+      //   isSignedIn() &&
+      //   request.auth.uid == request.resource.data.actorId && // The actor (current user) creates the notification
+      //   request.resource.data.actorId != request.resource.data.recipientId && // Cannot notify self
+      //   (
+      //     (request.resource.data.type == 'like' || request.resource.data.type == 'comment') ||
+      //     (request.resource.data.type == 'follow_request' && isProfilePrivate(request.resource.data.recipientId)) ||
+      //     (request.resource.data.type == 'follow_accept') // Simplified: accept implies prior valid request or public follow
+      //   );
+        
+      allow update: if isSignedIn() && 
+                      request.auth.uid == resource.data.recipientId && // Only recipient can mark as read or actionTaken
+                      request.resource.data.keys().hasOnly(['isRead', 'actionTaken']); 
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.recipientId || request.auth.uid == resource.data.actorId); // Recipient or actor can delete
     }
-
+    
+    // Chats and Messages
     match /chats/{chatId} {
-      allow read: if request.auth != null && request.auth.uid in resource.data.userIds;
-      allow create: if request.auth != null && request.auth.uid in request.resource.data.userIds;
-      allow update: if request.auth != null && request.auth.uid in resource.data.userIds &&
-                       // Allow updating last message details or userDetails (e.g., if a user changes their name)
-                       request.resource.data.diff(resource.data).affectedKeys()
-                         .hasAny(['lastMessageText', 'lastMessageSenderId', 'lastMessageTimestamp', 'updatedAt', 'userDetails']);
+      allow read, update: if isSignedIn() && request.auth.uid in resource.data.userIds;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.userIds &&
+                      request.resource.data.userIds.size() == 2; 
+                      // ensure userDetails has correct keys
+                      // request.resource.data.userDetails.keys().hasAll(request.resource.data.userIds)
 
       match /messages/{messageId} {
-        allow read: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.senderId &&
-                         request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
-        allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+        allow create: if isSignedIn() && 
+                        request.auth.uid == request.resource.data.senderId &&
+                        request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.senderId; // Only sender can delete their message
       }
     }
   }
 }
+
+    
