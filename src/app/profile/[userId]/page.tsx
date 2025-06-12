@@ -47,7 +47,6 @@ interface UserProfile extends AuthContextUserProfile {
 type FollowStatus = 'not_following' | 'following';
 
 
-// Placeholder for Media
 const NoMediaPlaceholder = () => (
   <div className="py-12 text-center w-full">
     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -58,7 +57,6 @@ const NoMediaPlaceholder = () => (
   </div>
 );
 
-// Placeholder for Likes
 const NoLikesPlaceholder = () => (
   <div className="py-12 text-center w-full">
     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -69,7 +67,6 @@ const NoLikesPlaceholder = () => (
   </div>
 );
 
-// Placeholder for Posts when posts.length === 0
 const NoPostsPlaceholder = () => (
   <div className="py-12 text-center w-full">
     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -80,9 +77,8 @@ const NoPostsPlaceholder = () => (
   </div>
 );
 
-// Loading state for posts (will be bypassed in this diagnostic)
 const LoadingPostsPlaceholder = () => (
-  <div className="py-12 text-center w-full">
+ <div className="py-12 text-center w-full">
     <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
     <p className="mt-4 text-lg font-semibold text-foreground">Loading Posts...</p>
     <p className="mt-1 text-sm text-muted-foreground">
@@ -100,9 +96,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]); // Will be kept empty for diagnostic
+  // const [posts, setPosts] = useState<Post[]>([]); // Commented out for diagnostic
+  // const [loadingPosts, setLoadingPosts] = useState(true); // Commented out for diagnostic
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [loadingPosts, setLoadingPosts] = useState(false); // Set to false to show NoPostsPlaceholder
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
   const [isProcessingFollow, setIsProcessingFollow] = useState(false);
@@ -167,13 +163,37 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingProfile(false);
       });
 
-      // DIAGNOSTIC: Do not fetch posts, always show placeholder for Posts tab
-      setPosts([]);
-      setLoadingPosts(false);
+      // Commented out posts fetching logic for diagnostic
+      /*
+      const postsCollectionRef = collection(db, 'posts');
+      const q = query(postsCollectionRef, where('userId', '==', userId), where('isStory', '!=', true), orderBy('createdAt', 'desc'));
+      setLoadingPosts(true);
+      const unsubscribePosts = onSnapshot(q, (snapshot) => {
+        const fetchedPosts = snapshot.docs.map((docSnapshot) => {
+          const data = docSnapshot.data();
+          return {
+            id: docSnapshot.id, ...data,
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
+            imagePath: data.imagePath || null,
+          } as Post;
+        });
+        setPosts(fetchedPosts);
+        setLoadingPosts(false);
+      }, (error) => {
+        console.error(`Error fetching posts for user ${userId}:`, error);
+        setLoadingPosts(false);
+        toast({ title: "Error fetching posts", description: error.message, variant: "destructive" });
+      });
+      */
+
+      // Immediately set posts to empty and loading to false for diagnostic
+      // setPosts([]);
+      // setLoadingPosts(false);
+
 
       return () => {
         unsubscribeProfile();
-        // No posts unsubscribe needed for this diagnostic
+        // unsubscribePosts(); // No longer needed as it's commented out
       };
     }
   }, [userId, toast]);
@@ -298,14 +318,41 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   };
 
   const confirmDeletePost = async () => {
-    // This logic will not be hit in this diagnostic version for Posts tab
     if (!postToDelete || !currentUser || postToDelete.userId !== currentUser.uid) {
       toast({ title: "Error", description: "Cannot delete this post.", variant: "destructive" });
       setIsDeleteDialogOpen(false);
       setPostToDelete(null);
       return;
     }
-    // ... rest of delete logic ...
+    setIsDeletingPost(true);
+    try {
+      const postRef = doc(db, 'posts', postToDelete.id);
+
+      const commentsRef = collection(postRef, 'comments');
+      const commentsSnapshot = await getDocs(commentsRef);
+      const commentBatch = writeBatch(db);
+      commentsSnapshot.docs.forEach(commentDoc => {
+        commentBatch.delete(commentDoc.ref);
+      });
+      await commentBatch.commit();
+
+      if (postToDelete.imagePath) {
+        const imageFileRef = storageRef(storage, postToDelete.imagePath);
+        await deleteObject(imageFileRef).catch(storageError => {
+          console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
+          toast({ title: "Storage Warning", description: "Could not delete image file, but post will be deleted.", variant: "default", duration: 5000 });
+        });
+      }
+      await deleteDoc(postRef);
+      toast({ title: "Post Deleted", description: "Your post has been successfully deleted." });
+    } catch (error: any) {
+      console.error("Error deleting post:", error);
+      toast({ title: "Deletion Failed", description: error.message || "Could not delete post.", variant: "destructive" });
+    } finally {
+      setIsDeletingPost(false);
+      setIsDeleteDialogOpen(false);
+      setPostToDelete(null);
+    }
   };
 
   const ProfileSkeleton = () => (
@@ -447,7 +494,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
               <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
 
               <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
-                <span><strong className="text-foreground font-medium">{posts.length}</strong> Posts</span>
+                {/* Changed posts.length to 0 for diagnostic */}
+                <span><strong className="text-foreground font-medium">{0}</strong> Posts</span>
                 <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
                 <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
               </div>
@@ -462,7 +510,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   value="posts"
                   className="mt-6 w-full min-w-0"
                 >
-                  {/* DIAGNOSTIC: Always show NoPostsPlaceholder, loadingPosts is false */}
                   <NoPostsPlaceholder />
                 </TabsContent>
                 <TabsContent value="media" className="mt-6 w-full min-w-0">
@@ -505,5 +552,4 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     </MainLayout>
   );
 }
-
     
