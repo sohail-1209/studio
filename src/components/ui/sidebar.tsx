@@ -45,8 +45,8 @@ function useSidebar() {
 
 const SidebarProvider = React.forwardRef<
   HTMLDivElement,
-  Omit<React.ComponentProps<"div">, 'onOpenChange'> & { // Omit onOpenChange from div's native props
-    open: boolean 
+  Omit<React.ComponentProps<"div">, 'onOpenChange'> & {
+    open: boolean
     onOpenChange: (open: boolean) => void
   }
 >(
@@ -55,22 +55,22 @@ const SidebarProvider = React.forwardRef<
       className,
       style,
       children,
-      open, 
-      onOpenChange, 
-      ...props 
+      open: openProp, // Renamed to avoid conflict with div's open attribute
+      onOpenChange: onOpenChangeProp, // Renamed
+      ...props
     },
     ref
   ) => {
 
     const contextValue = React.useMemo<SidebarContextType>(
       () => ({
-        state: "expanded", 
-        open: true,        
-        setOpen: () => {}, 
-        isMobile: false,   
-        openMobile: false, 
-        setOpenMobile: () => {}, 
-        toggleSidebar: () => {}, 
+        state: "expanded",
+        open: true,
+        setOpen: () => {},
+        isMobile: false,
+        openMobile: false,
+        setOpenMobile: () => {},
+        toggleSidebar: () => {},
       }),
       []
     );
@@ -92,7 +92,7 @@ const SidebarProvider = React.forwardRef<
               className
             )}
             ref={ref}
-            {...props} 
+            {...props}
           >
             {children}
           </div>
@@ -115,25 +115,22 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    // Removed !bg-red-500 from here, as it's controlled by MainLayout inline style
-    // Kept text-white and width/flex/border/z-index related classes
     return (
       <aside
         ref={ref}
         className={cn(
-          "flex flex-col h-screen sticky top-0 z-50",
-          "text-white", // Default text color if not overridden by children
-          "w-64 flex-shrink-0 border-r-4 border-black", // Width and border for debug visibility
+          "bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0 z-40", // Removed !bg-red-500, !w-64, text-white, border-r-4, border-black. Using theme classes. Adjusted z-index.
+          "w-[var(--sidebar-width)] flex-shrink-0 border-r border-sidebar-border", // Using CSS var for width, added theme border
           className
         )}
-        data-state={"expanded"} 
+        data-state={"expanded"}
         {...props}
       >
         <div
           data-sidebar="sidebar-inner-content"
           className="flex h-full w-full flex-col overflow-hidden"
         >
-          {children} 
+          {children}
         </div>
       </aside>
     )
@@ -153,7 +150,7 @@ const SidebarTrigger = React.forwardRef<
       variant="ghost"
       size="icon"
       className={cn("h-7 w-7", className)}
-      style={{ display: 'none' }} 
+      style={{ display: 'none' }}
       {...props}
     >
       <PanelLeft />
@@ -175,7 +172,7 @@ const SidebarRail = React.forwardRef<
       aria-label="Toggle Sidebar"
       tabIndex={-1}
       title="Toggle Sidebar"
-      className={cn("hidden", className)} 
+      className={cn("hidden", className)}
       {...props}
     />
   )
@@ -190,8 +187,7 @@ const SidebarInset = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "flex-1 flex flex-col overflow-y-auto",
-        "!bg-blue-500", // Main content debug blue
+        "flex-1 flex flex-col overflow-y-auto bg-background", // Removed !bg-blue-500, using theme background
         className
       )}
       {...props}
@@ -211,7 +207,7 @@ const SidebarInput = React.forwardRef<
       ref={ref}
       data-sidebar="input"
       className={cn(
-        "h-8 w-full bg-background shadow-none focus-visible:ring-1 focus-visible:ring-ring text-foreground placeholder:text-muted-foreground", 
+        "h-8 w-full bg-input text-foreground shadow-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground", // Adjusted bg
         className
       )}
       {...props}
@@ -228,7 +224,7 @@ const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex flex-col gap-2", className)} // Removed p-3, AppSidebar will handle its padding
+      className={cn("flex flex-col gap-2", className)}
       {...props}
     />
   )
@@ -243,7 +239,7 @@ const SidebarFooter = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 mt-auto", className)} // Removed p-2, AppSidebar will handle its padding
+      className={cn("flex flex-col gap-2 mt-auto", className)}
       {...props}
     />
   )
@@ -258,7 +254,7 @@ const SidebarSeparator = React.forwardRef<
     <Separator
       ref={ref}
       data-sidebar="separator"
-      className={cn("bg-white/30", className)} // Adjusted for red background, AppSidebar controls mx and w-auto
+      className={cn("bg-sidebar-border", className)} // Use theme border
       {...props}
     />
   )
@@ -274,7 +270,7 @@ const SidebarContent = React.forwardRef<
       ref={ref}
       data-sidebar="content"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden", // Removed p-2, AppSidebar will handle its padding
+        "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden text-sidebar-foreground", // Use theme foreground
         className
       )}
       {...props}
@@ -308,7 +304,7 @@ const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar="group-label"
       className={cn(
-        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-white/70 outline-none ring-ring focus-visible:ring-1 [&>svg]:size-4 [&>svg]:shrink-0", 
+        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-ring focus-visible:ring-1 [&>svg]:size-4 [&>svg]:shrink-0", // Use theme foreground
         className
       )}
       {...props}
@@ -327,7 +323,7 @@ const SidebarGroupAction = React.forwardRef<
       ref={ref}
       data-sidebar="group-action"
       className={cn(
-        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-white/70 outline-none ring-ring transition-transform hover:bg-white/20 hover:text-white focus-visible:ring-1 [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground/70 outline-none ring-ring transition-transform hover:bg-sidebar-hover hover:text-sidebar-hover-foreground focus-visible:ring-1 [&>svg]:size-4 [&>svg]:shrink-0", // Theme colors
         "after:absolute after:-inset-2 after:md:hidden",
         className
       )}
@@ -377,11 +373,11 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-ring transition-[width,height,padding] hover:bg-white/20 focus-visible:ring-1 active:bg-white/30 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white/30 data-[active=true]:font-medium data-[state=open]:hover:bg-white/20",
+  "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-ring transition-[width,height,padding] hover:bg-sidebar-hover hover:text-sidebar-hover-foreground focus-visible:ring-1 active:bg-sidebar-active/80 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-active data-[active=true]:text-sidebar-active-foreground data-[active=true]:font-medium data-[state=open]:hover:bg-sidebar-hover", // Theme colors
   {
     variants: {
       variant: {
-        default: "text-white", 
+        default: "text-sidebar-foreground", // Theme foreground
       },
       size: {
         default: "h-9 text-sm px-2.5",
@@ -424,7 +420,7 @@ const SidebarMenuButton = React.forwardRef<
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        data-sidebar-state={"expanded"} 
+        data-sidebar-state={"expanded"}
         className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
         {...props}
       >
@@ -448,7 +444,7 @@ const SidebarMenuAction = React.forwardRef<
       ref={ref}
       data-sidebar="menu-action"
       className={cn(
-        "absolute right-1 top-1/2 -translate-y-1/2 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-white/70 outline-none ring-ring transition-transform hover:bg-white/20 hover:text-white focus-visible:ring-1 peer-hover/menu-button:text-white [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute right-1 top-1/2 -translate-y-1/2 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground/70 outline-none ring-ring transition-transform hover:bg-sidebar-hover hover:text-sidebar-hover-foreground focus-visible:ring-1 peer-hover/menu-button:text-sidebar-hover-foreground [&>svg]:size-4 [&>svg]:shrink-0", // Theme colors
         "after:absolute after:-inset-2 after:md:hidden",
         className
       )}
@@ -467,7 +463,7 @@ const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar="menu-badge"
     className={cn(
-      "ml-auto flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-background bg-white select-none pointer-events-none", 
+      "ml-auto flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-background bg-sidebar-foreground select-none pointer-events-none", // Theme colors
       className
     )}
     {...props}
@@ -494,12 +490,12 @@ const SidebarMenuSkeleton = React.forwardRef<
     >
       {showIcon && (
         <Skeleton
-          className="size-4 rounded-sm shrink-0 bg-white/30" 
+          className="size-4 rounded-sm shrink-0 bg-sidebar-foreground/30" // Theme color
           data-sidebar="menu-skeleton-icon"
         />
       )}
       <Skeleton
-        className="h-4 flex-1 max-w-[--skeleton-width] bg-white/30" 
+        className="h-4 flex-1 max-w-[--skeleton-width] bg-sidebar-foreground/30" // Theme color
         data-sidebar="menu-skeleton-text"
         style={
           {
@@ -521,7 +517,7 @@ const SidebarMenuSub = React.forwardRef<
     ref={ref}
     data-sidebar="menu-sub"
     className={cn(
-      "mx-[calc(theme(spacing.2)_+_9px)] flex min-w-0 translate-x-px flex-col gap-0.5 border-l border-white/30 py-0.5 pl-2.5", 
+      "mx-[calc(theme(spacing.2)_+_9px)] flex min-w-0 translate-x-px flex-col gap-0.5 border-l border-sidebar-border py-0.5 pl-2.5", // Theme border
       className
     )}
     {...props}
@@ -551,8 +547,8 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-white outline-none ring-ring hover:bg-white/20 hover:text-white focus-visible:ring-1 active:bg-white/30 active:text-white disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-white", 
-        "data-[active=true]:bg-white/30 data-[active=true]:text-white",
+        "flex min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-ring hover:bg-sidebar-hover hover:text-sidebar-hover-foreground focus-visible:ring-1 active:bg-sidebar-active/80 active:text-sidebar-active-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-foreground", // Theme colors
+        "data-[active=true]:bg-sidebar-active data-[active=true]:text-sidebar-active-foreground",
         size === "sm" && "h-8 text-xs",
         size === "default" && "h-9 text-sm",
         className
