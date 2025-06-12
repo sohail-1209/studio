@@ -116,16 +116,31 @@ export default function SettingsPage() {
     try {
       const profileRef = doc(db, 'profiles', currentUser.uid);
       await updateDoc(profileRef, { isPrivate });
+
+      // Update all user's posts with the new authorIsPrivate status
+      const postsColRef = collection(db, 'posts');
+      const userPostsQuery = query(postsColRef, where('userId', '==', currentUser.uid));
+      const postsSnapshot = await getDocs(userPostsQuery);
+
+      if (!postsSnapshot.empty) {
+        const postUpdateBatch = writeBatch(db);
+        postsSnapshot.forEach(postDoc => {
+          postUpdateBatch.update(postDoc.ref, { authorIsPrivate: isPrivate });
+        });
+        await postUpdateBatch.commit();
+        console.log(`Updated ${postsSnapshot.size} posts with new authorIsPrivate status: ${isPrivate}`);
+      }
+
       setIsPrivateAccount(isPrivate);
       // Update local state in AuthContext by calling reloadUser or directly setting user state if possible
       // For now, rely on reloadUser which re-fetches profile
       await reloadUser();
       toast({
         title: "Privacy Setting Updated",
-        description: `Your account is now ${isPrivate ? 'private' : 'public'}.`,
+        description: `Your account is now ${isPrivate ? 'private' : 'public'}. Your existing posts' visibility has also been updated.`,
       });
     } catch (error: any) {
-      console.error("Error updating privacy setting:", error);
+      console.error("Error updating privacy setting or posts:", error);
       toast({ title: "Update Failed", description: error.message, variant: "destructive" });
       // Revert UI optimistic update if needed
       setIsPrivateAccount(!isPrivate);
@@ -425,3 +440,4 @@ export default function SettingsPage() {
     </MainLayout>
   );
 }
+
