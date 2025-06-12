@@ -1,3 +1,4 @@
+
 // src/app/profile/[userId]/page.tsx
 'use client';
 
@@ -394,7 +395,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
             <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
           </TabsList>
-          <TabsContent value="posts" className="mt-6 w-full">
+          <TabsContent value="posts" className="mt-6 w-full min-w-0">
              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full min-w-0">
                 {[...Array(6)].map((_, i) => (
                   <Skeleton key={i} className="aspect-square rounded-md min-w-0" />
@@ -456,8 +457,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   return (
     <MainLayout>
-      <div className="w-full">
-          <Card className="overflow-hidden shadow-lg w-full flex flex-col">
+      <div className="w-full"> {/* Removed h-[calc(...)] */}
+          <Card className="overflow-hidden shadow-lg w-full flex flex-col"> {/* Removed h-full */}
             <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
               <div className="relative h-48 w-full md:h-64">
                 <Image

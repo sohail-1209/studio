@@ -225,7 +225,7 @@ const SidebarInset = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "flex-1 flex flex-col bg-background overflow-y-scroll w-full min-w-0 overflow-x-hidden", // Changed to overflow-y-scroll
+        "flex-1 flex flex-col bg-background overflow-y-scroll w-full min-w-0 overflow-x-hidden", 
         className
       )}
       {...props}
