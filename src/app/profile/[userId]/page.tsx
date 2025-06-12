@@ -87,7 +87,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
     try {
       const followRequestsRef = collection(db, 'followRequests');
-      
+
       // Check if current user has sent a request to the profile user OR if they are already accepted (following)
       const qSentOrFollowing = query(
         followRequestsRef,
@@ -167,8 +167,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingProfile(false);
       });
 
-      // Post fetching logic will be adjusted based on profile privacy later
-      // For now, fetch all posts then filter in UI if private and not followed
       setLoadingPosts(true);
       const postsQuery = query(
         collection(db, 'posts'),
@@ -220,21 +218,18 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     if (!currentUser || !profile || isOwnProfile || isProcessingFollow) return;
 
     setIsProcessingFollow(true);
-    
+
     if (profile.isPrivate) { // Request to follow private account
       if (followStatus === 'not_following' || followStatus === 'follow_back') {
-        // Send follow request
-        const batch = writeBatch(db);
-        const newRequestRef = doc(collection(db, 'followRequests'));
-        const newRequestId = `${currentUser.uid}_${profile.uid}`; // Use composite ID for easier querying
+        const newRequestId = `${currentUser.uid}_${profile.uid}`;
         const newRequestDocRef = doc(db, 'followRequests', newRequestId);
-
+        const batch = writeBatch(db);
         try {
           const existingRequestSnap = await getDoc(newRequestDocRef);
           if (existingRequestSnap.exists() && existingRequestSnap.data()?.status === 'pending') {
              toast({ title: "Request Already Sent", description: `Your request to follow ${profile.displayName || 'this user'} is pending.` });
              setIsProcessingFollow(false);
-             setFollowStatus('pending_them'); // Ensure UI matches
+             setFollowStatus('pending_them');
              setExistingRequestId(newRequestId);
              return;
           }
@@ -276,7 +271,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         try {
           const requestRef = doc(db, 'followRequests', existingRequestId);
           await deleteDoc(requestRef);
-          // Optionally delete notification (more complex, skip for now)
           setFollowStatus('not_following');
           setExistingRequestId(null);
           toast({ title: "Follow Request Cancelled" });
@@ -284,24 +278,24 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           console.error("Error cancelling follow request:", error);
           toast({ title: "Cancellation Error", description: error.message, variant: "destructive" });
         }
-      } else if (followStatus === 'following' && existingRequestId) { // Unfollow (cancel accepted request)
+      } else if (followStatus === 'following' && existingRequestId) { // Unfollow private account
          try {
             const requestRef = doc(db, 'followRequests', existingRequestId);
             const batchUnfollow = writeBatch(db);
-            batchUnfollow.delete(requestRef); // Delete the 'accepted' request doc
+            batchUnfollow.delete(requestRef);
 
-            // Decrement counts (ideally via cloud function for atomicity on target user)
             const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
             batchUnfollow.update(currentUserProfileRef, { followingCount: increment(-1) });
-            const targetUserProfileRef = doc(db, 'profiles', profile.uid);
-            batchUnfollow.update(targetUserProfileRef, { followersCount: increment(-1) });
+            // Note: We can't reliably update the other user's followersCount from client due to rules.
+            // This should ideally be handled by a Cloud Function triggered by followRequest deletion/status change.
+            // const targetUserProfileRef = doc(db, 'profiles', profile.uid);
+            // batchUnfollow.update(targetUserProfileRef, { followersCount: increment(-1) });
 
             await batchUnfollow.commit();
             setFollowStatus('not_following');
             setExistingRequestId(null);
             toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName || 'this user'}.` });
-        } catch (error: any)
-         {
+        } catch (error: any) {
             console.error("Error unfollowing (private):", error);
             toast({ title: "Unfollow Error", description: error.message, variant: "destructive"});
          }
@@ -314,8 +308,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       if (followStatus === 'following') { // Unfollow public account
         batchPublic.delete(followRequestRef);
         batchPublic.update(doc(db, 'profiles', currentUser.uid), { followingCount: increment(-1) });
-        batchPublic.update(doc(db, 'profiles', profile.uid), { followersCount: increment(-1) });
-        
+        // Client cannot reliably update other user's followersCount due to rules.
+        // batchPublic.update(doc(db, 'profiles', profile.uid), { followersCount: increment(-1) });
+
         try {
             await batchPublic.commit();
             setFollowStatus('not_following');
@@ -330,14 +325,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         const newRequestData: FollowRequestDocument = {
             requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
             recipientId: profile.uid, recipientDisplayName: profile.displayName, recipientAvatarUrl: profile.photoURL,
-            status: 'accepted', // Directly accept for public profiles
+            status: 'accepted',
             createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         };
         batchPublic.set(followRequestRef, newRequestData);
         batchPublic.update(doc(db, 'profiles', currentUser.uid), { followingCount: increment(1) });
-        batchPublic.update(doc(db, 'profiles', profile.uid), { followersCount: increment(1) });
-        
-        // Create a 'follow_accept' notification for public follows as well for consistency (optional)
+        // Client cannot reliably update other user's followersCount due to rules.
+        // batchPublic.update(doc(db, 'profiles', profile.uid), { followersCount: increment(1) });
+
         const notificationRef = doc(collection(db, 'notifications'));
         const notificationData: Omit<NotificationDocument, 'createdAt'> = {
           recipientId: profile.uid, actorId: currentUser.uid, actorDisplayName: currentUser.displayName, actorAvatarUrl: currentUser.photoURL,
@@ -363,19 +358,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const handleMessageUser = async () => {
     if (!currentUser || !profile || currentUser.uid === profile.uid || isMessaging) return;
 
-    // Allow messaging if following, or if the account is public (even if not following yet)
     const canMessage = followStatus === 'following' || (profile && !profile.isPrivate);
 
     if (!canMessage && profile && profile.isPrivate) {
         toast({ title: "Cannot Message", description: `You need to be following ${profile.displayName || 'this user'} to send them a message as their account is private.`, variant: "default" });
         return;
     }
-     if (!canMessage && profile && !profile.isPrivate){
-       // This case should ideally not be blocked by the button's disabled state,
-       // but if it is, this message would show.
-       // For public profiles, messaging is usually allowed regardless of follow status.
-     }
-
 
     setIsMessaging(true);
     const chatId = [currentUser.uid, profile.uid].sort().join('_');
@@ -545,11 +533,10 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><Clock className="mr-2 h-4 w-4" />Requested</Button>;
             case 'following':
                 return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
-            case 'pending_me': // They sent a request to me for their private account (this state is less common for *this* button)
-                 // User should accept from notifications. This button could be "Follow Back" if they also want to follow.
+            case 'pending_me':
                 return <Button onClick={() => router.push('/notifications')} className="w-full sm:w-auto"><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
             case 'not_following':
-            case 'follow_back': // They follow me, I don't follow them yet (or request was declined/cancelled)
+            case 'follow_back':
             default:
                 return <Button onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Request Follow</Button>;
         }
@@ -558,20 +545,16 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             case 'following':
                 return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
             case 'not_following':
-            case 'follow_back': // They follow me, I don't follow them (public account)
-            case 'pending_them': // Should not happen for public, but if it does, treat as not_following
-            case 'pending_me': // They follow me, I don't follow them (public account)
+            case 'follow_back':
+            case 'pending_them':
+            case 'pending_me':
             default:
                 return <Button onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
         }
     }
  };
-  // Determine if current user can see posts:
-  // 1. If it's their own profile
-  // 2. If the profile is public
-  // 3. If the profile is private AND current user is 'following' (accepted request)
-  const canViewPosts = isOwnProfile || !profile.isPrivate || (profile.isPrivate && followStatus === 'following');
 
+  const canViewPosts = isOwnProfile || !profile.isPrivate || (profile.isPrivate && followStatus === 'following');
   const canMessage = isOwnProfile ? false : (followStatus === 'following' || (!profile.isPrivate && (followStatus === 'not_following' || followStatus === 'follow_back')));
 
 
@@ -617,9 +600,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   )}
                 </div>
               </div>
-              
+
               <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
-              
+
               <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
                 <span><strong className="text-foreground font-medium">{posts.length}</strong> Posts</span>
                 <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
