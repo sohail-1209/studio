@@ -40,9 +40,12 @@ body {
     --radius: 0.65rem; /* Slightly increased radius */
 
     /* Custom sidebar colors */
-    --sidebar-background: 45 25% 95.5%; /* Very light warm gray/beige for sidebar */
-    --sidebar-foreground: 120 25% 28%; /* Dark Sage Green for sidebar text */
-    --sidebar-border: 45 20% 84%;
+    /* DEBUG: Forcing highly visible sidebar colors */
+    --sidebar-background: 0 100% 50%; /* Bright Red for Debug */
+    --sidebar-foreground: 0 0% 100%; /* White text for Debug */
+    --sidebar-text-debug-color: 0 0% 100%; /* White text for AppSidebar content */
+    --sidebar-border: 45 20% 70%; /* Darker red border for debug */
+    
     --sidebar-active: 90 45% 58%; /* Accent Green for active items */
     --sidebar-active-foreground: 0 0% 100%; /* White */
     --sidebar-hover: 45 25% 91%;
@@ -92,9 +95,12 @@ body {
     --ring: 120 38% 72%; /* Brighter sage accent for focus rings */
 
     /* Custom sidebar colors for dark mode */
-    --sidebar-background: 120 10% 11%; /* Slightly darker than main dark bg */
-    --sidebar-foreground: 45 20% 85%; /* Light warm gray/beige text */
-    --sidebar-border: 120 10% 21%;
+    /* DEBUG: Forcing highly visible sidebar colors */
+    --sidebar-background: 0 100% 50%; /* Bright Red for Debug */
+    --sidebar-foreground: 0 0% 100%; /* White text for Debug */
+    --sidebar-text-debug-color: 0 0% 100%; /* White text for AppSidebar content */
+    --sidebar-border: 0 80% 40%; /* Darker red border for debug */
+    
     --sidebar-active: 90 48% 68%; /* Accent Green for dark mode */
     --sidebar-active-foreground: 120 10% 13%; /* Dark text on active */
     --sidebar-hover: 120 10% 15%;

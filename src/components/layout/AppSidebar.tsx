@@ -3,161 +3,50 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Home, MessageSquare, Bell, PlusSquare, LogOut, Settings, Compass, PanelLeft } from 'lucide-react';
+import { Home } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
-import { useAuth } from '@/hooks/useAuth';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import Image from 'next/image';
-import {
-  useSidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarSeparator as UISidebarSeparator,
-} from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
 
+// Simplified navItems for debugging
 const navItems = [
-  { href: '/', label: 'Feed', icon: Home, tooltip: 'Feed' },
-  { href: '/messages', label: 'Messages', icon: MessageSquare, tooltip: 'Messages' },
-  { href: '/notifications', label: 'Notifications', icon: Bell, tooltip: 'Notifications' },
-  { href: '/explore', label: 'Explore', icon: Compass, tooltip: 'Explore' },
-  { href: '/create', label: 'Create Post', icon: PlusSquare, tooltip: 'Create Post' },
+  { href: '/', label: 'Test Feed Link', icon: Home, tooltip: 'Feed' },
 ];
 
-
 export function AppSidebar() {
-  const pathname = usePathname();
-  const { user, logout } = useAuth();
-  const {
-    open: isDesktopExpanded,
-    isMobile,
-    toggleSidebar
-  } = useSidebar();
+  // const pathname = usePathname(); // Not needed for this simplified version
+  // const { user, logout } = useAuth(); // Not needed for this simplified version
+  // const { isMobile, open: isDesktopExpanded } = useSidebar(); // 'open' is always true from context
 
-  const isActive = (href: string) => {
-    if (href === '/') return pathname === href;
-    if (href.includes('/profile/')) return pathname === href || pathname.startsWith(`${href}/`);
-    return pathname.startsWith(href);
-  };
-
-  // Labels are shown if: on desktop and expanded OR if it's the mobile sheet content.
-  const showLabels = (!isMobile && isDesktopExpanded) || isMobile;
-  // Tooltips are shown if: on desktop and collapsed.
-  const showTooltips = !isMobile && !isDesktopExpanded;
+  // Since sidebar is always expanded in this debug state, showLabels is always true
+  const showLabels = true;
 
   return (
     <>
-      <SidebarHeader className="p-3">
-        <div className="flex h-10 items-center justify-between">
-          {showLabels ? ( // Show full logo if labels are shown (desktop expanded or mobile sheet)
-            <Logo iconSize={28} textSize="text-xl" className="gap-2 ml-1" />
-          ) : ( // Otherwise, show icon-only logo (for desktop collapsed)
-            <Link href="/" className="flex items-center justify-center w-full h-full">
-              <Image
-                src="https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png"
-                alt="Synora Logo Icon"
-                width={28}
-                height={28}
-                priority
-                className="rounded-full"
-              />
-            </Link>
-          )}
-          {/* Toggle button for desktop sidebar collapse/expand. Hidden on mobile as sheet has its own trigger. */}
-          {!isMobile && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={toggleSidebar}
-            >
-              <PanelLeft />
-              <span className="sr-only">Toggle Sidebar</span>
-            </Button>
-          )}
-        </div>
-      </SidebarHeader>
-      <UISidebarSeparator className="my-0 bg-sidebar-border/50" />
+      <div className="p-3 h-16 flex items-center" style={{ color: "hsl(var(--sidebar-text-debug-color))" }}>
+        <Logo iconSize={28} textSize="text-xl" className="gap-2 ml-1" />
+      </div>
+      <div className="border-t my-0" style={{ borderColor: "hsl(var(--sidebar-border))" }} />
 
-      <SidebarContent className="p-2">
-        <SidebarMenu>
-          {navItems.map((item) => {
-            return (
-              <SidebarMenuItem key={item.label}>
-                <SidebarMenuButton
-                  asChild
-                  size="default"
-                  isActive={isActive(item.href)}
-                  tooltip={showTooltips ? { content: item.tooltip, side: "right", align: "center", className: "ml-1" } : undefined}
-                  className="justify-start h-9 px-2.5 text-sm"
-                >
-                  <Link href={item.href}>
-                    <item.icon className="h-5 w-5 shrink-0" />
-                    {showLabels && <span className="truncate">{item.label}</span>}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          })}
-        </SidebarMenu>
-      </SidebarContent>
+      <div className="p-2 flex-1 overflow-y-auto" style={{ color: "hsl(var(--sidebar-text-debug-color))" }}>
+        <div className="text-lg p-4">This is AppSidebar</div>
+        <ul className="flex flex-col gap-1">
+          {navItems.map((item) => (
+            <li key={item.label}>
+              <Link 
+                href={item.href}
+                className="flex items-center gap-2.5 p-2.5 rounded-md text-sm hover:bg-[hsla(0,0%,100%,0.1)]"
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                {showLabels && <span className="truncate">{item.label}</span>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-      <UISidebarSeparator className="my-0 bg-sidebar-border/50" />
-      <SidebarFooter className="p-2 space-y-1">
-        {user && (
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                size="default"
-                isActive={isActive(`/profile/${user.uid}`)}
-                tooltip={showTooltips ? { content: "My Profile", side: "right", align: "center", className: "ml-1" } : undefined}
-                className="justify-start h-9 px-2.5 text-sm"
-              >
-                <Link href={`/profile/${user.uid}`}>
-                  <Avatar className="h-6 w-6 shrink-0">
-                      {user.photoURL ? <Image src={user.photoURL} alt={user.displayName || 'User'} width={24} height={24} className="rounded-full" data-ai-hint="user avatar"/> : <AvatarFallback className="text-xs">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>}
-                  </Avatar>
-                  {showLabels && <span className="truncate">My Profile</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                size="default"
-                isActive={isActive('/settings')}
-                tooltip={showTooltips ? { content: "Settings", side: "right", align: "center", className: "ml-1" } : undefined}
-                className="justify-start h-9 px-2.5 text-sm"
-              >
-                <Link href="/settings">
-                  <Settings className="h-5 w-5 shrink-0" />
-                  {showLabels && <span className="truncate">Settings</span>}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild={false}
-                size="default"
-                onClick={() => {
-                   logout();
-                }}
-                tooltip={showTooltips ? { content: "Logout", side: "right", align: "center", className: "ml-1" } : undefined}
-                className="justify-start h-9 px-2.5 text-sm w-full"
-              >
-                <LogOut className="h-5 w-5 shrink-0" />
-                {showLabels && <span className="truncate">Logout</span>}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        )}
-      </SidebarFooter>
+      <div className="border-t my-0" style={{ borderColor: "hsl(var(--sidebar-border))" }} />
+      <div className="p-2" style={{ color: "hsl(var(--sidebar-text-debug-color))" }}>
+        <div className="p-2">Sidebar Footer Area (Debug)</div>
+      </div>
     </>
   );
 }
