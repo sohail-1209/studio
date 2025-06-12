@@ -622,7 +622,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             </Tabs>
           </CardContent>
         </Card>
-      </div>
       {isOwnProfile && profile && (
         <EditProfileDialog
           open={isEditDialogOpen}
