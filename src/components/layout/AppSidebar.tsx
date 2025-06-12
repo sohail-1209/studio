@@ -1,3 +1,4 @@
+
 // src/components/layout/AppSidebar.tsx
 'use client';
 
@@ -37,13 +38,35 @@ export function AppSidebar() {
   const [currentTheme, setCurrentTheme] = useState('light');
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem('theme');
-    if (storedTheme === 'dark') {
+    // Initialize theme based on localStorage
+    const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (storedTheme) {
+      setCurrentTheme(storedTheme);
+      document.documentElement.classList.toggle('dark', storedTheme === 'dark');
+    } else if (systemPrefersDark) {
       setCurrentTheme('dark');
+      document.documentElement.classList.add('dark');
     } else {
       setCurrentTheme('light');
+      document.documentElement.classList.remove('dark');
     }
+
+    // Listener for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('theme')) { // Only if no theme is manually set
+        const newSystemTheme = e.matches ? 'dark' : 'light';
+        setCurrentTheme(newSystemTheme);
+        document.documentElement.classList.toggle('dark', newSystemTheme === 'dark');
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+
   }, []);
+
 
   const toggleTheme = () => {
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
@@ -87,7 +110,7 @@ export function AppSidebar() {
   return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground p-2">
       <SidebarHeader className="p-1 mb-1">
-        <Logo className="!text-white" iconSize={30} textSize="text-2xl" />
+         <Logo className="!text-white" iconSize={30} textSize="text-2xl" />
       </SidebarHeader>
       <SidebarSeparator className="!bg-white/20 my-1" />
 
@@ -95,7 +118,8 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.filter(item => {
             if (item.requiresAuth && !user) return false;
-            if (item.mobileOnly && typeof window !== 'undefined' && window.innerWidth >= 768) return false; // Example: hide on md and up
+            // Example: hide on md and up - this logic might need adjustment if window is not available SSR
+            if (item.mobileOnly && typeof window !== 'undefined' && window.innerWidth >= 768) return false; 
             return true;
           }).map((item) => {
             // Handle dynamic href for profile
@@ -107,16 +131,16 @@ export function AppSidebar() {
 
             return (
               <SidebarMenuItem key={item.label} className={item.className}>
-                <Link href={href} legacyBehavior passHref>
+                <Link href={href} passHref>
                   <SidebarMenuButton
                     asChild
                     isActive={isActive}
                     className="!text-white hover:!bg-white/20 data-[active=true]:!bg-white/30 data-[active=true]:font-semibold"
                   >
-                    <a>
+                    <>
                       <item.icon />
                       <span>{item.label}</span>
-                    </a>
+                    </>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -134,28 +158,28 @@ export function AppSidebar() {
               </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <Link href="/settings" legacyBehavior passHref>
+            <Link href="/settings" passHref>
               <SidebarMenuButton asChild isActive={pathname === '/settings'} className="!text-white hover:!bg-white/20 data-[active=true]:!bg-white/30 data-[active=true]:font-semibold">
-                <a><Settings /><span>Settings</span></a>
+                <>
+                  <Settings /><span>Settings</span>
+                </>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
           {user && (
               <SidebarMenuItem>
-                <Link href={`/profile/${user.uid}`} passHref legacyBehavior>
-                  <a className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/20 cursor-pointer w-full">
-                    <Avatar className="h-8 w-8">
-                      {user.photoURL ? (
-                        <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
-                      ) : (
-                        <AvatarFallback className="bg-white/30 text-white">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="text-xs !text-white overflow-hidden">
-                      <p className="font-semibold truncate">{user.displayName || 'User'}</p>
-                      {user.username && <p className="text-white/70 truncate">@{user.username}</p>}
-                    </div>
-                  </a>
+                <Link href={`/profile/${user.uid}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/20 cursor-pointer w-full">
+                  <Avatar className="h-8 w-8">
+                    {user.photoURL ? (
+                      <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
+                    ) : (
+                      <AvatarFallback className="bg-white/30 text-white">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                    )}
+                  </Avatar>
+                  <div className="text-xs !text-white overflow-hidden">
+                    <p className="font-semibold truncate">{user.displayName || 'User'}</p>
+                    {user.username && <p className="text-white/70 truncate">@{user.username}</p>}
+                  </div>
                 </Link>
             </SidebarMenuItem>
           )}

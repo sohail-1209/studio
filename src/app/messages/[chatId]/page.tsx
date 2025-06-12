@@ -27,6 +27,7 @@ import {
   writeBatch,
   deleteDoc,
 } from 'firebase/firestore';
+import { ref as storageRefFirebase, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import type { ChatMessage, ChatMessageDocument, ChatSessionDocument, ChatSessionUserDetail } from '@/types/chat';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -198,7 +199,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
         lastMessageText = `${user.displayName || 'User'} sent an image.`;
         const uniqueFileName = `${Date.now()}-${selectedFile.name}`;
         const filePath = `chat_images/${chatId}/${user.uid}/${uniqueFileName}`;
-        const fileSgRef = storageRef(storage, filePath);
+        const fileSgRef = storageRefFirebase(storage, filePath);
         const uploadTask = uploadBytesResumable(fileSgRef, selectedFile);
 
         await new Promise<void>((resolve, reject) => {
@@ -269,7 +270,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       const messageRef = doc(db, 'chats', chatId, 'messages', messageToDelete.id);
       
       if (messageToDelete.imagePath) {
-        const imageFileRef = storageRef(storage, messageToDelete.imagePath);
+        const imageFileRef = storageRefFirebase(storage, messageToDelete.imagePath);
         await deleteObject(imageFileRef).catch(storageError => {
           console.warn("Error deleting image from storage:", storageError);
           toast({ title: "Storage Warning", description: "Could not delete image file from storage.", variant: "default", duration: 4000 });
@@ -334,207 +335,208 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const callButtonsDisabled = !chatPartnerId || !chatPartnerProfile;
 
   return (
-    <div className="flex h-[calc(100vh-theme(spacing.24))] flex-col">
-        <header className="flex items-center justify-between border-b bg-card p-4">
-          <div className="flex items-center space-x-3 min-w-0">
-            <Button variant="ghost" size="icon" asChild className="md:hidden flex-shrink-0">
-              <Link href="/messages"> <ArrowLeft className="h-5 w-5" /> </Link>
-            </Button>
-            {chatPartnerProfile ? (
-              <>
-                <Avatar className="flex-shrink-0">
-                  {chatPartnerProfile.photoURL ? (
-                    <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
-                  ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || 'U').charAt(0)}</AvatarFallback> )}
-                </Avatar>
-                <div className="min-w-0"> 
-                  <p className="font-semibold text-foreground truncate">{chatPartnerProfile.displayName}</p> 
-                </div>
-              </>
-            ) : (
-              <>
-                <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
-                <div className="space-y-1 min-w-0"> <Skeleton className="h-4 w-24" /> </div>
-              </>
-            )}
-          </div>
-          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-            <Button variant="ghost" size="icon" title="Voice Call (Coming Soon)" onClick={() => handleInitiateCall('audio')} disabled={callButtonsDisabled}>
-              <Phone className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" title="Video Call (Coming Soon)" onClick={() => handleInitiateCall('video')} disabled={callButtonsDisabled}>
-              <Video className="h-5 w-5" />
-            </Button>
-          </div>
-        </header>
-
-        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-          {loadingMessages && (
-            <div className="space-y-4"> <MessageSkeleton /> <div className="flex justify-end"><MessageSkeleton /></div> <MessageSkeleton /> </div>
-          )}
-          {!loadingMessages && (
-            <div className="space-y-4">
-              {messages.map((msg) => (
-                <div key={msg.id} className={cn("flex items-end space-x-2 group", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
-                  {msg.senderId !== user?.uid && chatPartnerProfile && (
-                    <Avatar className="h-8 w-8 self-start flex-shrink-0">
-                       {chatPartnerProfile.photoURL ? (
-                        <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || 'Sender'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
-                      ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
-                    </Avatar>
-                  )}
-                  <div 
-                    className={cn(
-                      "max-w-xs rounded-lg p-2 lg:max-w-md shadow-md relative", 
-                      msg.senderId === user?.uid 
-                        ? "bg-primary text-primary-foreground rounded-tr-none" 
-                        : "bg-muted text-foreground rounded-tl-none border border-border/10"
-                    )}
-                  >
-                    {msg.imageUrl ? (
-                      <div className="space-y-1">
-                        <Image 
-                          src={msg.imageUrl} 
-                          alt="Sent image" 
-                          width={250} 
-                          height={250} 
-                          className="rounded max-w-full h-auto object-contain border border-border/5" 
-                          data-ai-hint={msg.dataAiHint || "chat image"} 
-                        />
-                         {msg.text ? (
-                            <p className="text-sm whitespace-pre-wrap px-0.5">
-                              {msg.text}
-                              <span className={cn(
-                                "ml-1.5 text-xs",
-                                msg.senderId === user?.uid ? "text-primary-foreground/70" : "text-muted-foreground/80"
-                              )}>
-                                {' '}{msg.timestamp ? format(msg.timestamp, 'p') : ''}
-                              </span>
-                            </p>
-                          ) : (
-                            <p 
-                              className={cn(
-                                "mt-1 text-xs text-right", 
-                                msg.senderId === user?.uid ? "text-primary-foreground/80" : "text-muted-foreground"
-                              )}
-                            >
-                              {msg.timestamp ? format(msg.timestamp, 'p') : ''}
-                            </p>
-                          )}
-                      </div>
-                    ) : (
-                       msg.text && (
-                        <p className="text-sm whitespace-pre-wrap">
-                          {msg.text}
-                          <span className={cn(
-                            "ml-1.5 text-xs",
-                            msg.senderId === user?.uid ? "text-primary-foreground/70" : "text-muted-foreground/80"
-                          )}>
-                            {' '}{msg.timestamp ? format(msg.timestamp, 'p') : ''}
-                          </span>
-                        </p>
-                       )
-                    )}
-                     {msg.senderId === user?.uid && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-0.5 right-0.5 h-6 w-6 p-1 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                          onClick={() => handleDeleteMessageRequest(msg)}
-                          title="Delete message"
-                          disabled={isDeletingMessage}
-                        >
-                          {isDeletingMessage && messageToDelete?.id === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={12} />}
-                        </Button>
-                      )}
-                  </div>
-                </div>
-              ))}
-              {isPartnerTyping && chatPartnerProfile && (
-                <div className="flex items-end space-x-2 justify-start">
-                   <Avatar className="h-8 w-8 self-start flex-shrink-0">
-                      {chatPartnerProfile.photoURL ? (
-                        <Image src={chatPartnerProfile.photoURL} alt="Sender" width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
-                       ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
-                    </Avatar>
-                  <div className="bg-muted text-foreground rounded-lg p-2 shadow-md border border-border/10 rounded-tl-none"> 
-                    <p className="text-sm italic">typing...</p> 
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </ScrollArea>
-
-        <footer className="border-t bg-card p-4">
-          {filePreviewUrl && (
-            <div className="mb-2 p-2 border rounded-md relative bg-card shadow-sm">
-              <Image src={filePreviewUrl} alt="File preview" width={80} height={80} className="rounded object-contain border border-border/20" />
-              <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={clearFileSelection}>
-                <XCircle className="h-4 w-4" />
+    <>
+      <div className="flex h-[calc(100vh-theme(spacing.24))] flex-col">
+          <header className="flex items-center justify-between border-b bg-card p-4">
+            <div className="flex items-center space-x-3 min-w-0">
+              <Button variant="ghost" size="icon" asChild className="md:hidden flex-shrink-0">
+                <Link href="/messages"> <ArrowLeft className="h-5 w-5" /> </Link>
               </Button>
-              {uploadProgress !== null && (
-                <Progress value={uploadProgress} className="w-full h-1.5 mt-1" />
+              {chatPartnerProfile ? (
+                <>
+                  <Avatar className="flex-shrink-0">
+                    {chatPartnerProfile.photoURL ? (
+                      <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
+                    ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || 'U').charAt(0)}</AvatarFallback> )}
+                  </Avatar>
+                  <div className="min-w-0"> 
+                    <p className="font-semibold text-foreground truncate">{chatPartnerProfile.displayName}</p> 
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+                  <div className="space-y-1 min-w-0"> <Skeleton className="h-4 w-24" /> </div>
+                </>
               )}
             </div>
-          )}
-          <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-            <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" type="button" title="Emoji" className="flex-shrink-0">
-                  <Smile className="h-5 w-5 text-muted-foreground" />
+            <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+              <Button variant="ghost" size="icon" title="Voice Call (Coming Soon)" onClick={() => handleInitiateCall('audio')} disabled={callButtonsDisabled}>
+                <Phone className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Video Call (Coming Soon)" onClick={() => handleInitiateCall('video')} disabled={callButtonsDisabled}>
+                <Video className="h-5 w-5" />
+              </Button>
+            </div>
+          </header>
+
+          <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+            {loadingMessages && (
+              <div className="space-y-4"> <MessageSkeleton /> <div className="flex justify-end"><MessageSkeleton /></div> <MessageSkeleton /> </div>
+            )}
+            {!loadingMessages && (
+              <div className="space-y-4">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={cn("flex items-end space-x-2 group", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
+                    {msg.senderId !== user?.uid && chatPartnerProfile && (
+                      <Avatar className="h-8 w-8 self-start flex-shrink-0">
+                         {chatPartnerProfile.photoURL ? (
+                          <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || 'Sender'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
+                        ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
+                      </Avatar>
+                    )}
+                    <div 
+                      className={cn(
+                        "max-w-xs rounded-lg p-2 lg:max-w-md shadow-md relative", 
+                        msg.senderId === user?.uid 
+                          ? "bg-primary text-primary-foreground rounded-tr-none" 
+                          : "bg-muted text-foreground rounded-tl-none border border-border/10"
+                      )}
+                    >
+                      {msg.imageUrl ? (
+                        <div className="space-y-1">
+                          <Image 
+                            src={msg.imageUrl} 
+                            alt="Sent image" 
+                            width={250} 
+                            height={250} 
+                            className="rounded max-w-full h-auto object-contain border border-border/5" 
+                            data-ai-hint={msg.dataAiHint || "chat image"} 
+                          />
+                           {msg.text ? (
+                              <p className="text-sm whitespace-pre-wrap px-0.5">
+                                {msg.text}
+                                <span className={cn(
+                                  "ml-1.5 text-xs",
+                                  msg.senderId === user?.uid ? "text-primary-foreground/70" : "text-muted-foreground/80"
+                                )}>
+                                  {' '}{msg.timestamp ? format(msg.timestamp, 'p') : ''}
+                                </span>
+                              </p>
+                            ) : (
+                              <p 
+                                className={cn(
+                                  "mt-1 text-xs text-right", 
+                                  msg.senderId === user?.uid ? "text-primary-foreground/80" : "text-muted-foreground"
+                                )}
+                              >
+                                {msg.timestamp ? format(msg.timestamp, 'p') : ''}
+                              </p>
+                            )}
+                        </div>
+                      ) : (
+                         msg.text && (
+                          <p className="text-sm whitespace-pre-wrap">
+                            {msg.text}
+                            <span className={cn(
+                              "ml-1.5 text-xs",
+                              msg.senderId === user?.uid ? "text-primary-foreground/70" : "text-muted-foreground/80"
+                            )}>
+                              {' '}{msg.timestamp ? format(msg.timestamp, 'p') : ''}
+                            </span>
+                          </p>
+                         )
+                      )}
+                       {msg.senderId === user?.uid && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-0.5 right-0.5 h-6 w-6 p-1 text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                            onClick={() => handleDeleteMessageRequest(msg)}
+                            title="Delete message"
+                            disabled={isDeletingMessage}
+                          >
+                            {isDeletingMessage && messageToDelete?.id === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={12} />}
+                          </Button>
+                        )}
+                    </div>
+                  </div>
+                ))}
+                {isPartnerTyping && chatPartnerProfile && (
+                  <div className="flex items-end space-x-2 justify-start">
+                     <Avatar className="h-8 w-8 self-start flex-shrink-0">
+                        {chatPartnerProfile.photoURL ? (
+                          <Image src={chatPartnerProfile.photoURL} alt="Sender" width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
+                         ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
+                      </Avatar>
+                    <div className="bg-muted text-foreground rounded-lg p-2 shadow-md border border-border/10 rounded-tl-none"> 
+                      <p className="text-sm italic">typing...</p> 
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </ScrollArea>
+
+          <footer className="border-t bg-card p-4">
+            {filePreviewUrl && (
+              <div className="mb-2 p-2 border rounded-md relative bg-card shadow-sm">
+                <Image src={filePreviewUrl} alt="File preview" width={80} height={80} className="rounded object-contain border border-border/20" />
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={clearFileSelection}>
+                  <XCircle className="h-4 w-4" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 border-0">
-                <EmojiPicker 
-                  onEmojiClick={handleEmojiClick} 
-                  autoFocusSearch={false}
-                  height={350}
-                  width="100%"
-                  theme={Theme.AUTO}
-                  lazyLoadEmojis
-                />
-              </PopoverContent>
-            </Popover>
-            <Button variant="ghost" size="icon" type="button" onClick={() => fileInputRef.current?.click()} disabled={sendingMessage} className="flex-shrink-0">
-              <Paperclip className="h-5 w-5 text-muted-foreground" />
-            </Button>
-            <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" disabled={sendingMessage}/>
-            <Input
-              type="text"
-              placeholder={selectedFile ? "Add a caption..." : "Type a message..."}
-              className="flex-1"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              disabled={sendingMessage || (selectedFile && uploadProgress !== null && uploadProgress < 100)}
-            />
-            <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 flex-shrink-0" disabled={sendingMessage || (!newMessage.trim() && !selectedFile) || (selectedFile && uploadProgress !== null && uploadProgress < 100)}>
-              {sendingMessage ? <Spinner size={18} className="text-primary-foreground" /> : <Send className="h-5 w-5 text-primary-foreground" />}
-            </Button>
-          </form>
-        </footer>
-      </div>
+                {uploadProgress !== null && (
+                  <Progress value={uploadProgress} className="w-full h-1.5 mt-1" />
+                )}
+              </div>
+            )}
+            <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+              <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" type="button" title="Emoji" className="flex-shrink-0">
+                    <Smile className="h-5 w-5 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 border-0">
+                  <EmojiPicker 
+                    onEmojiClick={handleEmojiClick} 
+                    autoFocusSearch={false}
+                    height={350}
+                    width="100%"
+                    theme={Theme.AUTO}
+                    lazyLoadEmojis
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button variant="ghost" size="icon" type="button" onClick={() => fileInputRef.current?.click()} disabled={sendingMessage} className="flex-shrink-0">
+                <Paperclip className="h-5 w-5 text-muted-foreground" />
+              </Button>
+              <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" disabled={sendingMessage}/>
+              <Input
+                type="text"
+                placeholder={selectedFile ? "Add a caption..." : "Type a message..."}
+                className="flex-1"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                disabled={sendingMessage || (selectedFile && uploadProgress !== null && uploadProgress < 100)}
+              />
+              <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90 flex-shrink-0" disabled={sendingMessage || (!newMessage.trim() && !selectedFile) || (selectedFile && uploadProgress !== null && uploadProgress < 100)}>
+                {sendingMessage ? <Spinner size={18} className="text-primary-foreground" /> : <Send className="h-5 w-5 text-primary-foreground" />}
+              </Button>
+            </form>
+          </footer>
+        </div>
        {messageToDelete && (
-        <AlertDialog open={isDeleteMessageDialogOpen} onOpenChange={setIsDeleteMessageDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Message?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this message.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setMessageToDelete(null)} disabled={isDeletingMessage}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDeleteMessage} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingMessage}>
-                {isDeletingMessage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-    </div>
+          <AlertDialog open={isDeleteMessageDialogOpen} onOpenChange={setIsDeleteMessageDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Message?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete this message.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setMessageToDelete(null)} disabled={isDeletingMessage}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteMessage} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingMessage}>
+                  {isDeletingMessage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+    </>
   );
 }
 
