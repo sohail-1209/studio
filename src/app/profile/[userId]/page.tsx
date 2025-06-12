@@ -106,18 +106,16 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           setFollowStatus('following');
           setExistingRequestId(requestId);
         } else {
-          setFollowStatus('not_following'); // e.g. if 'declined' by system or an old state
+          setFollowStatus('not_following'); 
         }
         setIsProcessingFollow(false);
         return;
       }
 
-      // If no sent request, check if target is following current user (for 'follow_back' status)
-      // or if they sent a request to current user ('pending_me')
       const qReceived = query(
         followRequestsRef,
-        where('requesterId', '==', userId), // Target user is requester
-        where('recipientId', '==', currentUser.uid), // Current user is recipient
+        where('requesterId', '==', userId), 
+        where('recipientId', '==', currentUser.uid), 
         limit(1)
       );
       const receivedSnapshot = await getDocs(qReceived);
@@ -126,9 +124,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         const request = receivedSnapshot.docs[0].data() as FollowRequestDocument;
         if (request.status === 'pending') {
           setFollowStatus('pending_me');
-          // existingRequestId remains null as this is a request TO the current user
         } else if (request.status === 'accepted') {
-          // They are following current user. If current user is not following them, it's 'follow_back'
           setFollowStatus('follow_back');
         } else {
           setFollowStatus('not_following');
@@ -214,9 +210,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   const handleFollowRequestOrToggle = async () => {
     console.log("--- handleFollowRequestOrToggle START ---");
-    console.log("Current User (client-side):", currentUser ? { uid: currentUser.uid, displayName: currentUser.displayName, isPrivate: currentUser.isPrivate } : "NULL");
-    console.log("Target Profile (client-side):", profile ? { uid: profile.uid, displayName: profile.displayName, isPrivate: profile.isPrivate } : "NULL");
-
     if (!currentUser || !currentUser.uid) {
       console.error("CRITICAL: currentUser or currentUser.uid is null/undefined at START. Aborting.");
       toast({ title: "Authentication Error", description: "User not logged in.", variant: "destructive" });
@@ -239,16 +232,20 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setIsProcessingFollow(true);
     let newRequestData: FollowRequestDocument | null = null;
     let notificationData: Omit<NotificationDocument, 'createdAt' | 'actionTaken'> | null = null;
-    let updateCurrentUserFollowingCount = false;
-    // let updateTargetUserFollowersCount = false; // We decided against client-side update for target's followers
-
+    
     const followDocId = existingRequestId || `${currentUser.uid}_${profile.uid}`;
     const followRequestRef = doc(db, 'followRequests', followDocId);
     const batch = writeBatch(db);
+    const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
+    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); // We will NOT update target's followersCount from client
 
-    console.log("Generated/Using followDocId:", followDocId);
-    console.log("Initial Follow Status (client-side):", followStatus);
-    console.log("Target profile.isPrivate (client-side):", profile.isPrivate);
+    console.log("Follow Action Details:");
+    console.log("Current User ID:", currentUser.uid);
+    console.log("Target Profile ID:", profile.uid);
+    console.log("Target Profile isPrivate (client-side view):", profile.isPrivate);
+    console.log("Current Follow Status (client-side view):", followStatus);
+    console.log("Existing Request ID (if any):", existingRequestId);
+    console.log("Document Path for Follow Request:", followRequestRef.path);
 
     try {
         if (profile.isPrivate) {
@@ -267,25 +264,25 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     type: 'follow_request', followRequestId: followRequestRef.id, isRead: false,
                 };
                 batch.set(notificationRef, { ...notificationData, createdAt: serverTimestamp() });
-                console.log("Private Action: Requesting follow. status: pending. Notification type: follow_request");
+                console.log("Action: Requesting follow (private). Status: pending. Notification: follow_request.");
 
-            } else if (followStatus === 'pending_them') { // Cancel pending request
+            } else if (followStatus === 'pending_them') { // Cancel pending request sent by current user
                 batch.delete(followRequestRef);
-                console.log("Private Action: Cancelling pending request. Deleting followRequest doc.");
-                // No notification needed for cancellation
+                console.log("Action: Cancelling pending request (private). Deleting followRequest doc.");
+                // No notification for cancellation by requester.
             } else if (followStatus === 'following') { // Unfollow private account
                 batch.delete(followRequestRef);
-                updateCurrentUserFollowingCount = true; // Decrement own following count
-                // updateTargetUserFollowersCount = true; // Decrement target's followers count
-                console.log("Private Action: Unfollowing. Deleting followRequest doc. Will update counters.");
+                batch.update(currentUserProfileRef, { followingCount: increment(-1) });
+                // batch.update(targetUserProfileRef, { followersCount: increment(-1) }); // DO NOT DO THIS FROM CLIENT
+                console.log("Action: Unfollowing (private). Deleting followRequest doc. Updating own followingCount.");
             }
         } else { // Target profile is PUBLIC
             console.log("Target profile IS PUBLIC.");
             if (followStatus === 'following') { // Unfollow public account
                 batch.delete(followRequestRef);
-                updateCurrentUserFollowingCount = true;
-                // updateTargetUserFollowersCount = true;
-                console.log("Public Action: Unfollowing. Deleting followRequest doc. Will update counters.");
+                batch.update(currentUserProfileRef, { followingCount: increment(-1) });
+                // batch.update(targetUserProfileRef, { followersCount: increment(-1) }); // DO NOT DO THIS FROM CLIENT
+                console.log("Action: Unfollowing (public). Deleting followRequest doc. Updating own followingCount.");
             } else { // Follow public account (not_following, follow_back, or even pending_them if state was weird)
                 newRequestData = {
                     requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
@@ -293,66 +290,50 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     status: 'accepted', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                 };
                 batch.set(followRequestRef, newRequestData, { merge: true }); // Use merge for public follows
-                updateCurrentUserFollowingCount = true;
-                // updateTargetUserFollowersCount = true;
+                batch.update(currentUserProfileRef, { followingCount: increment(1) });
+                // batch.update(targetUserProfileRef, { followersCount: increment(1) }); // DO NOT DO THIS FROM CLIENT
 
                 const notificationRef = doc(collection(db, 'notifications'));
-                notificationData = { // Send a "follow_accept" style notification for public direct follows
+                notificationData = { 
                     recipientId: profile.uid, actorId: currentUser.uid, actorDisplayName: currentUser.displayName, actorAvatarUrl: currentUser.photoURL,
                     type: 'follow_accept', originalFollowRequestId: followRequestRef.id, isRead: false,
                 };
                 batch.set(notificationRef, { ...notificationData, createdAt: serverTimestamp() });
-                console.log("Public Action: Following. status: accepted. Notification type: follow_accept. Will update counters.");
+                console.log("Action: Following (public). Status: accepted. Notification: follow_accept. Updating own followingCount.");
             }
         }
         
-        // Log final data before commit
-        if (newRequestData) console.log("Data for followRequest document:", JSON.stringify(newRequestData));
-        if (notificationData) console.log("Data for notification document:", JSON.stringify(notificationData));
-
-        // Update profile counters if applicable
-        if (updateCurrentUserFollowingCount) {
-            const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-            const incrementValue = (profile.isPrivate && followStatus === 'following') || (!profile.isPrivate && followStatus === 'following') ? -1 : 1;
-            console.log(`Updating current user (${currentUser.uid}) followingCount by ${incrementValue}`);
-            batch.update(currentUserProfileRef, { followingCount: increment(incrementValue) });
-        }
-        // if (updateTargetUserFollowersCount) {
-        //     const targetUserProfileRef = doc(db, 'profiles', profile.uid);
-        //     const incrementValue = (followStatus === 'following') ? -1 : 1; // If currently following, then unfollowing (decrement). Else, following (increment).
-        //     console.log(`Updating target user (${profile.uid}) followersCount by ${incrementValue}`);
-        //     batch.update(targetUserProfileRef, { followersCount: increment(incrementValue) });
-        // }
-
-
+        if (newRequestData) console.log("Data for followRequest document to be written:", JSON.stringify(newRequestData));
+        if (notificationData) console.log("Data for notification document to be written:", JSON.stringify(notificationData));
+        
         console.log("Attempting batch.commit()...");
         await batch.commit();
         console.log("BATCH COMMIT SUCCESSFUL.");
 
-        // UI Updates and Toasts
+        // UI Updates and Toasts (Optimistic updates based on expected outcome)
+        let newFollowStatus: FollowStatus | null = null;
+        let toastMessage = "";
+
         if (profile.isPrivate) {
             if (followStatus === 'not_following' || followStatus === 'follow_back') {
-                setFollowStatus('pending_them'); setExistingRequestId(followDocId);
-                toast({ title: "Follow Request Sent" });
+                newFollowStatus = 'pending_them'; setExistingRequestId(followDocId); toastMessage = "Follow Request Sent";
             } else if (followStatus === 'pending_them') {
-                setFollowStatus('not_following'); setExistingRequestId(null);
-                toast({ title: "Follow Request Cancelled" });
+                newFollowStatus = 'not_following'; setExistingRequestId(null); toastMessage = "Follow Request Cancelled";
             } else if (followStatus === 'following') {
-                setFollowStatus('not_following'); setExistingRequestId(null);
-                toast({ title: "Unfollowed" });
+                newFollowStatus = 'not_following'; setExistingRequestId(null); toastMessage = "Unfollowed";
             }
         } else { // Public profile
             if (followStatus === 'following') {
-                setFollowStatus('not_following'); setExistingRequestId(null);
-                toast({ title: "Unfollowed" });
+                newFollowStatus = 'not_following'; setExistingRequestId(null); toastMessage = "Unfollowed";
             } else {
-                setFollowStatus('following'); setExistingRequestId(followDocId);
-                toast({ title: "Followed Successfully" });
+                newFollowStatus = 'following'; setExistingRequestId(followDocId); toastMessage = "Followed Successfully";
             }
         }
-        // Force re-fetch profile data for both users to update counts shown on page
-        await reloadUser(); // Reloads current user's context data
-        // To refresh target profile's counts, a direct fetch or onSnapshot update is needed for 'profile' state
+        
+        if (newFollowStatus) setFollowStatus(newFollowStatus);
+        if (toastMessage) toast({ title: toastMessage });
+
+        await reloadUser(); 
         const updatedTargetProfileSnap = await getDoc(doc(db, 'profiles', profile.uid));
         if (updatedTargetProfileSnap.exists()) {
             setProfile(updatedTargetProfileSnap.data() as UserProfile);
@@ -437,11 +418,11 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
       const commentsRef = collection(postRef, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
-      const batch = writeBatch(db);
+      const commentBatch = writeBatch(db);
       commentsSnapshot.docs.forEach(commentDoc => {
-        batch.delete(commentDoc.ref);
+        commentBatch.delete(commentDoc.ref);
       });
-      await batch.commit();
+      await commentBatch.commit();
 
       if (postToDelete.imagePath) {
         const { ref: storageRefFc, deleteObject: deleteObjectFc } = await import('firebase/storage');
@@ -549,10 +530,10 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><Clock className="mr-2 h-4 w-4" />Requested</Button>;
             case 'following':
                 return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
-            case 'pending_me': // Current user has a pending request FROM this profile
+            case 'pending_me': 
                 return <Button onClick={() => router.push('/notifications')} className="w-full sm:w-auto"><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
-            case 'not_following': // Not following and no pending request sent by current user
-            case 'follow_back': // Target user is following current user, but current user is not following back
+            case 'not_following': 
+            case 'follow_back': 
             default:
                 return <Button onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Request Follow</Button>;
         }
@@ -562,8 +543,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
             case 'not_following':
             case 'follow_back':
-            case 'pending_them': // Should ideally resolve to 'following' or 'not_following' quickly for public
-            case 'pending_me':   // This profile (public) is awaiting current user's response (unlikely for public direct follow model)
+            case 'pending_them': 
+            case 'pending_me':   
             default:
                 return <Button onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
         }
