@@ -79,10 +79,14 @@ export function SignupForm() {
       });
       router.push('/login'); // Redirect to login page
     } catch (error: any) {
-      console.error("Signup Form Error Details:", error); 
+      console.error("Signup Form Error Details:", error);
+      let description = error.message || 'An unexpected error occurred.';
+      if (error.code === 'auth/network-request-failed') {
+        description = 'A network error occurred. Please check your internet connection, firewall settings, and ensure no browser extensions are interfering. Then try again.';
+      }
       toast({
         title: 'Signup Failed',
-        description: error.message || 'An unexpected error occurred.',
+        description: description,
         variant: 'destructive',
       });
     } finally {
