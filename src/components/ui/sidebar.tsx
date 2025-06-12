@@ -48,7 +48,6 @@ const SidebarProvider = React.forwardRef<
   React.ComponentProps<"div"> & {
     initialDesktopCollapsed?: boolean;
     onDesktopCollapseChange?: (collapsed: boolean) => void;
-    // Mobile sheet open state is handled internally by Sheet now if SidebarTrigger is SheetTrigger
   }
 >(
   (
@@ -73,7 +72,6 @@ const SidebarProvider = React.forwardRef<
       });
     }, [onDesktopCollapseChange]);
     
-    // Effect to update internal state if prop changes (e.g. saved preference)
     React.useEffect(() => {
         setIsDesktopCollapsed(initialDesktopCollapsed);
     }, [initialDesktopCollapsed]);
@@ -116,7 +114,6 @@ const SidebarProvider = React.forwardRef<
 )
 SidebarProvider.displayName = "SidebarProvider"
 
-// This is the DESKTOP sidebar
 const Sidebar = React.forwardRef<
   HTMLElement,
   React.ComponentProps<"aside">
@@ -134,10 +131,10 @@ const Sidebar = React.forwardRef<
       <aside
         ref={ref}
         className={cn(
-          "bg-sidebar text-sidebar-foreground flex-col h-screen sticky top-0 z-30", // Adjusted z-index
+          "bg-sidebar text-sidebar-foreground flex-col h-screen sticky top-0 z-30", 
           "flex-shrink-0 border-r border-sidebar-border transition-[width] duration-300 ease-in-out", 
           isDesktopCollapsed ? "w-[var(--sidebar-width-icon)]" : "w-[var(--sidebar-width)]",
-          "hidden md:flex", // Only visible on md and up
+          "hidden md:flex", 
           className
         )}
         data-state={isDesktopCollapsed ? "collapsed" : "expanded"}
@@ -155,20 +152,17 @@ const Sidebar = React.forwardRef<
 )
 Sidebar.displayName = "Sidebar"
 
-// This is the MOBILE sidebar (Sheet-based)
 const MobileSheetSidebar = ({ children }: { children: React.ReactNode }) => {
     const { isMobileSheetOpen, setIsMobileSheetOpen } = useSidebar();
     return (
         <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-            {/* The SheetTrigger is now expected to be in MobileHeader */}
             <SheetContent side="left" className="md:hidden w-[var(--sidebar-width-mobile)] p-0 overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle className="sr-only">Main Menu</SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-col h-full">
-                    {children} {/* AppSidebar content goes here */}
+                    {children}
                 </div>
-                {/* The SheetClose button is part of SheetContent from ui/sheet.tsx, so no need to add it here explicitly */}
             </SheetContent>
         </Sheet>
     );
@@ -182,15 +176,15 @@ const SidebarTrigger = React.forwardRef<
   const { toggleDesktopCollapse } = useSidebar();
   const isMobile = useIsMobile();
 
-  if (isMobile) return null; // Desktop trigger should not render on mobile
+  if (isMobile) return null; 
 
   return (
     <Button
       ref={ref}
-      data-sidebar="trigger" // This is the DESKTOP trigger
+      data-sidebar="trigger" 
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7", className)} // Displayed on desktop by default, hidden on mobile by parent logic if needed
+      className={cn("h-7 w-7", className)} 
       onClick={(e) => {
         toggleDesktopCollapse();
         onClick?.(e);
@@ -231,7 +225,7 @@ const SidebarInset = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "flex-1 flex flex-col overflow-y-auto bg-background",
+        "flex-1 flex flex-col overflow-y-scroll bg-background", // Changed from overflow-y-auto
         className
       )}
       {...props}
@@ -618,7 +612,7 @@ const SidebarMenuSubButton = React.forwardRef<
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
 
 export {
-  MobileSheetSidebar, // Exporting the new MobileSheetSidebar
+  MobileSheetSidebar, 
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -641,6 +635,7 @@ export {
   SidebarProvider,
   SidebarRail,
   SidebarSeparator,
-  SidebarTrigger, // This is now primarily the DESKTOP trigger
+  SidebarTrigger, 
   useSidebar,
 }
+

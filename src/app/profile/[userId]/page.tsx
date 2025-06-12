@@ -12,7 +12,7 @@ import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loa
 import Image from 'next/image';
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment } from 'firebase/firestore';
-import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext'; // Renamed to avoid conflict
+import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext'; 
 import type { Post } from '@/types/post';
 import { useAuth } from '@/hooks/useAuth';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
@@ -485,12 +485,12 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     </div>
                   )}
                   {!loadingPosts && posts.length > 0 && (
-                    // TEMPORARY DIAGNOSTIC: Replace grid with placeholder
+                    // TEMPORARY DIAGNOSTIC: Ensure this placeholder is identical to the one in "Media"
                     <div className="py-12 text-center w-full">
                       <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                      <p className="mt-4 text-lg font-semibold text-foreground">Diagnostic Placeholder for Posts</p>
+                      <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        This is a temporary view to check container width.
+                        This user hasn't shared any media yet, or this tab is under construction.
                       </p>
                     </div>
                     // ORIGINAL GRID:
