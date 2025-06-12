@@ -140,17 +140,14 @@ export function AppSidebar() {
 
             return (
               <SidebarMenuItem key={item.label} className={item.className}>
-                <Link href={href} passHref legacyBehavior>
+                <Link href={href}>
                   <SidebarMenuButton
-                    asChild
                     isActive={isActive}
                     tooltip={isCollapsed ? item.label : undefined}
                     className={cn(isCollapsed && "justify-center")}
                   >
-                    <a> {/* Use <a> tag for proper href with Link legacyBehavior */}
-                      <item.icon />
-                      <span className={cn(isCollapsed && "sr-only md:hidden")}>{item.label}</span>
-                    </a>
+                    <item.icon />
+                    <span className={cn(isCollapsed && "sr-only md:hidden")}>{item.label}</span>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -168,12 +165,10 @@ export function AppSidebar() {
               </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <Link href="/settings" passHref legacyBehavior>
-              <SidebarMenuButton asChild isActive={pathname === '/settings'} className={cn(isCollapsed && "justify-center")} tooltip={isCollapsed ? "Settings" : undefined}>
-                <a>
-                  <Settings />
-                  <span className={cn(isCollapsed && "sr-only md:hidden")}>Settings</span>
-                </a>
+            <Link href="/settings">
+              <SidebarMenuButton isActive={pathname === '/settings'} className={cn(isCollapsed && "justify-center")} tooltip={isCollapsed ? "Settings" : undefined}>
+                <Settings />
+                <span className={cn(isCollapsed && "sr-only md:hidden")}>Settings</span>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
@@ -196,9 +191,8 @@ export function AppSidebar() {
           )}
           {user && ( // Show compact user avatar for collapsed sidebar
             <SidebarMenuItem className={cn(!isCollapsed && "hidden")}>
-               <Link href={`/profile/${user.uid}`} passHref legacyBehavior>
-                <SidebarMenuButton asChild className={cn("justify-center h-auto py-1.5")} tooltip={isCollapsed ? "Profile" : undefined}>
-                  <a>
+               <Link href={`/profile/${user.uid}`}>
+                <SidebarMenuButton className={cn("justify-center h-auto py-1.5")} tooltip={isCollapsed ? "Profile" : undefined}>
                     <Avatar className="h-8 w-8">
                         {user.photoURL ? (
                             <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
@@ -207,7 +201,6 @@ export function AppSidebar() {
                         )}
                     </Avatar>
                     <span className="sr-only md:hidden">Profile</span>
-                  </a>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
