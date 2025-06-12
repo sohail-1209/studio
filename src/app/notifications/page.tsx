@@ -187,129 +187,130 @@ export default function NotificationsPage() {
 
 
   return (
-    <div className="w-full">
-        <Card className="shadow-lg w-full">
-          <CardHeader className="flex flex-row items-center justify-between border-b">
-            <div className="flex items-center space-x-3">
-              <Bell className="h-6 w-6 text-primary" />
-              <CardTitle className="font-headline text-2xl">Notifications</CardTitle>
-            </div>
-            {notifications.some(n => !n.isRead && !n.actionTaken) && (
-                 <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>Mark all as read</Button>
-            )}
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading && (
-              <ul className="divide-y divide-border">
-                <NotificationItemSkeleton />
-                <NotificationItemSkeleton />
-                <NotificationItemSkeleton />
-              </ul>
-            )}
-            {!loading && notifications.length === 0 && (
-              <div className="py-12 text-center">
-                <Bell className="mx-auto h-12 w-12 text-muted-foreground" />
-                <p className="mt-4 text-lg font-semibold text-foreground">No new notifications</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  You&apos;re all caught up! We&apos;ll let you know when there&apos;s something new.
-                </p>
+    <MainLayout>
+      <div className="w-full">
+          <Card className="shadow-lg w-full">
+            <CardHeader className="flex flex-row items-center justify-between border-b">
+              <div className="flex items-center space-x-3">
+                <Bell className="h-6 w-6 text-primary" />
+                <CardTitle className="font-headline text-2xl">Notifications</CardTitle>
               </div>
-            )}
-            {!loading && notifications.length > 0 && (
-              <ul className="divide-y divide-border">
-                {notifications.map((notif) => (
-                  <li key={notif.id} className={`p-4 hover:bg-muted/50 transition-colors ${!notif.isRead && !notif.actionTaken ? 'bg-primary/5' : ''}`}>
-                    <div className="flex items-start space-x-3">
-                      <Avatar className="h-10 w-10">
-                        {notif.actorAvatarUrl ? (
-                           <Image src={notif.actorAvatarUrl} alt={notif.actorDisplayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
-                        ) : (
-                          <AvatarFallback>{(notif.actorDisplayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                        )}
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="text-sm">
-                          {notif.type === 'like' && (
-                            <>
-                              <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
-                              {' liked '}
-                              <Link href={`/post/${notif.postId}`} className="text-primary hover:underline cursor-pointer">
-                                {notif.postContentPreview || 'your post'}
-                              </Link>
-                            </>
+              {notifications.some(n => !n.isRead && !n.actionTaken) && (
+                   <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>Mark all as read</Button>
+              )}
+            </CardHeader>
+            <CardContent className="p-0">
+              {loading && (
+                <ul className="divide-y divide-border">
+                  <NotificationItemSkeleton />
+                  <NotificationItemSkeleton />
+                  <NotificationItemSkeleton />
+                </ul>
+              )}
+              {!loading && notifications.length === 0 && (
+                <div className="py-12 text-center">
+                  <Bell className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <p className="mt-4 text-lg font-semibold text-foreground">No new notifications</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    You&apos;re all caught up! We&apos;ll let you know when there&apos;s something new.
+                  </p>
+                </div>
+              )}
+              {!loading && notifications.length > 0 && (
+                <ul className="divide-y divide-border">
+                  {notifications.map((notif) => (
+                    <li key={notif.id} className={`p-4 hover:bg-muted/50 transition-colors ${!notif.isRead && !notif.actionTaken ? 'bg-primary/5' : ''}`}>
+                      <div className="flex items-start space-x-3">
+                        <Avatar className="h-10 w-10">
+                          {notif.actorAvatarUrl ? (
+                             <Image src={notif.actorAvatarUrl} alt={notif.actorDisplayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
+                          ) : (
+                            <AvatarFallback>{(notif.actorDisplayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                           )}
-                          {notif.type === 'comment' && (
-                            <>
-                              <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
-                              {' commented on '}
-                              <Link href={`/post/${notif.postId}`} className="text-primary hover:underline cursor-pointer">
-                                {notif.postContentPreview || 'your post'}
-                              </Link>
-                              {notif.commentText && (
-                                <span className="text-muted-foreground block mt-1 italic">
-                                  &ldquo;{notif.commentText}&rdquo;
-                                </span>
-                              )}
-                            </>
-                          )}
-                          {notif.type === 'follow_request' && (
-                            <>
-                               <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
-                              {' wants to follow you.'}
-                            </>
-                          )}
-                          {notif.type === 'follow_accept' && (
-                             <>
-                              <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
-                              {' accepted your follow request.'}
-                            </>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatDistanceToNow(notif.createdAt, { addSuffix: true })}
-                        </p>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="text-sm">
+                            {notif.type === 'like' && (
+                              <>
+                                <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
+                                {' liked '}
+                                <Link href={`/post/${notif.postId}`} className="text-primary hover:underline cursor-pointer">
+                                  {notif.postContentPreview || 'your post'}
+                                </Link>
+                              </>
+                            )}
+                            {notif.type === 'comment' && (
+                              <>
+                                <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
+                                {' commented on '}
+                                <Link href={`/post/${notif.postId}`} className="text-primary hover:underline cursor-pointer">
+                                  {notif.postContentPreview || 'your post'}
+                                </Link>
+                                {notif.commentText && (
+                                  <span className="text-muted-foreground block mt-1 italic">
+                                    &ldquo;{notif.commentText}&rdquo;
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {notif.type === 'follow_request' && (
+                              <>
+                                 <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
+                                {' wants to follow you.'}
+                              </>
+                            )}
+                            {notif.type === 'follow_accept' && (
+                               <>
+                                <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
+                                {' accepted your follow request.'}
+                              </>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDistanceToNow(notif.createdAt, { addSuffix: true })}
+                          </p>
 
-                        {notif.type === 'follow_request' && !notif.actionTaken && (
-                          <div className="mt-2 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleAcceptFollowRequest(notif)}
-                              disabled={processingRequestId === notif.id}
-                              className="w-full sm:w-auto"
-                            >
-                              {processingRequestId === notif.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <UserCheck className="mr-2 h-3 w-3"/>}
-                              Accept
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeclineFollowRequest(notif)}
-                              disabled={processingRequestId === notif.id}
-                              className="w-full sm:w-auto"
-                            >
-                              {processingRequestId === notif.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
-                              Decline
-                            </Button>
-                          </div>
-                        )}
-                        {notif.type === 'follow_request' && notif.actionTaken === 'accepted' && (
-                          <p className="text-sm text-green-600 mt-1 italic">You accepted this request.</p>
-                        )}
-                        {notif.type === 'follow_request' && notif.actionTaken === 'declined' && (
-                          <p className="text-sm text-red-600 mt-1 italic">You declined this request.</p>
+                          {notif.type === 'follow_request' && !notif.actionTaken && (
+                            <div className="mt-2 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleAcceptFollowRequest(notif)}
+                                disabled={processingRequestId === notif.id}
+                                className="w-full sm:w-auto"
+                              >
+                                {processingRequestId === notif.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <UserCheck className="mr-2 h-3 w-3"/>}
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeclineFollowRequest(notif)}
+                                disabled={processingRequestId === notif.id}
+                                className="w-full sm:w-auto"
+                              >
+                                {processingRequestId === notif.id ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
+                                Decline
+                              </Button>
+                            </div>
+                          )}
+                          {notif.type === 'follow_request' && notif.actionTaken === 'accepted' && (
+                            <p className="text-sm text-green-600 mt-1 italic">You accepted this request.</p>
+                          )}
+                          {notif.type === 'follow_request' && notif.actionTaken === 'declined' && (
+                            <p className="text-sm text-red-600 mt-1 italic">You declined this request.</p>
+                          )}
+                        </div>
+                        {!notif.isRead && !notif.actionTaken && (
+                          <div className="h-2.5 w-2.5 rounded-full bg-accent self-center"></div>
                         )}
                       </div>
-                      {!notif.isRead && !notif.actionTaken && (
-                        <div className="h-2.5 w-2.5 rounded-full bg-accent self-center"></div>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+    </MainLayout>
   );
 }
-

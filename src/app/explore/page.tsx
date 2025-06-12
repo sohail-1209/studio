@@ -231,128 +231,129 @@ export default function ExplorePage() {
   console.log("ExplorePage Render: showSuggestions:", showSuggestions, "suggestedUsers:", suggestedUsers.length, "searchTerm:", searchTerm.length, "inputFocusedRef.current:", inputFocusedRef.current, "loadingSuggestions:", loadingSuggestions);
 
   return (
-    <div className="w-full">
-        <Card className="shadow-lg w-full">
-          <CardHeader>
-            <div className="flex items-center space-x-3">
-              <Compass className="h-6 w-6 text-primary" />
-              <CardTitle className="font-headline text-2xl">Explore</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-6 relative">
-              <h3 className="text-lg font-semibold text-foreground mb-2">Find a User by Username</h3>
-              <form onSubmit={handleExactUsernameSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                <Input
-                  type="text"
-                  placeholder="Enter Username..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onFocus={() => {
-                    inputFocusedRef.current = true;
-                    if (suggestedUsers.length > 0 && searchTerm.length >= 2) {
-                       setShowSuggestions(true);
-                       console.log("ExplorePage: Input focused, showing suggestions.");
-                    } else {
-                       console.log("ExplorePage: Input focused, but no suggestions or term too short.");
-                    }
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => {
-                        inputFocusedRef.current = false;
-                        setShowSuggestions(false);
-                        console.log("ExplorePage: Input blurred, hiding suggestions after delay.");
-                    }, 200);
-                  }}
-                  className="flex-grow"
-                  disabled={isSearchingUserExact}
-                  autoComplete="off"
-                />
-                <Button type="submit" disabled={isSearchingUserExact || loadingSuggestions} className="w-full sm:w-auto">
-                  {isSearchingUserExact ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SearchIcon className="mr-2 h-4 w-4" />}
-                   Search
-                </Button>
-              </form>
-              {showSuggestions && searchTerm.length >= 2 && (
-                 <div className="absolute z-10 w-full sm:w-[calc(100%-5rem)] mt-1 max-h-60 overflow-y-auto rounded-md border bg-background shadow-lg">
-                  {loadingSuggestions && (
-                    <div className="p-3 text-sm text-muted-foreground text-center">Loading suggestions...</div>
-                  )}
-                  {!loadingSuggestions && suggestedUsers.length === 0 && searchTerm.length >= 2 && (
-                    <div className="p-3 text-sm text-muted-foreground">No users found matching &quot;{searchTerm}&quot;.</div>
-                  )}
-                  {!loadingSuggestions && suggestedUsers.map((user) => (
-                    <div
-                      key={user.uid}
-                      className="flex items-center space-x-2 p-3 hover:bg-muted cursor-pointer"
-                      onMouseDown={() => handleSuggestionClick(user.uid)}
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
-                        <AvatarFallback>{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{user.displayName}</p>
-                        <p className="text-xs text-muted-foreground">@{user.username}</p>
+    <MainLayout>
+      <div className="w-full">
+          <Card className="shadow-lg w-full">
+            <CardHeader>
+              <div className="flex items-center space-x-3">
+                <Compass className="h-6 w-6 text-primary" />
+                <CardTitle className="font-headline text-2xl">Explore</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-6 relative">
+                <h3 className="text-lg font-semibold text-foreground mb-2">Find a User by Username</h3>
+                <form onSubmit={handleExactUsernameSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                  <Input
+                    type="text"
+                    placeholder="Enter Username..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onFocus={() => {
+                      inputFocusedRef.current = true;
+                      if (suggestedUsers.length > 0 && searchTerm.length >= 2) {
+                         setShowSuggestions(true);
+                         console.log("ExplorePage: Input focused, showing suggestions.");
+                      } else {
+                         console.log("ExplorePage: Input focused, but no suggestions or term too short.");
+                      }
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => {
+                          inputFocusedRef.current = false;
+                          setShowSuggestions(false);
+                          console.log("ExplorePage: Input blurred, hiding suggestions after delay.");
+                      }, 200);
+                    }}
+                    className="flex-grow"
+                    disabled={isSearchingUserExact}
+                    autoComplete="off"
+                  />
+                  <Button type="submit" disabled={isSearchingUserExact || loadingSuggestions} className="w-full sm:w-auto">
+                    {isSearchingUserExact ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SearchIcon className="mr-2 h-4 w-4" />}
+                     Search
+                  </Button>
+                </form>
+                {showSuggestions && searchTerm.length >= 2 && (
+                   <div className="absolute z-10 w-full sm:w-[calc(100%-5rem)] mt-1 max-h-60 overflow-y-auto rounded-md border bg-background shadow-lg">
+                    {loadingSuggestions && (
+                      <div className="p-3 text-sm text-muted-foreground text-center">Loading suggestions...</div>
+                    )}
+                    {!loadingSuggestions && suggestedUsers.length === 0 && searchTerm.length >= 2 && (
+                      <div className="p-3 text-sm text-muted-foreground">No users found matching &quot;{searchTerm}&quot;.</div>
+                    )}
+                    {!loadingSuggestions && suggestedUsers.map((user) => (
+                      <div
+                        key={user.uid}
+                        className="flex items-center space-x-2 p-3 hover:bg-muted cursor-pointer"
+                        onMouseDown={() => handleSuggestionClick(user.uid)}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
+                          <AvatarFallback>{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{user.displayName}</p>
+                          <p className="text-xs text-muted-foreground">@{user.username}</p>
+                        </div>
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Start typing a username to see suggestions, or press Enter/Search for an exact match.
+                </p>
+              </div>
+              <Separator className="my-6" />
+
+              <h3 className="text-lg font-semibold text-foreground mb-4">Discover Posts</h3>
+              {loadingRecentPosts && <PostGridSkeleton />}
+              {!loadingRecentPosts && posts.length === 0 && (
+                <div className="py-12 text-center">
+                  <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <p className="mt-4 text-lg font-semibold text-foreground">Nothing to explore yet</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Check back later for new and exciting content from other users!
+                  </p>
+                </div>
+              )}
+              {!loadingRecentPosts && posts.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 sm:gap-2">
+                  {posts.map((post) => (
+                    <Link href={`/profile/${post.userId}`} key={post.id} className="group relative aspect-square block w-full overflow-hidden rounded-md">
+                      {post.imageUrl ? (
+                        <Image
+                          src={post.imageUrl}
+                          alt={post.caption || 'Explore post'}
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                          style={{objectFit: 'cover'}}
+                          className="transition-transform duration-300 group-hover:scale-105"
+                          data-ai-hint={post.dataAiHint || "photo landscape"}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-muted">
+                          <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-2 flex flex-col justify-end">
+                          <div className="flex items-center space-x-2">
+                              <Avatar className="h-6 w-6 border-2 border-background">
+                                  <AvatarImage src={post.userAvatarUrl || undefined} alt={post.userDisplayName || 'User'} data-ai-hint="user avatar" />
+                                  <AvatarFallback>{(post.userDisplayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <p className="text-xs font-medium text-white truncate">
+                                  {post.userDisplayName || 'Anonymous'}
+                              </p>
+                          </div>
+                      </div>
+                    </Link>
                   ))}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">
-                Start typing a username to see suggestions, or press Enter/Search for an exact match.
-              </p>
-            </div>
-            <Separator className="my-6" />
-
-            <h3 className="text-lg font-semibold text-foreground mb-4">Discover Posts</h3>
-            {loadingRecentPosts && <PostGridSkeleton />}
-            {!loadingRecentPosts && posts.length === 0 && (
-              <div className="py-12 text-center">
-                <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                <p className="mt-4 text-lg font-semibold text-foreground">Nothing to explore yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Check back later for new and exciting content from other users!
-                </p>
-              </div>
-            )}
-            {!loadingRecentPosts && posts.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1 sm:gap-2">
-                {posts.map((post) => (
-                  <Link href={`/profile/${post.userId}`} key={post.id} className="group relative aspect-square block w-full overflow-hidden rounded-md">
-                    {post.imageUrl ? (
-                      <Image
-                        src={post.imageUrl}
-                        alt={post.caption || 'Explore post'}
-                        fill
-                        sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
-                        style={{objectFit: 'cover'}}
-                        className="transition-transform duration-300 group-hover:scale-105"
-                        data-ai-hint={post.dataAiHint || "photo landscape"}
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-muted">
-                        <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-2 flex flex-col justify-end">
-                        <div className="flex items-center space-x-2">
-                            <Avatar className="h-6 w-6 border-2 border-background">
-                                <AvatarImage src={post.userAvatarUrl || undefined} alt={post.userDisplayName || 'User'} data-ai-hint="user avatar" />
-                                <AvatarFallback>{(post.userDisplayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <p className="text-xs font-medium text-white truncate">
-                                {post.userDisplayName || 'Anonymous'}
-                            </p>
-                        </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+    </MainLayout>
   );
 }
-

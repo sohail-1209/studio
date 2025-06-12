@@ -449,22 +449,26 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   if (loadingProfile || !userId) {
     return (
-      <div className="w-full">
-          <ProfileSkeleton />
-      </div>
+      <MainLayout>
+        <div className="w-full">
+            <ProfileSkeleton />
+        </div>
+      </MainLayout>
     );
   }
 
   if (!profile) {
      return (
-      <div className="text-center w-full">
-          <Card className="w-full shadow-lg">
-            <CardContent className="p-12">
-              <h2 className="text-2xl font-semibold">Profile Not Found</h2>
-              <p className="text-muted-foreground">The user profile you are looking for does not exist or could not be loaded.</p>
-            </CardContent>
-          </Card>
-        </div>
+      <MainLayout>
+        <div className="text-center w-full">
+            <Card className="w-full shadow-lg">
+              <CardContent className="p-12">
+                <h2 className="text-2xl font-semibold">Profile Not Found</h2>
+                <p className="text-muted-foreground">The user profile you are looking for does not exist or could not be loaded.</p>
+              </CardContent>
+            </Card>
+          </div>
+      </MainLayout>
     );
   }
 
@@ -497,159 +501,160 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const canMessage = followStatus === 'following' || followStatus === 'follow_back';
 
   return (
-    <div className="w-full">
-        <Card className="overflow-hidden shadow-lg w-full">
-          <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
-            <div className="relative h-48 w-full md:h-64">
-              <Image
-                src={profile.coverPhotoURL || "https://placehold.co/1200x400.png/E9E6F5/4A4458"}
-                alt={`${profile.displayName || 'User'}'s cover photo`}
-                fill
-                style={{objectFit: 'cover'}}
-                data-ai-hint="abstract background landscape"
-                priority
-              />
-              <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
-                <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-card shadow-lg">
-                  <AvatarImage src={profile.photoURL || `https://placehold.co/128x128.png?text=${(profile.displayName || 'U').charAt(0)}`} alt={profile.displayName || 'User'} data-ai-hint="profile picture" />
-                  <AvatarFallback className="text-4xl sm:text-5xl">{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
+    <MainLayout>
+      <div className="w-full">
+          <Card className="overflow-hidden shadow-lg w-full">
+            <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
+              <div className="relative h-48 w-full md:h-64">
+                <Image
+                  src={profile.coverPhotoURL || "https://placehold.co/1200x400.png/E9E6F5/4A4458"}
+                  alt={`${profile.displayName || 'User'}'s cover photo`}
+                  fill
+                  style={{objectFit: 'cover'}}
+                  data-ai-hint="abstract background landscape"
+                  priority
+                />
+                <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
+                  <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-card shadow-lg">
+                    <AvatarImage src={profile.photoURL || `https://placehold.co/128x128.png?text=${(profile.displayName || 'U').charAt(0)}`} alt={profile.displayName || 'User'} data-ai-hint="profile picture" />
+                    <AvatarFallback className="text-4xl sm:text-5xl">{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
-              <div className="mb-3 sm:mb-0">
-                <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
-                <p className="text-sm text-muted-foreground">@{profile.username || profile.uid.substring(0,8)}</p>
+            </CardHeader>
+            <CardContent className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
+                <div className="mb-3 sm:mb-0">
+                  <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
+                  <p className="text-sm text-muted-foreground">@{profile.username || profile.uid.substring(0,8)}</p>
+                </div>
+                <div className="flex flex-col space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                  {isOwnProfile ? (
+                    <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto"><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
+                  ) : (
+                    <>
+                      <FollowButtonComponent />
+                      <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full sm:w-auto">
+                        {isMessaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
+                        Message
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-                {isOwnProfile ? (
-                  <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto"><Edit3 className="mr-2 h-4 w-4" />Edit Profile</Button>
-                ) : (
-                  <>
-                    <FollowButtonComponent />
-                    <Button variant="outline" onClick={handleMessageUser} disabled={isMessaging || !canMessage} className="w-full sm:w-auto">
-                      {isMessaging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
-                      Message
-                    </Button>
-                  </>
-                )}
+              
+              <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
+              
+              <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
+                <span><strong className="text-foreground font-medium">{posts.length}</strong> Posts</span>
+                <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
+                <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
               </div>
-            </div>
-            
-            <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
-            
-            <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
-              <span><strong className="text-foreground font-medium">{posts.length}</strong> Posts</span>
-              <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
-              <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
-            </div>
 
-            <Tabs defaultValue="posts" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-muted/60">
-                <TabsTrigger value="posts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Posts</TabsTrigger>
-                <TabsTrigger value="media" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Media</TabsTrigger>
-                <TabsTrigger value="likes" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Likes</TabsTrigger>
-              </TabsList>
-              <TabsContent value="posts" className="mt-6">
-                {loadingPosts && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
-                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md" />)}
-                  </div>
-                )}
-                {!loadingPosts && posts.length === 0 && (
+              <Tabs defaultValue="posts" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 bg-muted/60">
+                  <TabsTrigger value="posts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Posts</TabsTrigger>
+                  <TabsTrigger value="media" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Media</TabsTrigger>
+                  <TabsTrigger value="likes" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Likes</TabsTrigger>
+                </TabsList>
+                <TabsContent value="posts" className="mt-6">
+                  {loadingPosts && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
+                      {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md" />)}
+                    </div>
+                  )}
+                  {!loadingPosts && posts.length === 0 && (
+                    <div className="py-12 text-center">
+                      <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                      <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        This user hasn't shared any posts.
+                      </p>
+                    </div>
+                  )}
+                  {!loadingPosts && posts.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
+                      {posts.map(post => (
+                        <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
+                          <Image
+                            src={post.imageUrl || "https://placehold.co/300x300.png/CCC/FFF?text=Post"}
+                            alt={post.caption || `Post by ${profile.displayName}`}
+                            fill
+                            style={{objectFit: 'cover'}}
+                            data-ai-hint={post.dataAiHint || "user content"}
+                            className="transition-transform duration-300 group-hover:scale-105"
+                          />
+                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-start p-2">
+                              {isOwnProfile && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="absolute top-1.5 right-1.5 text-white/80 hover:bg-white/20 hover:text-white h-7 w-7 z-10">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                              {/* You can add post stats like likes/comments here if desired */}
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+                <TabsContent value="media" className="mt-6">
                   <div className="py-12 text-center">
                     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
+                    <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      This user hasn't shared any posts.
+                      This user hasn't shared any media yet, or this tab is under construction.
                     </p>
                   </div>
-                )}
-                {!loadingPosts && posts.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
-                    {posts.map(post => (
-                      <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
-                        <Image
-                          src={post.imageUrl || "https://placehold.co/300x300.png/CCC/FFF?text=Post"}
-                          alt={post.caption || `Post by ${profile.displayName}`}
-                          fill
-                          style={{objectFit: 'cover'}}
-                          data-ai-hint={post.dataAiHint || "user content"}
-                          className="transition-transform duration-300 group-hover:scale-105"
-                        />
-                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-start p-2">
-                            {isOwnProfile && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="absolute top-1.5 right-1.5 text-white/80 hover:bg-white/20 hover:text-white h-7 w-7 z-10">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                            {/* You can add post stats like likes/comments here if desired */}
-                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="media" className="mt-6">
-                <div className="py-12 text-center">
-                  <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    This user hasn't shared any media yet, or this tab is under construction.
-                  </p>
-                </div>
-              </TabsContent>
-              <TabsContent value="likes" className="mt-6">
-                 <div className="py-12 text-center">
-                    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        This user hasn't liked any posts, or this tab is under construction.
-                    </p>
-                 </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      {isOwnProfile && profile && (
-        <EditProfileDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          userProfile={profile}
-          onProfileUpdate={handleProfileUpdate}
-        />
-      )}
-       {postToDelete && (
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this {postToDelete.isStory ? 'story' : 'post'} and all its comments.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setPostToDelete(null)} disabled={isDeletingPost}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDeletePost} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingPost}>
-                {isDeletingPost ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-    </div>
+                </TabsContent>
+                <TabsContent value="likes" className="mt-6">
+                   <div className="py-12 text-center">
+                      <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                      <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                          This user hasn't liked any posts, or this tab is under construction.
+                      </p>
+                   </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        {isOwnProfile && profile && (
+          <EditProfileDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            userProfile={profile}
+            onProfileUpdate={handleProfileUpdate}
+          />
+        )}
+         {postToDelete && (
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete this {postToDelete.isStory ? 'story' : 'post'} and all its comments.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setPostToDelete(null)} disabled={isDeletingPost}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeletePost} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingPost}>
+                  {isDeletingPost ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
+    </MainLayout>
   );
 }
-

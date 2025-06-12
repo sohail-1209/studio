@@ -201,146 +201,145 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="w-full">
-        <Card className="shadow-lg w-full">
-          <CardHeader>
-            <div className="flex items-center space-x-3">
-              <SettingsIcon className="h-7 w-7 text-primary" />
-              <CardTitle className="font-headline text-3xl">Settings</CardTitle>
-            </div>
-            <CardDescription>Manage your account, profile, and appearance settings.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold text-foreground mb-3">Profile Settings</h2>
-              {loadingProfile ? (
-                <ProfileInfoSkeleton />
-              ) : userProfileData ? (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 bg-muted/30 space-y-3 sm:space-y-0 sm:gap-4">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-16 w-16">
-                      {userProfileData.photoURL ? (
-                        <Image src={userProfileData.photoURL} alt={userProfileData.displayName || 'User'} width={64} height={64} className="rounded-full" data-ai-hint="user avatar" />
-                      ) : (
-                        <AvatarFallback>{(userProfileData.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div>
-                      <p className="text-lg font-medium text-foreground">{userProfileData.displayName}</p>
-                      <p className="text-sm text-muted-foreground">@{userProfileData.username || 'username_not_set'}</p>
+    <MainLayout>
+      <div className="w-full">
+          <Card className="shadow-lg w-full">
+            <CardHeader>
+              <div className="flex items-center space-x-3">
+                <SettingsIcon className="h-7 w-7 text-primary" />
+                <CardTitle className="font-headline text-3xl">Settings</CardTitle>
+              </div>
+              <CardDescription>Manage your account, profile, and appearance settings.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <section>
+                <h2 className="text-xl font-semibold text-foreground mb-3">Profile Settings</h2>
+                {loadingProfile ? (
+                  <ProfileInfoSkeleton />
+                ) : userProfileData ? (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 bg-muted/30 space-y-3 sm:space-y-0 sm:gap-4">
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="h-16 w-16">
+                        {userProfileData.photoURL ? (
+                          <Image src={userProfileData.photoURL} alt={userProfileData.displayName || 'User'} width={64} height={64} className="rounded-full" data-ai-hint="user avatar" />
+                        ) : (
+                          <AvatarFallback>{(userProfileData.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div>
+                        <p className="text-lg font-medium text-foreground">{userProfileData.displayName}</p>
+                        <p className="text-sm text-muted-foreground">@{userProfileData.username || 'username_not_set'}</p>
+                      </div>
                     </div>
+                    <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto flex-shrink-0">
+                      <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)} className="w-full sm:w-auto flex-shrink-0">
-                    <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">Could not load profile information.</p>
-              )}
-            </section>
+                ) : (
+                  <p className="text-muted-foreground">Could not load profile information.</p>
+                )}
+              </section>
 
-            <Separator />
+              <Separator />
 
-            <section>
-              <h2 className="text-xl font-semibold text-foreground mb-3">Appearance</h2>
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="theme-toggle" className="text-base">Dark Mode</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Toggle between light and dark themes for the application.
-                  </p>
+              <section>
+                <h2 className="text-xl font-semibold text-foreground mb-3">Appearance</h2>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="theme-toggle" className="text-base">Dark Mode</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Toggle between light and dark themes for the application.
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <Sun className={`h-5 w-5 ${currentTheme === 'light' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <Switch
+                      id="theme-toggle"
+                      checked={currentTheme === 'dark'}
+                      onCheckedChange={toggleTheme}
+                      aria-label="Toggle dark mode"
+                    />
+                    <Moon className={`h-5 w-5 ${currentTheme === 'dark' ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                  <Sun className={`h-5 w-5 ${currentTheme === 'light' ? 'text-primary' : 'text-muted-foreground'}`} />
-                  <Switch
-                    id="theme-toggle"
-                    checked={currentTheme === 'dark'}
-                    onCheckedChange={toggleTheme}
-                    aria-label="Toggle dark mode"
-                  />
-                  <Moon className={`h-5 w-5 ${currentTheme === 'dark' ? 'text-primary' : 'text-muted-foreground'}`} />
-                </div>
-              </div>
-            </section>
+              </section>
 
-            <Separator />
+              <Separator />
 
-            <section>
-              <h2 className="text-xl font-semibold text-foreground mb-3">Account Management</h2>
-              <div className="space-y-4">
-                <div className="rounded-lg border p-4">
-                  <Label className="text-base">Change Password</Label>
-                   <Button variant="outline" size="sm" className="mt-3 w-full sm:w-auto" onClick={handleChangePassword} disabled={isSendingResetEmail}>
-                    {isSendingResetEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                    Send Password Reset Email
-                  </Button>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    A link to reset your password will be sent to your registered email address.
-                  </p>
+              <section>
+                <h2 className="text-xl font-semibold text-foreground mb-3">Account Management</h2>
+                <div className="space-y-4">
+                  <div className="rounded-lg border p-4">
+                    <Label className="text-base">Change Password</Label>
+                     <Button variant="outline" size="sm" className="mt-3 w-full sm:w-auto" onClick={handleChangePassword} disabled={isSendingResetEmail}>
+                      {isSendingResetEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                      Send Password Reset Email
+                    </Button>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      A link to reset your password will be sent to your registered email address.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-4 border-destructive/50 bg-destructive/5">
+                    <Label className="text-base text-destructive flex items-center">
+                      <AlertTriangle className="mr-2 h-5 w-5" /> Delete Account
+                    </Label>
+                     <Button variant="destructive" size="sm" className="mt-3 w-full sm:w-auto" onClick={handleDeleteAccountRequest} disabled={isDeletingAccount}>
+                      {isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" /> }
+                      Delete My Account
+                    </Button>
+                    <p className="text-sm text-destructive/80 mt-1">
+                      This action is permanent and cannot be undone. All your data will be removed.
+                    </p>
+                  </div>
+                   <div className="rounded-lg border p-4">
+                     <Button variant="outline" onClick={logout} className="w-full sm:w-auto">
+                      <LogOut className="mr-2 h-4 w-4" /> Log Out
+                    </Button>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Securely log out of your Synora account.
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-lg border p-4 border-destructive/50 bg-destructive/5">
-                  <Label className="text-base text-destructive flex items-center">
-                    <AlertTriangle className="mr-2 h-5 w-5" /> Delete Account
-                  </Label>
-                   <Button variant="destructive" size="sm" className="mt-3 w-full sm:w-auto" onClick={handleDeleteAccountRequest} disabled={isDeletingAccount}>
-                    {isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" /> }
-                    Delete My Account
-                  </Button>
-                  <p className="text-sm text-destructive/80 mt-1">
-                    This action is permanent and cannot be undone. All your data will be removed.
-                  </p>
-                </div>
-                 <div className="rounded-lg border p-4">
-                   <Button variant="outline" onClick={logout} className="w-full sm:w-auto">
-                    <LogOut className="mr-2 h-4 w-4" /> Log Out
-                  </Button>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Securely log out of your Synora account.
-                  </p>
-                </div>
-              </div>
-            </section>
-          </CardContent>
-        </Card>
-      {/* The problematic extra </div> was here. It's now removed. */}
-      {/* All dialogs are now correctly inside the main page wrapper div. */}
-      {userProfileData && (
-        <EditProfileDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          userProfile={userProfileData}
-          onProfileUpdate={handleProfileUpdate}
+              </section>
+            </CardContent>
+          </Card>
+        {userProfileData && (
+          <EditProfileDialog
+            open={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            userProfile={userProfileData}
+            onProfileUpdate={handleProfileUpdate}
+          />
+        )}
+
+        <ReauthenticateDialog
+          open={isReauthDialogOpen}
+          onOpenChange={setIsReauthDialogOpen}
+          onSuccess={handleReauthSuccess}
         />
-      )}
 
-      <ReauthenticateDialog
-        open={isReauthDialogOpen}
-        onOpenChange={setIsReauthDialogOpen}
-        onSuccess={handleReauthSuccess}
-      />
-
-      <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsConfirmDeleteDialogOpen(false)} disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDeleteAccount}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-              disabled={isDeletingAccount}
-            >
-              {isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Yes, Delete My Account
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsConfirmDeleteDialogOpen(false)} disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDeleteAccount}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                disabled={isDeletingAccount}
+              >
+                {isDeletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Yes, Delete My Account
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </MainLayout>
   );
 }
-
