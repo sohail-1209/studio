@@ -3,8 +3,8 @@ import type {NextConfig} from 'next';
 
 const withPWA = require('next-pwa')({
   dest: 'public',
-  register: false, // Keep this false: do not auto-register SW via injected script
-  skipWaiting: false, // Change to false: new SW will wait to activate
+  register: false, // Prevents auto-registration script, helping Firebase Auth init
+  skipWaiting: true, // Recommended for better PWA update flow once installed
   disable: false, // Ensure PWA features are generated
   manifest: {
     name: 'Synora',
@@ -60,3 +60,4 @@ const nextConfig: NextConfig = {
 };
 
 export default withPWA(nextConfig);
+
