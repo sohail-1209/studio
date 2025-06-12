@@ -39,18 +39,17 @@ service cloud.firestore {
         request.auth.uid == request.resource.data.requesterId &&
         request.resource.data.requesterId != request.resource.data.recipientId &&
         (
-          // Case 1: Recipient profile is explicitly private
+          // Case 1: Target profile is explicitly private, request status must be 'pending'
           (
-            exists(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)) &&
             get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data.isPrivate == true &&
             request.resource.data.status == 'pending'
           )
           ||
-          // Case 2: Recipient profile is not explicitly private (public or field missing)
+          // Case 2: Target profile is public (isPrivate is false OR isPrivate field is missing), request status must be 'accepted'
           (
             (
-              !exists(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)) ||
-              get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data.isPrivate != true
+              get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data.isPrivate == false ||
+              !( 'isPrivate' in get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data )
             ) &&
             request.resource.data.status == 'accepted'
           )
@@ -74,53 +73,47 @@ service cloud.firestore {
     // == END OF FOLLOW REQUESTS COLLECTION RULES ==
     // ================================================================================
 
-    // ================================================================================
-    // == POSTS COLLECTION RULES ==
-    // ================================================================================
+    // Posts collection
     match /posts/{postId} {
-      allow read: if
-        (request.auth != null && resource.data.userId == request.auth.uid) || // Author can always read
-        (resource.data.authorIsPrivate == false || resource.data.authorIsPrivate == null) || // Public post or old post
-        (
-          resource.data.authorIsPrivate == true &&
-          request.auth != null && // Ensure user is authenticated before checking follow status
-          exists(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(resource.data.userId)) &&
-          get(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(resource.data.userId)).data.status == 'accepted'
-        );
+      allow read: if (resource.data.authorIsPrivate == false || resource.data.authorIsPrivate == null) ||
+                     (request.auth != null && resource.data.authorIsPrivate == true &&
+                       (
+                         (exists(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(resource.data.userId)) &&
+                          get(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(resource.data.userId)).data.status == 'accepted')
+                         ||
+                         resource.data.userId == request.auth.uid
+                       )
+                     );
 
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
 
       allow update: if request.auth != null &&
                       (
-                        // Owner can update their post (except interaction counts)
+                        // Owner can update non-counter fields and their own visibility flag
                         (request.auth.uid == resource.data.userId &&
-                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['likesCount', 'likedBy', 'commentsCount', 'userId', 'createdAt', 'authorIsPrivate'])) ||
-                        // Any authenticated user can update interaction counts (liking, unliking)
-                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy']) ||
-                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount'])) // Separate for comment increment
+                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['likesCount', 'likedBy', 'commentsCount'])) ||
+                        // Any authenticated user can update interaction counts
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy'])) ||
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']))
                       );
 
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
 
       match /comments/{commentId} {
-        allow read: if true; // Comments are public if the post is readable
+        allow read: if true;
         allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+        // Allow comment deletion by comment author OR post owner
         allow delete: if request.auth != null &&
-                         ( request.auth.uid == resource.data.userId || // Comment author
-                           request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId ); // Post author
+                         (request.auth.uid == resource.data.userId ||
+                          request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId);
       }
     }
-    // ================================================================================
-    // == END OF POSTS COLLECTION RULES ==
-    // ================================================================================
 
-    // ================================================================================
-    // == PROFILES COLLECTION RULES ==
-    // ================================================================================
+    // Profiles collection
     match /profiles/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+			allow delete: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null &&
                      (
                        (request.auth.uid == userId &&
@@ -132,18 +125,12 @@ service cloud.firestore {
                        )
                      );
     }
-    // ================================================================================
-    // == END OF PROFILES COLLECTION RULES ==
-    // ================================================================================
 
-    // ================================================================================
-    // == NOTIFICATIONS COLLECTION RULES ==
-    // ================================================================================
+    // Notifications collection
     match /notifications/{notificationId} {
         allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
-        // Allow deletion if user is recipient OR actor (for account deletion cleanup)
-        allow delete: if request.auth != null &&
-                         (request.auth.uid == resource.data.recipientId || request.auth.uid == resource.data.actorId);
+        // Allow deletion by recipient OR actor (for cleanup during account deletion)
+        allow delete: if request.auth != null && (request.auth.uid == resource.data.recipientId || request.auth.uid == resource.data.actorId);
 
         allow create: if request.auth != null &&
                        request.resource.data.actorId == request.auth.uid &&
@@ -164,8 +151,5 @@ service cloud.firestore {
                          )
                        );
     }
-    // ================================================================================
-    // == END OF NOTIFICATIONS COLLECTION RULES ==
-    // ================================================================================
   }
 }
