@@ -74,7 +74,13 @@ export default function FeedPage() {
 
   useEffect(() => {
     const postsCollectionRef = collection(db, 'posts');
-    const qPosts = query(postsCollectionRef, where('isStory', '!=', true), orderBy('createdAt', 'desc'));
+    // Fetch only non-story posts from public accounts for the main feed
+    const qPosts = query(
+      postsCollectionRef,
+      where('isStory', '!=', true),
+      where('authorIsPrivate', '==', false), // Only show posts from public accounts
+      orderBy('createdAt', 'desc')
+    );
 
     setLoadingPosts(true);
     const unsubscribePosts = onSnapshot(
@@ -99,11 +105,20 @@ export default function FeedPage() {
       (error) => {
         console.error('Error fetching posts:', error);
         setLoadingPosts(false);
-        toast({
-          title: 'Error Fetching Posts',
-          description: 'Could not load the feed. Please try again later.',
-          variant: 'destructive',
-        });
+        if (error.code === 'failed-precondition') {
+           toast({
+              title: "Error Fetching Feed Posts",
+              description: "A database index might be required. Please check Firebase console.",
+              variant: "destructive",
+              duration: 10000
+          });
+        } else {
+          toast({
+            title: 'Error Fetching Posts',
+            description: 'Could not load the feed. Please try again later.',
+            variant: 'destructive',
+          });
+        }
       }
     );
 
@@ -115,6 +130,11 @@ export default function FeedPage() {
       postsCollectionRef,
       where('isStory', '==', true),
       where('createdAt', '>=', twentyFourHoursAgoTimestamp),
+      // For stories, we might still want to show stories from private accounts the user *follows*,
+      // but that's complex. For now, showing all recent stories, privacy relies on individual story access rules.
+      // Or filter by authorIsPrivate == false here too for simplicity in the reel.
+      // For now, let's keep it simple and rely on navigation to StoryViewer handling actual story content.
+      // A more advanced reel would filter based on followed private users.
       orderBy('createdAt', 'desc'),
       firestoreLimit(20)
     );
@@ -123,7 +143,7 @@ export default function FeedPage() {
       const uniqueUsersMap = new Map<string, StoryUserData>();
       snapshot.docs.forEach(docSnapshot => {
         const post = docSnapshot.data() as PostDocument;
-        if (post.userId && !uniqueUsersMap.has(post.userId)) {
+        if (post.userId && !uniqueUsersMap.has(post.userId) && (post.authorIsPrivate === false || post.userId === user?.uid)) { // Show public stories or own stories
           uniqueUsersMap.set(post.userId, {
             userId: post.userId,
             displayName: post.userDisplayName,
@@ -148,7 +168,7 @@ export default function FeedPage() {
       unsubscribePosts();
       unsubscribeStoriesReel();
     };
-  }, [toast]);
+  }, [toast, user?.uid]); // Added user.uid as dependency for stories reel filtering
 
   const handleLikePost = async (postId: string, currentPost: Post) => {
     if (!user) {
@@ -217,7 +237,7 @@ export default function FeedPage() {
     const shareData = {
       title: `Check out this post on Synora by ${post.userDisplayName || 'a user'}!`,
       text: post.caption || 'An interesting post from Synora.',
-      url: window.location.origin + `/post/${post.id}`,
+      url: window.location.origin + `/post/${post.id}`, // Assumes post detail pages exist at /post/:id
     };
 
     if (navigator.share) {
@@ -461,7 +481,7 @@ export default function FeedPage() {
             <Card className="py-12 text-center w-full shadow-lg">
               <CardContent>
                 <p className="text-lg font-semibold text-foreground">No posts yet!</p>
-                <p className="text-muted-foreground">Be the first one to share something.</p>
+                <p className="text-muted-foreground">Be the first one to share something, or check out the Explore page.</p>
               </CardContent>
             </Card>
           )}
@@ -529,7 +549,7 @@ export default function FeedPage() {
                   {post.videoUrl && (
                     <div className="relative aspect-[16/10] w-full bg-black flex items-center justify-center overflow-hidden">
                        <Image
-                         src={post.videoUrl}
+                         src={post.videoUrl} // This will use the placeholder if videoUrl is a placeholder
                          alt={post.caption || "Post video placeholder"}
                          fill
                          style={{objectFit: 'contain'}}
