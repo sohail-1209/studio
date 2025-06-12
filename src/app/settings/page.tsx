@@ -10,11 +10,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { SettingsIcon, Edit3, Palette, ShieldCheck, LogOut, AlertTriangle, Moon, Sun, Loader2, Trash2, Lock, Unlock } from 'lucide-react';
+import { SettingsIcon, Edit3, Palette, ShieldCheck, LogOut, AlertTriangle, Moon, Sun, Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/contexts/AuthContext';
 import { db, storage, auth } from '@/lib/firebase'; // Ensure auth is imported
-import { doc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { sendPasswordResetEmail, deleteUser as deleteAuthUser } from 'firebase/auth'; // Import deleteUser
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
@@ -49,8 +49,6 @@ export default function SettingsPage() {
   const [isReauthDialogOpen, setIsReauthDialogOpen] = useState(false);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [isPrivateAccount, setIsPrivateAccount] = useState(false);
-  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
 
 
   useEffect(() => {
@@ -84,7 +82,6 @@ export default function SettingsPage() {
         if (profileSnap.exists()) {
           const data = profileSnap.data() as UserProfile;
           setUserProfileData(data);
-          setIsPrivateAccount(data.isPrivate || false);
         } else {
           toast({ title: "Profile not found", description: "Could not load your profile data.", variant: "destructive" });
         }
@@ -105,50 +102,10 @@ export default function SettingsPage() {
 
   const handleProfileUpdate = async (updatedProfile: UserProfile) => {
     setUserProfileData(updatedProfile);
-    setIsPrivateAccount(updatedProfile.isPrivate || false);
-    await reloadUser(); // This will re-fetch from AuthContext and update the global state
+    await reloadUser(); 
     toast({ title: "Profile Updated", description: "Your settings page reflects the latest changes." });
   };
   
-  const handlePrivacyToggle = async (isPrivate: boolean) => {
-    if (!currentUser || !userProfileData) return;
-    setIsUpdatingPrivacy(true);
-    try {
-      const profileRef = doc(db, 'profiles', currentUser.uid);
-      await updateDoc(profileRef, { isPrivate });
-
-      // Update all user's posts with the new authorIsPrivate status
-      const postsColRef = collection(db, 'posts');
-      const userPostsQuery = query(postsColRef, where('userId', '==', currentUser.uid));
-      const postsSnapshot = await getDocs(userPostsQuery);
-
-      if (!postsSnapshot.empty) {
-        const postUpdateBatch = writeBatch(db);
-        postsSnapshot.forEach(postDoc => {
-          postUpdateBatch.update(postDoc.ref, { authorIsPrivate: isPrivate });
-        });
-        await postUpdateBatch.commit();
-        console.log(`Updated ${postsSnapshot.size} posts with new authorIsPrivate status: ${isPrivate}`);
-      }
-
-      setIsPrivateAccount(isPrivate);
-      // Update local state in AuthContext by calling reloadUser or directly setting user state if possible
-      // For now, rely on reloadUser which re-fetches profile
-      await reloadUser();
-      toast({
-        title: "Privacy Setting Updated",
-        description: `Your account is now ${isPrivate ? 'private' : 'public'}. Your existing posts' visibility has also been updated.`,
-      });
-    } catch (error: any) {
-      console.error("Error updating privacy setting or posts:", error);
-      toast({ title: "Update Failed", description: error.message, variant: "destructive" });
-      // Revert UI optimistic update if needed
-      setIsPrivateAccount(!isPrivate);
-    } finally {
-      setIsUpdatingPrivacy(false);
-    }
-  };
-
 
   const handleChangePassword = async () => {
     if (!firebaseUser || !firebaseUser.email) {
@@ -186,20 +143,17 @@ export default function SettingsPage() {
       const userId = currentUser.uid;
       const batch = writeBatch(db);
 
-      // Delete user's posts and their comments
       const postsQuery = query(collection(db, 'posts'), where('userId', '==', userId));
       const postsSnapshot = await getDocs(postsQuery);
       for (const postDoc of postsSnapshot.docs) {
         const postData = postDoc.data();
         
-        // Delete comments subcollection for each post
         const commentsRef = collection(postDoc.ref, 'comments');
         const commentsSnapshot = await getDocs(commentsRef);
         commentsSnapshot.docs.forEach(commentDoc => {
           batch.delete(commentDoc.ref);
         });
 
-        // Delete image from storage if it exists
         if (postData.imagePath) {
           try {
             const imageFileRef = storageRef(storage, postData.imagePath);
@@ -208,21 +162,17 @@ export default function SettingsPage() {
             console.warn(`Could not delete post image ${postData.imagePath}:`, storageError);
           }
         }
-        // Delete the post document itself
         batch.delete(postDoc.ref);
       }
 
-      // Delete user's notifications
       const notificationsQuery = query(collection(db, 'notifications'), where('recipientId', '==', userId));
       const notificationsSnapshot = await getDocs(notificationsQuery);
       notificationsSnapshot.forEach(doc => batch.delete(doc.ref));
-      // Also consider notifications where actorId is the user, if relevant (e.g. a notification sent *by* them that needs cleanup)
       const actorNotificationsQuery = query(collection(db, 'notifications'), where('actorId', '==', userId));
       const actorNotificationsSnapshot = await getDocs(actorNotificationsQuery);
       actorNotificationsSnapshot.forEach(doc => batch.delete(doc.ref));
 
 
-      // Delete user's follow requests (sent and received)
       const followRequestsSentQuery = query(collection(db, 'followRequests'), where('requesterId', '==', userId));
       const followRequestsSentSnapshot = await getDocs(followRequestsSentQuery);
       followRequestsSentSnapshot.forEach(doc => batch.delete(doc.ref));
@@ -231,22 +181,13 @@ export default function SettingsPage() {
       const followRequestsReceivedSnapshot = await getDocs(followRequestsReceivedQuery);
       followRequestsReceivedSnapshot.forEach(doc => batch.delete(doc.ref));
       
-      // Delete chats where user is a participant (optional, can be complex to decide if chats should be fully deleted)
-      // For simplicity, we'll skip chat deletion in this client-side example.
-      // A Cloud Function would be better for robust chat cleanup.
-
-      // Delete user's profile
       const profileRef = doc(db, 'profiles', userId);
       batch.delete(profileRef);
 
-      // Commit all Firestore deletions
       await batch.commit();
-
-      // Delete the Firebase Auth user
       await deleteAuthUser(firebaseUser);
 
       toast({ title: "Account Deleted", description: "Your account and associated data have been successfully deleted." });
-      // await logout(); // User will be signed out and onAuthStateChanged will redirect automatically
     } catch (error: any) {
       console.error("Error deleting account:", error);
       toast({ title: "Account Deletion Failed", description: error.message || "Could not delete your account. Please try again.", variant: "destructive" });
@@ -308,33 +249,6 @@ export default function SettingsPage() {
                 ) : (
                   <p className="text-muted-foreground">Could not load profile information.</p>
                 )}
-              </section>
-
-              <Separator />
-
-              <section>
-                <h2 className="text-xl font-semibold text-foreground mb-3">Account Privacy</h2>
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="privacy-toggle" className="text-base">
-                      Private Account
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      When your account is private, only people you approve can see your posts.
-                    </p>
-                  </div>
-                   {loadingProfile ? (
-                    <Skeleton className="h-6 w-12" />
-                  ) : (
-                    <Switch
-                      id="privacy-toggle"
-                      checked={isPrivateAccount}
-                      onCheckedChange={handlePrivacyToggle}
-                      disabled={isUpdatingPrivacy}
-                      aria-label="Toggle account privacy"
-                    />
-                  )}
-                </div>
               </section>
               
               <Separator />
@@ -440,4 +354,3 @@ export default function SettingsPage() {
     </MainLayout>
   );
 }
-
