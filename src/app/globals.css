@@ -12,7 +12,9 @@
   }
 
   html {
-    overflow-y: scroll !important; /* Force scrollbar, with !important */
+    width: 100%;
+    overflow-x: hidden; /* Prevent horizontal scroll on html */
+    overflow-y: scroll !important; /* Force vertical scrollbar, with !important */
     box-sizing: border-box;
   }
   *, *:before, *:after { /* Apply border-box to all elements */
@@ -24,6 +26,8 @@
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     min-height: 100vh;
+    width: 100%; /* Ensure body takes full width of html */
+    position: relative; /* Can help with stacking contexts and layout stability */
     line-height: 1.5; /* Added a sensible default line-height */
   }
 
@@ -133,9 +137,6 @@
 
 @layer base {
   * {
-    @apply border-border; /* This was already here, keep it */
+    @apply border-border; 
   }
-  /* Removed body selector from here as it's defined above */
 }
-
-  

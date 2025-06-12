@@ -157,9 +157,10 @@ const MobileSheetSidebar = ({ children }: { children: React.ReactNode }) => {
     return (
         <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
             <SheetContent side="left" className="md:hidden w-[var(--sidebar-width-mobile)] p-0 overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle className="sr-only">Main Menu</SheetTitle>
-                </SheetHeader>
+                 <SheetHeader className="p-4 border-b">
+                    <SheetTitle className="sr-only">Main Menu</SheetTitle>
+                    {/* You can place a logo or title here if needed visually inside the sheet header */}
+                 </SheetHeader>
                 <div className="flex flex-col h-full">
                     {children}
                 </div>
