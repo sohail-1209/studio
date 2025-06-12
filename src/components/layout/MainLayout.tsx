@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import { Spinner } from '@/components/shared/Spinner';
 import {
   SidebarProvider,
-  Sidebar as UISidebar, 
+  Sidebar as UISidebar,
   SidebarInset,
 } from '@/components/ui/sidebar'; // Using the forcefully styled Sidebar and SidebarInset
 
@@ -38,18 +38,31 @@ function LayoutContent({ children }: MainLayoutProps) {
   }
 
   if (!user) {
-    return null; 
+    return null;
   }
 
   return (
     <div className="flex min-h-screen"> {/* Root flex container */}
-      <UISidebar> {/* This is the <aside> with !bg-red-500 !w-64 etc. */}
-        <AppSidebar /> {/* This is the very simplified content for the red sidebar */}
+      <UISidebar
+        style={{
+          backgroundColor: 'red', // Direct inline style for testing
+          width: '256px',        // Direct inline style for testing
+          borderRight: '4px solid black',
+          position: 'sticky',
+          top: '0',
+          height: '100vh',
+          zIndex: 100, // High z-index
+          flexShrink: 0,
+        }}
+        // We keep some classes for flex behavior if needed, but critical visual styles are inline
+        className="flex flex-col"
+      >
+        <AppSidebar />
       </UISidebar>
       <SidebarInset> {/* This is the div with !bg-blue-500 and flex-1 */}
         {/* The direct child of SidebarInset gets the padding and max-width for content */}
         <div
-          className="w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8" 
+          className="w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8"
           // The blue background is now directly on SidebarInset from ui/sidebar.tsx
         >
           {children}
