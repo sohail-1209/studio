@@ -351,9 +351,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
           </TabsList>
           <TabsContent value="posts" className="mt-6 w-full">
-             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full">
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full min-w-0">
                 {[...Array(6)].map((_, i) => (
-                  <Skeleton key={i} className="aspect-square rounded-md" />
+                  <Skeleton key={i} className="aspect-square rounded-md min-w-0" />
                 ))}
              </div>
           </TabsContent>
@@ -470,8 +470,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 </TabsList>
                 <TabsContent value="posts" className="mt-6 w-full">
                   {loadingPosts && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full">
-                      {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md" />)}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full min-w-0">
+                      {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md min-w-0" />)}
                     </div>
                   )}
                   
@@ -480,50 +480,41 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                       <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                       <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        This user hasn't shared any posts.
+                        This user hasn&apos;t shared any posts.
                       </p>
                     </div>
                   )}
                   {!loadingPosts && posts.length > 0 && (
-                    // TEMPORARY DIAGNOSTIC: Ensure this placeholder is identical to the one in "Media"
-                    <div className="py-12 text-center w-full">
-                      <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                      <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        This user hasn't shared any media yet, or this tab is under construction.
-                      </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full min-w-0">
+                      {posts.map(post => (
+                        <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl min-w-0">
+                          <Image
+                            src={post.imageUrl || "https://placehold.co/300x300.png?text=Post"}
+                            alt={post.caption || `Post by ${profile.displayName}`}
+                            fill
+                            style={{objectFit: 'contain'}}
+                            data-ai-hint={post.dataAiHint || "user content"}
+                            className="transition-transform duration-300 group-hover:scale-105"
+                          />
+                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-start p-2">
+                              {isOwnProfile && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="absolute top-1.5 right-1.5 text-white/80 hover:bg-white/20 hover:text-white h-7 w-7 z-10">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                           </div>
+                        </div>
+                      ))}
                     </div>
-                    // ORIGINAL GRID:
-                    // <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full">
-                    //   {posts.map(post => (
-                    //     <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
-                    //       <Image
-                    //         src={post.imageUrl || "https://placehold.co/300x300.png?text=Post"}
-                    //         alt={post.caption || `Post by ${profile.displayName}`}
-                    //         fill
-                    //         style={{objectFit: 'contain'}}
-                    //         data-ai-hint={post.dataAiHint || "user content"}
-                    //         className="transition-transform duration-300 group-hover:scale-105"
-                    //       />
-                    //        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-start p-2">
-                    //           {isOwnProfile && (
-                    //             <DropdownMenu>
-                    //               <DropdownMenuTrigger asChild>
-                    //                 <Button variant="ghost" size="icon" className="absolute top-1.5 right-1.5 text-white/80 hover:bg-white/20 hover:text-white h-7 w-7 z-10">
-                    //                   <MoreHorizontal className="h-4 w-4" />
-                    //                 </Button>
-                    //               </DropdownMenuTrigger>
-                    //               <DropdownMenuContent align="end">
-                    //                 <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                    //                   <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    //                 </DropdownMenuItem>
-                    //               </DropdownMenuContent>
-                    //             </DropdownMenu>
-                    //           )}
-                    //        </div>
-                    //     </div>
-                    //   ))}
-                    // </div>
                   )}
                 </TabsContent>
                 <TabsContent value="media" className="mt-6 w-full">
@@ -531,7 +522,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                     <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      This user hasn't shared any media yet, or this tab is under construction.
+                      This user hasn&apos;t shared any media yet, or this tab is under construction.
                     </p>
                   </div>
                 </TabsContent>
@@ -540,7 +531,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                       <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                       <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                          This user hasn't liked any posts, or this tab is under construction.
+                          This user hasn&apos;t liked any posts, or this tab is under construction.
                       </p>
                    </div>
                 </TabsContent>
