@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import Link from 'next/link';
@@ -69,12 +69,15 @@ export function SignupForm() {
       // Send email verification
       await sendEmailVerification(firebaseUser);
 
+      // Sign the user out
+      await signOut(auth);
+
       toast({ 
-        title: 'Signup Successful!', 
-        description: 'Your account has been created. Please check your email to verify your address.',
-        duration: 7000, 
+        title: 'Account Created! Please Verify Your Email.', 
+        description: 'A verification link has been sent to your email address. Please verify your email before logging in.',
+        duration: 10000, // Longer duration for this important message
       });
-      router.push('/'); // Redirect to feed or dashboard
+      router.push('/login'); // Redirect to login page
     } catch (error: any) {
       console.error("Signup Form Error Details:", error); 
       toast({
@@ -147,3 +150,4 @@ export function SignupForm() {
     </form>
   );
 }
+
