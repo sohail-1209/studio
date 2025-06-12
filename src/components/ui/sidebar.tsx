@@ -157,9 +157,9 @@ const MobileSheetSidebar = ({ children }: { children: React.ReactNode }) => {
     return (
         <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
             <SheetContent side="left" className="md:hidden w-[var(--sidebar-width-mobile)] p-0 overflow-y-auto">
-                 <SheetHeader className="p-4 border-b">
-                    <SheetTitle className="sr-only">Main Menu</SheetTitle>
-                    {/* You can place a logo or title here if needed visually inside the sheet header */}
+                 <SheetHeader className="p-0 border-b">
+                    {/* Removed SheetTitle as AppSidebar might have its own visual header logic,
+                        and sr-only title is now in AppSidebar. This ensures no visual title here if AppSidebar manages it. */}
                  </SheetHeader>
                 <div className="flex flex-col h-full">
                     {children}
@@ -226,7 +226,7 @@ const SidebarInset = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "flex-1 flex flex-col overflow-y-auto bg-background", 
+        "flex-1 flex flex-col bg-background overflow-y-auto overflow-x-hidden w-full min-w-0", // Added w-full, min-w-0, overflow-x-hidden
         className
       )}
       {...props}

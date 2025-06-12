@@ -15,6 +15,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { MobileHeader } from './MobileHeader'; 
+import { cn } from '@/lib/utils'; // Import cn
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -55,7 +56,10 @@ function LayoutContent({ children }: MainLayoutProps) {
 
       <SidebarInset>
         <MobileHeader /> 
-        <main className="w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 pt-20 md:pt-4 lg:pt-6"> 
+        <main className={cn(
+          "w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 pt-20 md:pt-4 lg:pt-6",
+          "min-w-0 overflow-x-hidden" // Added min-w-0 and overflow-x-hidden
+        )}> 
           {children}
         </main>
       </SidebarInset>
