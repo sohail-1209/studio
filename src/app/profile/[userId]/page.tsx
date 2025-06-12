@@ -228,7 +228,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           batch.delete(followRequestRef);
         }
         batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-        batch.update(targetUserProfileRef, { followersCount: increment(-1) });
+        // batch.update(targetUserProfileRef, { followersCount: increment(-1) }); // DIAGNOSTIC: Commented out
         await batch.commit();
         setFollowStatus('not_following');
         setExistingFollowDocId(null);
@@ -239,22 +239,21 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         const newRequestData = {
             requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
             recipientId: profile.uid, recipientDisplayName: profile.displayName, recipientAvatarUrl: profile.photoURL,
-            status: 'accepted', // Assuming public profiles auto-accept, or a simplified follow for now
+            status: 'accepted', 
             createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         };
         batch.set(followRequestRef, newRequestData);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
-        batch.update(targetUserProfileRef, { followersCount: increment(1) });
+        // batch.update(targetUserProfileRef, { followersCount: increment(1) }); // DIAGNOSTIC: Commented out
 
-        // Create notification for the target user
         const notificationRef = doc(collection(db, 'notifications'));
         const notificationData = {
-            recipientId: profile.uid, // The user being followed
-            actorId: currentUser.uid, // The user who initiated the follow
+            recipientId: profile.uid, 
+            actorId: currentUser.uid, 
             actorDisplayName: currentUser.displayName,
             actorAvatarUrl: currentUser.photoURL,
-            type: 'follow_accept', // Changed from 'follow_request' for direct follow
-            originalFollowRequestId: newFollowDocId, // Reference the follow document
+            type: 'follow_accept', 
+            originalFollowRequestId: newFollowDocId, 
             isRead: false,
             createdAt: serverTimestamp()
         };
@@ -265,9 +264,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setExistingFollowDocId(newFollowDocId);
         toast({ title: "Followed", description: `You are now following ${profile.displayName}.` });
       }
-      // Reload user data to reflect changes in counts for both users if possible
-      await reloadUser(); // Reloads current user's auth context data
-      // Fetch and set the target profile's updated data
+      await reloadUser(); 
       const updatedTargetProfileSnap = await getDoc(targetUserProfileRef);
       if (updatedTargetProfileSnap.exists()) {
         setProfile(updatedTargetProfileSnap.data() as UserProfile);
@@ -276,7 +273,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     } catch (error: any) {
       console.error("Error in handleFollowToggle:", error);
       toast({ title: "Operation Failed", description: error.message || "Could not perform follow/unfollow action.", variant: "destructive" });
-      // Re-check status if operation failed to ensure UI consistency
       await checkFollowStatus();
     } finally {
       setIsProcessingFollow(false);
