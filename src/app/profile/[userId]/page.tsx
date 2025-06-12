@@ -91,7 +91,7 @@ const LoadingPostsPlaceholder = () => (
 
 export default function UserProfilePage({ params: paramsPromise }: { params: { userId: string } }) {
   const params = use(paramsPromise);
-  const { userId } = params;
+  const { userId: paramsUserId } = params; // Renamed to avoid conflict with state/prop userId
   const { user: currentUser, reloadUser } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -113,18 +113,22 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const [followListUsers, setFollowListUsers] = useState<UserProfile[]>([]);
   const [loadingFollowList, setLoadingFollowList] = useState(false);
 
-  const isOwnProfile = currentUser?.uid === userId;
+  const isOwnProfile = currentUser?.uid === paramsUserId;
 
   const checkFollowStatus = useCallback(async () => {
-    if (!currentUser || !userId || isOwnProfile) {
+    if (!currentUser || !currentUser.uid || !paramsUserId || paramsUserId === '' || isOwnProfile) {
+      console.log("checkFollowStatus: Pre-conditions not met (current user, target userId empty, or own profile). Skipping.", 
+        { currentUserUid: currentUser?.uid, targetUserId: paramsUserId, isOwnProfile });
       setFollowStatus('not_following');
       setExistingFollowDocId(null);
       setIsProcessingFollow(false);
       return;
     }
 
+    console.log(`checkFollowStatus: Attempting to check for currentUser ${currentUser.uid} and targetUser ${paramsUserId}`);
     setIsProcessingFollow(true);
-    const followDocId = `${currentUser.uid}_${userId}`;
+    const followDocId = `${currentUser.uid}_${paramsUserId}`;
+    console.log(`checkFollowStatus: Constructed followDocId: '${followDocId}'`);
     const followRequestRef = doc(db, 'followRequests', followDocId);
 
     try {
@@ -138,24 +142,29 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       }
     } catch (error: any) {
         console.error("Error checking follow status:", error);
-        toast({ title: "Network Error", description: `Could not check follow status: ${error.message || 'Please try again.'}`, variant: "destructive"});
-        setFollowStatus('not_following');
+        console.error(`Error details - Code: ${error.code}, Name: ${error.name}, Message: ${error.message}`);
+        toast({ 
+            title: "Follow Status Check Failed", 
+            description: "Unable to determine follow status. Technical details logged to console.", 
+            variant: "default" 
+        });
+        setFollowStatus('not_following'); // Fallback
     } finally {
         setIsProcessingFollow(false);
     }
-  }, [currentUser, userId, isOwnProfile, toast]);
+  }, [currentUser, paramsUserId, isOwnProfile, toast]);
 
 
   useEffect(() => {
-    if (userId) {
+    if (paramsUserId) {
       setLoadingProfile(true);
-      const profileRef = doc(db, 'profiles', userId);
+      const profileRef = doc(db, 'profiles', paramsUserId);
       const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data() as UserProfile;
           setProfile(data);
         } else {
-          console.warn("No such profile for userId:", userId);
+          console.warn("No such profile for userId:", paramsUserId);
           toast({ title: "Profile not found", variant: "destructive" });
           setProfile(null);
         }
@@ -170,7 +179,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         unsubscribeProfile();
       };
     }
-  }, [userId, toast]);
+  }, [paramsUserId, toast]);
 
   useEffect(() => {
     if (profile && currentUser && !isOwnProfile) {
@@ -444,7 +453,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   );
 
 
-  if (loadingProfile || !userId) {
+  if (loadingProfile || !paramsUserId) {
     return (
       <MainLayout>
         <div className="w-full">
