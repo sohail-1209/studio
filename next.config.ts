@@ -1,11 +1,10 @@
 
 import type {NextConfig} from 'next';
-// import type { PWAConfig } from 'next-pwa'; // Not explicitly used, but good for reference
 
 const withPWA = require('next-pwa')({
   dest: 'public',
-  register: false, // DIAGNOSTIC: Changed from true to false to avoid auto-registering SW
-  skipWaiting: true,
+  register: false, // Keep this false: do not auto-register SW via injected script
+  skipWaiting: false, // Change to false: new SW will wait to activate
   disable: false, // Ensure PWA features are generated
   manifest: {
     name: 'Synora',
@@ -26,9 +25,6 @@ const withPWA = require('next-pwa')({
       { src: 'https://toppng.com/uploads/preview/white-deer-silhouette-png-download-stag-logo-11563060029d1cigtaxq5.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
     ],
   },
-  // fallbacks: { // Example for offline fallback page
-  //   document: '/offline', 
-  // },
 });
 
 const nextConfig: NextConfig = {
