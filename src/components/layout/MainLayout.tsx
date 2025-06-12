@@ -45,69 +45,54 @@ function LayoutContent({ children }: MainLayoutProps) {
   }
 
   if (!user) {
+    // This typically won't be shown due to the redirect, but good for safety.
     return null;
   }
 
+  if (isMobile) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 shadow-sm backdrop-blur-sm sm:px-6">
+          <SidebarTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+              <PanelLeft className="h-5 w-5" />
+              <span className="sr-only">Toggle Menu</span>
+            </Button>
+          </SidebarTrigger>
+          <div className="ml-auto">
+            <Logo iconSize={24} textSize="text-lg" />
+          </div>
+        </header>
+        <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+          <SheetContent side="left" className="w-[var(--sidebar-width-mobile)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Navigation Menu</SheetTitle>
+            </SheetHeader>
+            <AppSidebar />
+          </SheetContent>
+        </Sheet>
+        <main className="flex-1 overflow-y-auto">
+          <div className="px-4 py-6 sm:px-6 w-full">
+            {children}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Desktop Layout
   return (
     <div className="flex min-h-screen bg-background">
-      {isMobile ? (
-        <>
-          <Sheet open={openMobile} onOpenChange={setOpenMobile}>
-            <SheetContent side="left" className="w-[var(--sidebar-width-mobile)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden">
-               <SheetHeader className="sr-only">
-                <SheetTitle>Navigation Menu</SheetTitle>
-              </SheetHeader>
-              <AppSidebar />
-            </SheetContent>
-          </Sheet>
-
-          <div className="flex flex-1 flex-col">
-            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 shadow-sm backdrop-blur-sm sm:px-6">
-              <SidebarTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                  <PanelLeft className="h-5 w-5" />
-                  <span className="sr-only">Toggle Menu</span>
-                </Button>
-              </SidebarTrigger>
-              <div className="ml-auto"> {/* Pushes Logo to the right if no other items */}
-                <Logo iconSize={24} textSize="text-lg" />
-              </div>
-            </header>
-            <main className="flex-1 overflow-y-auto">
-              <div className={cn(
-                "w-full",
-                "px-4 py-4 sm:px-6", // Mobile and small tablet padding
-                "md:px-6 lg:px-8" // Desktop padding (adjusted for consistency with max-width approach)
-              )}>
-                {children}
-              </div>
-            </main>
+      <Sidebar> {/* This is the actual desktop sidebar UI element */}
+        <AppSidebar /> {/* The content of the sidebar */}
+      </Sidebar>
+      <SidebarInset> {/* This is the main content area wrapper */}
+        <main className="flex-1 overflow-y-auto"> {/* Added main tag for semantics */}
+          <div className="w-full max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8"> {/* Content padding and max-width */}
+            {children}
           </div>
-        </>
-      ) : (
-        <>
-          <Sidebar
-            collapsible="icon"
-            variant="sidebar"
-            side="left"
-            className="border-sidebar-border bg-sidebar text-sidebar-foreground shadow-md"
-          >
-            <AppSidebar />
-          </Sidebar>
-          <SidebarInset>
-            <main className="flex-1 overflow-y-auto">
-               <div className={cn(
-                "w-full",
-                "p-4", // Base padding
-                "md:p-6", // Medium screen padding
-                "lg:max-w-7xl lg:mx-auto" // Large screen constraints
-              )}>
-                {children}
-              </div>
-            </main>
-          </SidebarInset>
-        </>
-      )}
+        </main>
+      </SidebarInset>
     </div>
   );
 }
