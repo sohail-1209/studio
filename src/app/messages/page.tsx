@@ -112,76 +112,77 @@ export default function MessagesPage() {
 
 
   return (
-    <div className="h-[calc(100vh-theme(spacing.24))] w-full"> {/* Adjusted height for main layout padding */}
-        <Card className="h-full flex flex-col shadow-lg w-full">
-          <CardHeader className="border-b">
-            <div className="flex items-center justify-between">
-              <CardTitle className="font-headline text-2xl">Messages</CardTitle>
-              <Button variant="outline" size="icon" onClick={() => setIsNewChatDialogOpen(true)} className="flex-shrink-0">
-                <MessageSquarePlus className="h-5 w-5" />
-                <span className="sr-only">New Message</span>
-              </Button>
-            </div>
-            <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search messages or users..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 p-0 overflow-hidden">
-            <ScrollArea className="h-full">
-              {loadingChats && (
-                <div className="divide-y">
-                  <ChatListItemSkeleton />
-                  <ChatListItemSkeleton />
-                  <ChatListItemSkeleton />
-                </div>
-              )}
-              {!loadingChats && filteredChats.length === 0 && (
-                 <div className="p-8 text-center text-muted-foreground">
-                    No chats found. Start a new conversation!
-                 </div>
-              )}
-              {!loadingChats && filteredChats.length > 0 && (
-                <div className="divide-y">
-                  {filteredChats.map((chat) => (
-                    <Link href={`/messages/${chat.id}`} key={chat.id} className="block hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center space-x-4 p-4">
-                        <Avatar className="h-12 w-12 flex-shrink-0">
-                          {chat.otherUser?.photoURL ? (
-                             <Image src={chat.otherUser.photoURL} alt={chat.otherUser?.displayName || 'User'} width={48} height={48} className="rounded-full" data-ai-hint="user avatar" />
-                          ) : (
-                             <AvatarFallback>{(chat.otherUser?.displayName || 'U').charAt(0)}</AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="truncate font-semibold text-foreground">{chat.otherUser?.displayName || 'Unnamed Chat'}</p>
-                            {chat.lastMessageTimestamp && (
-                              <p className="text-xs text-muted-foreground flex-shrink-0 ml-2">
-                                {formatDistanceToNow(chat.lastMessageTimestamp, { addSuffix: true })}
-                              </p>
+    <MainLayout>
+      <div className="h-[calc(100vh-theme(spacing.24))] w-full"> {/* Adjusted height for main layout padding */}
+          <Card className="h-full flex flex-col shadow-lg w-full">
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="font-headline text-2xl">Messages</CardTitle>
+                <Button variant="outline" size="icon" onClick={() => setIsNewChatDialogOpen(true)} className="flex-shrink-0">
+                  <MessageSquarePlus className="h-5 w-5" />
+                  <span className="sr-only">New Message</span>
+                </Button>
+              </div>
+              <div className="relative mt-4">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search messages or users..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 p-0 overflow-hidden">
+              <ScrollArea className="h-full">
+                {loadingChats && (
+                  <div className="divide-y">
+                    <ChatListItemSkeleton />
+                    <ChatListItemSkeleton />
+                    <ChatListItemSkeleton />
+                  </div>
+                )}
+                {!loadingChats && filteredChats.length === 0 && (
+                   <div className="p-8 text-center text-muted-foreground">
+                      No chats found. Start a new conversation!
+                   </div>
+                )}
+                {!loadingChats && filteredChats.length > 0 && (
+                  <div className="divide-y">
+                    {filteredChats.map((chat) => (
+                      <Link href={`/messages/${chat.id}`} key={chat.id} className="block hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center space-x-4 p-4">
+                          <Avatar className="h-12 w-12 flex-shrink-0">
+                            {chat.otherUser?.photoURL ? (
+                               <Image src={chat.otherUser.photoURL} alt={chat.otherUser?.displayName || 'User'} width={48} height={48} className="rounded-full" data-ai-hint="user avatar" />
+                            ) : (
+                               <AvatarFallback>{(chat.otherUser?.displayName || 'U').charAt(0)}</AvatarFallback>
                             )}
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <p className="truncate text-sm text-muted-foreground">{chat.lastMessageText || 'No messages yet'}</p>
-                            {/* Placeholder for unread count, not implemented yet */}
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className="truncate font-semibold text-foreground">{chat.otherUser?.displayName || 'Unnamed Chat'}</p>
+                              {chat.lastMessageTimestamp && (
+                                <p className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                                  {formatDistanceToNow(chat.lastMessageTimestamp, { addSuffix: true })}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="truncate text-sm text-muted-foreground">{chat.lastMessageText || 'No messages yet'}</p>
+                              {/* Placeholder for unread count, not implemented yet */}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      <NewChatDialog open={isNewChatDialogOpen} onOpenChange={setIsNewChatDialogOpen} />
-    </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        <NewChatDialog open={isNewChatDialogOpen} onOpenChange={setIsNewChatDialogOpen} />
+      </div>
+    </MainLayout>
   );
 }
-
