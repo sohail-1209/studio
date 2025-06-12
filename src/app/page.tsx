@@ -381,229 +381,238 @@ export default function FeedPage() {
   );
 
   return (
-    <div className="w-full">
-      <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between mb-6 md:mb-8">
-        <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">Feed</h1>
-        <Button onClick={() => setIsCreatePostDialogOpen(true)} size="default" className="w-full sm:w-auto">
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Create Post
-        </Button>
-      </div>
+    <>
+      <h1 style={{ backgroundColor: 'yellow', color: 'black', padding: '20px', textAlign: 'center', fontSize: '24px', fontWeight: 'bold', border: '5px solid red', zIndex: 9999, position: 'fixed', top: '0', left: '0', width: '100%',  boxSizing: 'border-box' }}>
+        ATTENTION: CODE CHANGE TEST - If you see this, changes ARE being applied. Version 2.
+      </h1>
+      <MainLayout>
+        <div className="w-full pt-20"> {/* Added padding-top to account for the fixed banner */}
+          <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between mb-6 md:mb-8">
+            <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">Feed</h1>
+            <Button onClick={() => setIsCreatePostDialogOpen(true)} size="default" className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Create Post
+            </Button>
+          </div>
 
-      <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
+          <CreatePostDialog open={isCreatePostDialogOpen} onOpenChange={setIsCreatePostDialogOpen} />
 
-      <Card className="w-full shadow-lg mb-6 md:mb-8">
-        <CardHeader className="pb-3 pt-5">
-          <CardTitle className="font-headline text-xl">Stories</CardTitle>
-        </CardHeader>
-        <CardContent className="flex space-x-4 overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
-          {loadingStoriesReel && (
-            [...Array(5)].map((_, i) => <StorySkeleton key={`story-skel-${i}`} />)
-          )}
-          {!loadingStoriesReel && storiesData.length === 0 && (
-            <p className="text-sm text-muted-foreground py-2">No stories to show right now. Be the first to share one!</p>
-          )}
-          {!loadingStoriesReel && storiesData.map((storyUser) => {
-            const isCurrentUserStoryAuthor = storyUser.userId === user?.uid;
-            const storyAvatarUrl = isCurrentUserStoryAuthor ? user?.photoURL || storyUser.photoURL : storyUser.photoURL;
-            const storyDisplayName = isCurrentUserStoryAuthor ? user?.displayName || storyUser.displayName : storyUser.displayName;
-            const storyAvatarFallback = (storyDisplayName || 'U').charAt(0).toUpperCase();
+          <Card className="w-full shadow-lg mb-6 md:mb-8">
+            <CardHeader className="pb-3 pt-5">
+              <CardTitle className="font-headline text-xl">Stories</CardTitle>
+            </CardHeader>
+            <CardContent className="flex space-x-4 overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+              {loadingStoriesReel && (
+                [...Array(5)].map((_, i) => <StorySkeleton key={`story-skel-${i}`} />)
+              )}
+              {!loadingStoriesReel && storiesData.length === 0 && (
+                <p className="text-sm text-muted-foreground py-2">No stories to show right now. Be the first to share one!</p>
+              )}
+              {!loadingStoriesReel && storiesData.map((storyUser) => {
+                const isCurrentUserStoryAuthor = storyUser.userId === user?.uid;
+                const storyAvatarUrl = isCurrentUserStoryAuthor ? user?.photoURL || storyUser.photoURL : storyUser.photoURL;
+                const storyDisplayName = isCurrentUserStoryAuthor ? user?.displayName || storyUser.displayName : storyUser.displayName;
+                const storyAvatarFallback = (storyDisplayName || 'U').charAt(0).toUpperCase();
 
-            return (
-              <div
-                key={storyUser.userId}
-                className="flex flex-col items-center space-y-1.5 cursor-pointer group flex-shrink-0"
-                onClick={() => handleStoryClick(storyUser)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && handleStoryClick(storyUser)}
-              >
-                <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5 group-hover:border-pink-400 transition-colors">
-                  {storyAvatarUrl ? (
-                    <Image
-                      src={storyAvatarUrl}
-                      alt={`${storyDisplayName || 'User'}'s story`}
-                      width={64}
-                      height={64}
-                      className="rounded-full"
-                      data-ai-hint={storyUser.dataAiHint || "portrait person"}
-                    />
-                  ) : (
-                    <AvatarFallback>{storyAvatarFallback}</AvatarFallback>
-                  )}
-                </Avatar>
-                <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors truncate w-16 text-center">
-                  {storyDisplayName || 'User'}
-                </span>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      {selectedStoryAuthor && (
-        <StoryViewerDialog
-          open={isStoryViewerOpen}
-          onOpenChange={setIsStoryViewerOpen}
-          stories={currentUserStories}
-          author={selectedStoryAuthor}
-          loadingStories={loadingCurrentUserStories}
-          onDeleteStory={handleDeleteRequest}
-        />
-      )}
-
-      <div className="space-y-6 md:space-y-8">
-        {loadingPosts && (
-          <> <PostSkeleton /> <PostSkeleton /> </>
-        )}
-        {!loadingPosts && posts.length === 0 && (
-          <Card className="py-12 text-center w-full shadow-lg">
-            <CardContent>
-              <p className="text-lg font-semibold text-foreground">No posts yet!</p>
-              <p className="text-muted-foreground">Be the first one to share something.</p>
+                return (
+                  <div
+                    key={storyUser.userId}
+                    className="flex flex-col items-center space-y-1.5 cursor-pointer group flex-shrink-0"
+                    onClick={() => handleStoryClick(storyUser)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && handleStoryClick(storyUser)}
+                  >
+                    <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5 group-hover:border-pink-400 transition-colors">
+                      {storyAvatarUrl ? (
+                        <Image
+                          src={storyAvatarUrl}
+                          alt={`${storyDisplayName || 'User'}'s story`}
+                          width={64}
+                          height={64}
+                          className="rounded-full"
+                          data-ai-hint={storyUser.dataAiHint || "portrait person"}
+                        />
+                      ) : (
+                        <AvatarFallback>{storyAvatarFallback}</AvatarFallback>
+                      )}
+                    </Avatar>
+                    <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors truncate w-16 text-center">
+                      {storyDisplayName || 'User'}
+                    </span>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
-        )}
-        {!loadingPosts && posts.map((post, index) => {
-          const isCurrentUserPost = post.userId === user?.uid;
-          const avatarUrl = isCurrentUserPost ? (user?.photoURL || post.userAvatarUrl) : post.userAvatarUrl;
-          const avatarAlt = isCurrentUserPost ? (user?.displayName || 'Your avatar') : (post.userDisplayName || 'User avatar');
-          const avatarFallbackInitial = (isCurrentUserPost ? (user?.displayName || 'U') : (post.userDisplayName || 'U')).charAt(0).toUpperCase();
-          const postAuthorDisplayName = isCurrentUserPost ? (user?.displayName || 'You') : (post.userDisplayName || 'Anonymous User');
-          const isLikedByCurrentUser = post.likedBy && user ? post.likedBy.includes(user.uid) : false;
 
-          let postContentPreviewForComment = post.caption
-              ? (post.caption.substring(0, 30) + (post.caption.length > 30 ? '...' : ''))
-              : (post.imageUrl ? 'your image' : (post.videoUrl ? 'your video' : 'your post'));
+          {selectedStoryAuthor && (
+            <StoryViewerDialog
+              open={isStoryViewerOpen}
+              onOpenChange={setIsStoryViewerOpen}
+              stories={currentUserStories}
+              author={selectedStoryAuthor}
+              loadingStories={loadingCurrentUserStories}
+              onDeleteStory={handleDeleteRequest}
+            />
+          )}
 
-          return (
-            <Card key={post.id} className="overflow-hidden shadow-lg w-full">
-              <CardHeader className="p-4">
-                <div className="flex items-center space-x-3">
-                  <Avatar>
-                    {avatarUrl ? (
-                      <Image src={avatarUrl} alt={avatarAlt} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
-                    ) : (
-                      <AvatarFallback>{avatarFallbackInitial}</AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div className="flex-grow">
-                    <p className="font-semibold text-foreground">{postAuthorDisplayName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {post.createdAt ? formatDistanceToNow(post.createdAt, { addSuffix: true }) : 'just now'}
-                    </p>
-                  </div>
-                   {isCurrentUserPost && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">More options</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Post
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {post.imageUrl && (
-                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/30">
-                    <Image
-                      src={post.imageUrl}
-                      alt={post.caption || "Post image"}
-                      fill
-                      style={{objectFit: 'contain'}}
-                      data-ai-hint={post.dataAiHint || "user content"}
-                      priority={index < 2}
-                      className="transition-opacity duration-300 hover:opacity-90"
-                    />
-                  </div>
-                )}
-                {post.videoUrl && (
-                  <div className="relative aspect-[16/10] w-full bg-black flex items-center justify-center overflow-hidden">
-                     <Image
-                       src={post.videoUrl}
-                       alt={post.caption || "Post video placeholder"}
-                       fill
-                       style={{objectFit: 'contain'}}
-                       data-ai-hint={post.dataAiHint || "user content video"}
-                     />
-                  </div>
-                )}
-                {post.caption && <p className="p-4 text-foreground whitespace-pre-wrap text-sm leading-relaxed">{post.caption}</p>}
+          <div className="space-y-6 md:space-y-8">
+            {loadingPosts && (
+              <> <PostSkeleton /> <PostSkeleton /> </>
+            )}
+            {!loadingPosts && posts.length === 0 && (
+              <Card className="py-12 text-center w-full shadow-lg">
+                <CardContent>
+                  <p className="text-lg font-semibold text-foreground">No posts yet!</p>
+                  <p className="text-muted-foreground">Be the first one to share something.</p>
+                </CardContent>
+              </Card>
+            )}
+            {!loadingPosts && posts.map((post, index) => {
+              const isCurrentUserPost = post.userId === user?.uid;
+              const avatarUrl = isCurrentUserPost ? (user?.photoURL || post.userAvatarUrl) : post.userAvatarUrl;
+              const avatarAlt = isCurrentUserPost ? (user?.displayName || 'Your avatar') : (post.userDisplayName || 'User avatar');
+              const avatarFallbackInitial = (isCurrentUserPost ? (user?.displayName || 'U') : (post.userDisplayName || 'U')).charAt(0).toUpperCase();
+              const postAuthorDisplayName = isCurrentUserPost ? (user?.displayName || 'You') : (post.userDisplayName || 'Anonymous User');
+              const isLikedByCurrentUser = post.likedBy && user ? post.likedBy.includes(user.uid) : false;
 
-                <div className="border-t border-border p-1.5">
-                  <div className="flex items-center justify-around text-muted-foreground">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="flex-1 py-2.5 hover:bg-accent/50"
-                      onClick={() => handleLikePost(post.id, post)}
-                      disabled={isLiking[post.id]}
-                    >
-                      {isLiking[post.id] ? <Spinner size={16} className="mr-2" /> :
-                        <Heart
-                          className={`mr-2 h-4 w-4 ${isLikedByCurrentUser ? 'text-red-500' : 'text-muted-foreground'}`}
-                          fill={isLikedByCurrentUser ? 'currentColor' : 'none'}
+              let postContentPreviewForComment = post.caption
+                  ? (post.caption.substring(0, 30) + (post.caption.length > 30 ? '...' : ''))
+                  : (post.imageUrl ? 'your image' : (post.videoUrl ? 'your video' : 'your post'));
+
+              return (
+                <Card key={post.id} className="overflow-hidden shadow-lg w-full">
+                  <CardHeader className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <Avatar>
+                        {avatarUrl ? (
+                          <Image src={avatarUrl} alt={avatarAlt} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
+                        ) : (
+                          <AvatarFallback>{avatarFallbackInitial}</AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="flex-grow">
+                        <p className="font-semibold text-foreground">{postAuthorDisplayName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {post.createdAt ? formatDistanceToNow(post.createdAt, { addSuffix: true }) : 'just now'}
+                        </p>
+                      </div>
+                       {isCurrentUserPost && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">More options</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Post
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {post.imageUrl && (
+                      <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/30">
+                        <Image
+                          src={post.imageUrl}
+                          alt={post.caption || "Post image"}
+                          fill
+                          style={{objectFit: 'contain'}}
+                          data-ai-hint={post.dataAiHint || "user content"}
+                          priority={index < 2}
+                          className="transition-opacity duration-300 hover:opacity-90"
                         />
-                      }
-                      Likes ({post.likesCount || 0})
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="flex-1 py-2.5 hover:bg-accent/50"
-                      onClick={() => toggleCommentSection(post.id)}
-                    >
-                      <MessageIcon className="mr-2 h-4 w-4" />
-                      Comments ({post.commentsCount || 0})
-                    </Button>
-                    <Button variant="ghost" size="sm" className="flex-1 py-2.5 hover:bg-accent/50" onClick={() => handleSharePost(post)}>
-                      <Share2 className="mr-2 h-4 w-4" /> Share
-                    </Button>
-                  </div>
-                </div>
-                {showComments[post.id] && (
-                  <div className="p-4 border-t border-border bg-muted/20">
-                     <CommentInput
-                        postId={post.id}
-                        postOwnerId={post.userId}
-                        postContentPreview={postContentPreviewForComment}
-                      />
-                     <Separator className="my-3 bg-border/70" />
-                     <CommentList postId={post.id} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-      {postToDelete && (
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this {postToDelete.isStory ? 'story' : 'post'} and all its comments.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setPostToDelete(null)} disabled={isDeletingPost}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDeletePost} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingPost}>
-                {isDeletingPost ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-    </div>
+                      </div>
+                    )}
+                    {post.videoUrl && (
+                      <div className="relative aspect-[16/10] w-full bg-black flex items-center justify-center overflow-hidden">
+                         <Image
+                           src={post.videoUrl}
+                           alt={post.caption || "Post video placeholder"}
+                           fill
+                           style={{objectFit: 'contain'}}
+                           data-ai-hint={post.dataAiHint || "user content video"}
+                         />
+                      </div>
+                    )}
+                    {post.caption && <p className="p-4 text-foreground whitespace-pre-wrap text-sm leading-relaxed">{post.caption}</p>}
+
+                    <div className="border-t border-border p-1.5">
+                      <div className="flex items-center justify-around text-muted-foreground">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-1 py-2.5 hover:bg-accent/50"
+                          onClick={() => handleLikePost(post.id, post)}
+                          disabled={isLiking[post.id]}
+                        >
+                          {isLiking[post.id] ? <Spinner size={16} className="mr-2" /> :
+                            <Heart
+                              className={`mr-2 h-4 w-4 ${isLikedByCurrentUser ? 'text-red-500' : 'text-muted-foreground'}`}
+                              fill={isLikedByCurrentUser ? 'currentColor' : 'none'}
+                            />
+                          }
+                          Likes ({post.likesCount || 0})
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-1 py-2.5 hover:bg-accent/50"
+                          onClick={() => toggleCommentSection(post.id)}
+                        >
+                          <MessageIcon className="mr-2 h-4 w-4" />
+                          Comments ({post.commentsCount || 0})
+                        </Button>
+                        <Button variant="ghost" size="sm" className="flex-1 py-2.5 hover:bg-accent/50" onClick={() => handleSharePost(post)}>
+                          <Share2 className="mr-2 h-4 w-4" /> Share
+                        </Button>
+                      </div>
+                    </div>
+                    {showComments[post.id] && (
+                      <div className="p-4 border-t border-border bg-muted/20">
+                         <CommentInput
+                            postId={post.id}
+                            postOwnerId={post.userId}
+                            postContentPreview={postContentPreviewForComment}
+                          />
+                         <Separator className="my-3 bg-border/70" />
+                         <CommentList postId={post.id} />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          {postToDelete && (
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete this {postToDelete.isStory ? 'story' : 'post'} and all its comments.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setPostToDelete(null)} disabled={isDeletingPost}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmDeletePost} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeletingPost}>
+                    {isDeletingPost ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </MainLayout>
+    </>
   );
 }
+
+    
