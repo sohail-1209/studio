@@ -38,17 +38,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  console.log("AuthContext: PROVIDER RENDERING. Initial loading state:", loading);
+
   const fetchUserProfile = useCallback(async (fbUser: FirebaseUser) => {
+    console.log(`AuthContext: fetchUserProfile called for UID: ${fbUser.uid}`);
     const userRef = doc(db, 'profiles', fbUser.uid);
     try {
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
+        console.log(`AuthContext: Profile FOUND in Firestore for UID: ${fbUser.uid}`);
         setUser(userSnap.data() as UserProfile);
       } else {
-        // Create a default profile if one doesn't exist
+        console.warn(`AuthContext: Profile NOT FOUND for UID: ${fbUser.uid}. Creating new profile.`);
         const derivedDisplayName = fbUser.displayName || fbUser.email?.split('@')[0] || 'Anonymous';
         const derivedPhotoURL = fbUser.photoURL || `https://placehold.co/100x100.png?text=${derivedDisplayName.charAt(0).toUpperCase()}`;
-        // Ensure username is valid for Firestore paths if used, and reasonably unique
         const baseUsername = (fbUser.email?.split('@')[0] || derivedDisplayName).toLowerCase().replace(/[^a-z0-9_.]/g, '').substring(0, 15);
         const derivedUsername = baseUsername || 'user' + fbUser.uid.substring(0,5);
         
@@ -59,40 +62,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: derivedPhotoURL,
           username: derivedUsername,
           bio: '',
-          followersCount: 0, // Initialize counts
+          followersCount: 0,
           followingCount: 0,
         };
         await setDoc(userRef, newUserProfile);
         setUser(newUserProfile);
+        console.log(`AuthContext: CREATED and set new profile for UID: ${fbUser.uid}`);
       }
     } catch (error) {
-      console.error("AuthContext: Error fetching/creating user profile from Firestore:", error);
-      setUser(null); // Handle error by clearing user profile
+      console.error("AuthContext: ERROR fetching/creating user profile from Firestore:", error);
+      setUser(null);
     }
   }, []);
 
 
   useEffect(() => {
+    console.log("AuthContext: useEffect for onAuthStateChanged ATTACHING.");
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setLoading(true);
+      console.log(`AuthContext: onAuthStateChanged FIRED. Firebase user: ${fbUser ? fbUser.uid : 'null'}. Current loading: ${loading}`);
+      setLoading(true); // Explicitly set loading true at the start of processing
       if (fbUser) {
-        setFirebaseUser(fbUser); // Set Firebase Auth user state
-        // Fetch/update Firestore profile based on the latest Firebase Auth user state
+        console.log(`AuthContext: Firebase user DETECTED (UID: ${fbUser.uid}). Fetching profile...`);
+        setFirebaseUser(fbUser);
         await fetchUserProfile(fbUser);
       } else {
+        console.log("AuthContext: No Firebase user detected (null). Clearing user states.");
         setFirebaseUser(null);
         setUser(null);
       }
+      console.log(`AuthContext: Auth state processing COMPLETE. Setting loading to false. User state:`, user, `FirebaseUser state:`, firebaseUser);
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [fetchUserProfile]);
+    return () => {
+      console.log("AuthContext: useEffect for onAuthStateChanged DETACHING.");
+      unsubscribe();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchUserProfile]); // Removed user and firebaseUser from deps to avoid potential loops if fetchUserProfile causes their update.
 
   const logout = async () => {
+    console.log("AuthContext: logout function CALLED.");
     try {
       await firebaseSignOut(auth);
-      // onAuthStateChanged will handle clearing firebaseUser and user states
+      console.log("AuthContext: Firebase signOut successful. Redirecting to /login.");
+      // onAuthStateChanged will handle clearing firebaseUser and user states.
       router.push('/login'); 
     } catch (error) {
       console.error('Error during logout (AuthContext):', error);
@@ -106,29 +120,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const reloadUser = useCallback(async () => {
     const currentAuthUser = auth.currentUser;
+    console.log(`AuthContext: reloadUser function CALLED. Current auth user: ${currentAuthUser ? currentAuthUser.uid : 'null'}`);
     if (currentAuthUser) {
       setLoading(true);
       try {
         await reload(currentAuthUser);
         const refreshedFbUser = auth.currentUser;
+        console.log(`AuthContext: Firebase user reloaded. Refreshed auth user: ${refreshedFbUser ? refreshedFbUser.uid : 'null'}`);
         if (refreshedFbUser) {
           setFirebaseUser(refreshedFbUser);
-          await fetchUserProfile(refreshedFbUser); // Re-fetch Firestore profile with new auth data
+          await fetchUserProfile(refreshedFbUser);
         } else {
-          // This case should ideally be handled by onAuthStateChanged if user becomes null
           setFirebaseUser(null);
           setUser(null);
         }
       } catch (error) {
         console.error("Error reloading user (AuthContext):", error);
         if ((error as any).code === 'auth/user-token-expired' || (error as any).code === 'auth/user-disabled') {
+          console.warn("AuthContext: User token expired or user disabled during reload. Logging out.");
           await logout();
         }
       } finally {
         setLoading(false);
+        console.log("AuthContext: reloadUser finished, loading set to false.");
       }
     }
-  }, [fetchUserProfile]); // Added fetchUserProfile
+  }, [fetchUserProfile, logout]);
   
   return (
     <AuthContext.Provider value={{ user, firebaseUser, loading, logout, reloadUser }}>
