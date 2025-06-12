@@ -39,26 +39,50 @@ service cloud.firestore {
         request.auth.uid == request.resource.data.requesterId &&
         request.resource.data.requesterId != request.resource.data.recipientId &&
         (
-          // Case 1: Target profile is explicitly private, request status must be 'pending'
+          // Case 1: Target profile is private, request must be 'pending'
           (
+            exists(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)) &&
             get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data.isPrivate == true &&
             request.resource.data.status == 'pending'
           )
           ||
-          // Case 2: Target profile is public (isPrivate is false OR isPrivate field is missing), request status must be 'accepted'
+          // Case 2: Target profile is public (isPrivate is false or field is missing), request must be 'accepted'
           (
             (
-              get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data.isPrivate == false ||
-              !( 'isPrivate' in get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data )
+              !exists(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)) ||
+              !('isPrivate' in get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data) ||
+              get(/databases/$(database)/documents/profiles/$(request.resource.data.recipientId)).data.isPrivate == false
             ) &&
             request.resource.data.status == 'accepted'
           )
         );
 
+      // UPDATED allow update RULE
       allow update: if request.auth != null &&
-                     request.auth.uid == resource.data.recipientId &&
-                     request.resource.data.status != resource.data.status &&
-                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+        (
+          // Case 1: Recipient is managing the request (accept/decline a pending request)
+          (
+            request.auth.uid == resource.data.recipientId &&
+            resource.data.status == 'pending' && // Can only manage if it's currently pending
+            (request.resource.data.status == 'accepted' || request.resource.data.status == 'declined') &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+          ||
+          // Case 2: Requester is re-following a PUBLIC profile
+          // (changing status from any non-'accepted' state, like 'declined', to 'accepted')
+          (
+            request.auth.uid == resource.data.requesterId &&
+            request.resource.data.status == 'accepted' &&
+            resource.data.status != 'accepted' && // Ensures status is actually changing to 'accepted'
+            exists(/databases/$(database)/documents/profiles/$(resource.data.recipientId)) &&
+            (
+              // Target profile must be public
+              get(/databases/$(database)/documents/profiles/$(resource.data.recipientId)).data.isPrivate == false ||
+              !('isPrivate' in get(/databases/$(database)/documents/profiles/$(resource.data.recipientId)).data) // isPrivate field missing means public
+            ) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) // Only status and timestamp can change
+          )
+        );
 
       allow delete: if request.auth != null &&
                      (
@@ -75,37 +99,43 @@ service cloud.firestore {
 
     // Posts collection
     match /posts/{postId} {
-      allow read: if (resource.data.authorIsPrivate == false || resource.data.authorIsPrivate == null) ||
-                     (request.auth != null && resource.data.authorIsPrivate == true &&
-                       (
-                         (exists(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(resource.data.userId)) &&
-                          get(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(resource.data.userId)).data.status == 'accepted')
-                         ||
-                         resource.data.userId == request.auth.uid
-                       )
-                     );
+      allow read: if
+        // Public posts or older posts (authorIsPrivate is null/missing)
+        (resource.data.authorIsPrivate == false || !('authorIsPrivate' in resource.data)) ||
+        // Author's own posts
+        (request.auth != null && resource.data.userId == request.auth.uid) ||
+        // Posts from private accounts the user is following
+        (
+          request.auth != null &&
+          resource.data.authorIsPrivate == true &&
+          exists(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(resource.data.userId)) &&
+          get(/databases/$(database)/documents/followRequests/$(request.auth.uid)_$(resource.data.userId)).data.status == 'accepted'
+        );
 
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
 
       allow update: if request.auth != null &&
                       (
-                        // Owner can update non-counter fields and their own visibility flag
-                        (request.auth.uid == resource.data.userId &&
-                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['likesCount', 'likedBy', 'commentsCount'])) ||
-                        // Any authenticated user can update interaction counts
-                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy'])) ||
-                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']))
+                        // Owner can update non-interaction fields
+                        ( request.auth.uid == resource.data.userId &&
+                          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['likesCount', 'likedBy', 'commentsCount'])
+                        ) ||
+                        // Any authenticated user can update interaction fields (likes, comments)
+                        // This assumes client-side logic for arrayUnion/arrayRemove/increment is trusted for these.
+                        ( request.resource.data.diff(resource.data).affectedKeys().hasAny(['likesCount', 'likedBy', 'commentsCount']) &&
+                          request.resource.data.diff(resource.data).affectedKeys().removeAll(['likesCount', 'likedBy', 'commentsCount']).size() == 0 // Ensures ONLY these fields change
+                        )
                       );
-
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
 
       match /comments/{commentId} {
         allow read: if true;
         allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-        // Allow comment deletion by comment author OR post owner
+        // Allow comment author OR post owner to delete comments
         allow delete: if request.auth != null &&
-                         (request.auth.uid == resource.data.userId ||
-                          request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId);
+                         ( request.auth.uid == resource.data.userId || // Comment author
+                           request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId // Post owner
+                         );
       }
     }
 
@@ -113,12 +143,14 @@ service cloud.firestore {
     match /profiles/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && request.auth.uid == userId;
-			allow delete: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null &&
                      (
+                       // Condition 1: Profile owner can update their own non-sensitive fields
                        (request.auth.uid == userId &&
                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'followersCount', 'followingCount']))
                        ||
+                       // Condition 2: Allow updates to ONLY followersCount or ONLY followingCount by the profile owner.
                        (
                          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount']) && request.auth.uid == userId) ||
                          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followingCount']) && request.auth.uid == userId)
@@ -128,28 +160,22 @@ service cloud.firestore {
 
     // Notifications collection
     match /notifications/{notificationId} {
+        // Recipient can read, update (e.g., mark as read, actionTaken), or delete their notifications
         allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
-        // Allow deletion by recipient OR actor (for cleanup during account deletion)
+        // Added actorId check for deletion during account cleanup
         allow delete: if request.auth != null && (request.auth.uid == resource.data.recipientId || request.auth.uid == resource.data.actorId);
 
         allow create: if request.auth != null &&
                        request.resource.data.actorId == request.auth.uid &&
                        request.resource.data.actorId != request.resource.data.recipientId &&
                        (
-                         ( request.resource.data.type == 'like' &&
-                           request.resource.data.postId != null
-                         ) ||
-                         ( request.resource.data.type == 'comment' &&
-                           request.resource.data.postId != null &&
-                           request.resource.data.commentText != null
-                         ) ||
-                         ( request.resource.data.type == 'follow_request' &&
-                           request.resource.data.followRequestId != null
-                         ) ||
-                         ( request.resource.data.type == 'follow_accept' &&
-                           request.resource.data.originalFollowRequestId != null
-                         )
+                         ( request.resource.data.type == 'like' && request.resource.data.postId != null ) ||
+                         ( request.resource.data.type == 'comment' && request.resource.data.postId != null && request.resource.data.commentText != null ) ||
+                         ( request.resource.data.type == 'follow_request' && request.resource.data.followRequestId != null ) ||
+                         ( request.resource.data.type == 'follow_accept' && request.resource.data.originalFollowRequestId != null )
                        );
     }
   }
 }
+
+    
