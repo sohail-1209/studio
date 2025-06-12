@@ -40,30 +40,41 @@ export function AppSidebar() {
   useEffect(() => {
     // Initialize theme based on localStorage
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const systemPrefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
     if (storedTheme) {
       setCurrentTheme(storedTheme);
-      document.documentElement.classList.toggle('dark', storedTheme === 'dark');
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', storedTheme === 'dark');
+      }
     } else if (systemPrefersDark) {
       setCurrentTheme('dark');
-      document.documentElement.classList.add('dark');
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.add('dark');
+      }
     } else {
       setCurrentTheme('light');
-      document.documentElement.classList.remove('dark');
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.remove('dark');
+      }
     }
 
     // Listener for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('theme')) { // Only if no theme is manually set
-        const newSystemTheme = e.matches ? 'dark' : 'light';
-        setCurrentTheme(newSystemTheme);
-        document.documentElement.classList.toggle('dark', newSystemTheme === 'dark');
-      }
-    };
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    let mediaQuery: MediaQueryList | undefined;
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (e: MediaQueryListEvent) => {
+          if (!localStorage.getItem('theme')) { // Only if no theme is manually set
+            const newSystemTheme = e.matches ? 'dark' : 'light';
+            setCurrentTheme(newSystemTheme);
+            if (typeof document !== 'undefined') {
+              document.documentElement.classList.toggle('dark', newSystemTheme === 'dark');
+            }
+          }
+        };
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery?.removeEventListener('change', handleChange);
+    }
 
   }, []);
 
@@ -72,7 +83,9 @@ export function AppSidebar() {
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
     setCurrentTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    }
     // Potentially add a toast notification here if desired
   };
 
@@ -118,15 +131,12 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.filter(item => {
             if (item.requiresAuth && !user) return false;
-            // Example: hide on md and up - this logic might need adjustment if window is not available SSR
             if (item.mobileOnly && typeof window !== 'undefined' && window.innerWidth >= 768) return false; 
             return true;
           }).map((item) => {
-            // Handle dynamic href for profile
             const href = item.label === 'Profile' && user ? `/profile/${user.uid}` : item.href;
             const isActive = pathname === href || (item.label === 'Profile' && user && pathname.startsWith(`/profile/${user.uid}`));
             
-            // Skip rendering profile link if user is not available
             if (item.label === 'Profile' && !user) return null;
 
             return (
@@ -137,10 +147,10 @@ export function AppSidebar() {
                     isActive={isActive}
                     className="!text-white hover:!bg-white/20 data-[active=true]:!bg-white/30 data-[active=true]:font-semibold"
                   >
-                    <>
+                    <span className="flex items-center gap-2.5 w-full"> {/* Ensure full width and consistent gap */}
                       <item.icon />
                       <span>{item.label}</span>
-                    </>
+                    </span>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -160,9 +170,9 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <Link href="/settings" passHref>
               <SidebarMenuButton asChild isActive={pathname === '/settings'} className="!text-white hover:!bg-white/20 data-[active=true]:!bg-white/30 data-[active=true]:font-semibold">
-                <>
+                <span className="flex items-center gap-2.5 w-full">
                   <Settings /><span>Settings</span>
-                </>
+                </span>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
