@@ -10,17 +10,14 @@ import { useEffect } from 'react';
 import { Spinner } from '@/components/shared/Spinner';
 import {
   SidebarProvider,
-  Sidebar as UISidebar,
+  Sidebar as UISidebar, // Renaming to avoid conflict with semantic HTML5 aside
   SidebarInset,
-  // useSidebar, // Temporarily remove useSidebar for forced desktop
-  // SidebarTrigger, // Not needed for forced desktop
 } from '@/components/ui/sidebar';
-// Mobile-specific imports are commented out for this debugging step
-// import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+// Mobile-specific imports are removed for this forced desktop layout
+// import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 // import { Button } from '@/components/ui/button';
 // import { PanelLeft } from 'lucide-react';
 // import { Logo } from '@/components/shared/Logo';
-// import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -29,7 +26,6 @@ interface MainLayoutProps {
 function LayoutContent({ children }: MainLayoutProps) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  // const { isMobile, openMobile, setOpenMobile } = useSidebar(); // Temporarily removed
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -46,36 +42,32 @@ function LayoutContent({ children }: MainLayoutProps) {
   }
 
   if (!user) {
-    // This typically won't be shown due to the redirect, but good for safety.
-    return null;
+    return null; // Should be redirected
   }
 
-  // FORCED DESKTOP LAYOUT FOR DEBUGGING
-  // This structure will be attempted on all screen sizes.
-  // The UISidebar component itself has `hidden md:flex` so it should only show on medium screens and up.
+  // FORCED DESKTOP LAYOUT
   return (
-    <div className="flex min-h-screen bg-background"> {/* Root flex container for desktop */}
-      <UISidebar> {/* Desktop sidebar component from ui/sidebar.tsx */}
-        <AppSidebar /> {/* Actual navigation links and user profile section */}
+    <div className="flex min-h-screen bg-background">
+      <UISidebar> {/* This is the Sidebar component from ui/sidebar.tsx */}
+        <AppSidebar />
       </UISidebar>
-      <SidebarInset> {/* Main content wrapper from ui/sidebar.tsx, takes remaining space */}
-        {/* Inner wrapper for consistent padding and max-width of the content itself */}
-        <div className="w-full max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      <SidebarInset> {/* This is the SidebarInset component from ui/sidebar.tsx */}
+        {/* Inner wrapper for consistent padding of the content itself */}
+        {/* Removing max-w-7xl and mx-auto for initial simplicity */}
+        <main className="w-full flex-1 p-4 sm:p-6 lg:p-8">
           {children}
-        </div>
+        </main>
       </SidebarInset>
     </div>
   );
 }
 
-
 export function MainLayout({ children }: MainLayoutProps) {
+  // Force 'open' to true and provide a no-op for onOpenChange
+  // as we are not implementing collapse/expand functionality in this simplified version.
   return (
-    // Force SidebarProvider to think it's always open for desktop for this test
-    // The 'open' state in SidebarContext will be true.
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider open={true} onOpenChange={() => {}}>
       <LayoutContent>{children}</LayoutContent>
     </SidebarProvider>
   );
 }
-
