@@ -5,7 +5,7 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft, X } from "lucide-react"
-import { useIsMobile } from "@/hooks/use-mobile" // Assuming you have this hook
+import { useIsMobile } from "@/hooks/use-mobile" 
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -18,7 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
 
 const SIDEBAR_WIDTH = "var(--sidebar-width, 16rem)"
@@ -225,7 +225,7 @@ const SidebarInset = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "flex-1 flex flex-col overflow-y-scroll bg-background", // Changed from overflow-y-auto
+        "flex-1 flex flex-col overflow-y-auto bg-background", 
         className
       )}
       {...props}
@@ -638,4 +638,3 @@ export {
   SidebarTrigger, 
   useSidebar,
 }
-
