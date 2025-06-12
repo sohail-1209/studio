@@ -7,16 +7,17 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-// Card and CardContent removed for diagnostic
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus, ShieldAlert } from 'lucide-react';
+import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus, ShieldAlert, Users } from 'lucide-react';
 import Image from 'next/image';
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment } from 'firebase/firestore';
 import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext';
 import type { Post } from '@/types/post';
+import type { FollowRequestDocument } from '@/types/follow';
 import { useAuth } from '@/hooks/useAuth';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
+import { FollowListDialog } from '@/components/profile/FollowListDialog'; // Import the new dialog
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -96,8 +97,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  // const [posts, setPosts] = useState<Post[]>([]); // Commented out for diagnosis
-  // const [loadingPosts, setLoadingPosts] = useState(true); // Commented out for diagnosis
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
@@ -105,10 +104,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const [followStatus, setFollowStatus] = useState<FollowStatus>('not_following');
   const [existingFollowDocId, setExistingFollowDocId] = useState<string | null>(null);
 
-
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
+
+  const [isFollowListDialogOpen, setIsFollowListDialogOpen] = useState(false);
+  const [followListTitle, setFollowListTitle] = useState<'Followers' | 'Following'>('Followers');
+  const [followListUsers, setFollowListUsers] = useState<UserProfile[]>([]);
+  const [loadingFollowList, setLoadingFollowList] = useState(false);
 
   const isOwnProfile = currentUser?.uid === userId;
 
@@ -163,10 +166,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingProfile(false);
       });
       
-      // Diagnostic: Keep posts logic static for now
-      // setPosts([]); 
-      // setLoadingPosts(false);
-
       return () => {
         unsubscribeProfile();
       };
@@ -178,38 +177,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       checkFollowStatus();
     }
   }, [profile, currentUser, isOwnProfile, checkFollowStatus]);
-
-  // useEffect(() => { // Diagnostic: Commented out post fetching
-  //   if (userId) {
-  //     // setLoadingPosts(true); // Commented out
-  //     // const postsColRef = collection(db, 'posts');
-  //     // const q = query(
-  //     //   postsColRef,
-  //     //   where('userId', '==', userId),
-  //     //   where('isStory', '!=', true), // Exclude stories from profile posts tab
-  //     //   orderBy('createdAt', 'desc')
-  //     // );
-  //     // const unsubscribePosts = onSnapshot(q, (snapshot) => {
-  //     //   const fetchedPosts = snapshot.docs.map((docSnap) => ({
-  //     //     id: docSnap.id,
-  //     //     ...docSnap.data(),
-  //     //     createdAt: (docSnap.data().createdAt as Timestamp).toDate(),
-  //     //   })) as Post[];
-  //     //   setPosts(fetchedPosts);
-  //     //   setLoadingPosts(false);
-  //     // }, (error) => {
-  //     //   console.error("Error fetching user posts:", error);
-  //     //   toast({ title: "Error fetching posts", description: error.message, variant: "destructive" });
-  //     //   setLoadingPosts(false);
-  //     // });
-  //     // return () => unsubscribePosts();
-
-  //     // Diagnostic: Immediately set posts to empty and loading to false
-  //      setPosts([]);
-  //      setLoadingPosts(false);
-  //   }
-  // }, [userId, toast]);
-
 
   const handleFollowToggle = async () => {
     if (!currentUser || !currentUser.uid || !profile || !profile.uid || isOwnProfile || isProcessingFollow) {
@@ -228,7 +195,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           batch.delete(followRequestRef);
         }
         batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-        // batch.update(targetUserProfileRef, { followersCount: increment(-1) }); // DIAGNOSTIC: Commented out
+        // batch.update(targetUserProfileRef, { followersCount: increment(-1) }); 
         await batch.commit();
         setFollowStatus('not_following');
         setExistingFollowDocId(null);
@@ -236,7 +203,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       } else {
         const newFollowDocId = `${currentUser.uid}_${profile.uid}`;
         const followRequestRef = doc(db, 'followRequests', newFollowDocId);
-        const newRequestData = {
+        const newRequestData: FollowRequestDocument = {
             requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
             recipientId: profile.uid, recipientDisplayName: profile.displayName, recipientAvatarUrl: profile.photoURL,
             status: 'accepted', 
@@ -244,7 +211,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         };
         batch.set(followRequestRef, newRequestData);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
-        // batch.update(targetUserProfileRef, { followersCount: increment(1) }); // DIAGNOSTIC: Commented out
+        // batch.update(targetUserProfileRef, { followersCount: increment(1) }); 
 
         const notificationRef = doc(collection(db, 'notifications'));
         const notificationData = {
@@ -292,7 +259,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       if (chatSnap.exists()) {
         router.push(`/messages/${chatId}`);
       } else {
-        // Create new chat session
         const newChatData = {
           userIds: [currentUser.uid, profile.uid],
           userDetails: {
@@ -307,7 +273,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           },
           lastMessageText: null,
           lastMessageSenderId: null,
-          lastMessageTimestamp: null, // Will be set by first message or can be serverTimestamp() here
+          lastMessageTimestamp: null, 
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         };
@@ -321,6 +287,67 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       setIsMessaging(false);
     }
   };
+
+  const fetchFollowList = async (type: 'followers' | 'following') => {
+    if (!profile?.uid) return;
+
+    setLoadingFollowList(true);
+    setFollowListUsers([]);
+    setFollowListTitle(type === 'followers' ? 'Followers' : 'Following');
+    setIsFollowListDialogOpen(true);
+
+    try {
+      const followRequestsRef = collection(db, 'followRequests');
+      let q;
+      if (type === 'followers') {
+        q = query(followRequestsRef, where('recipientId', '==', profile.uid), where('status', '==', 'accepted'));
+      } else { // 'following'
+        q = query(followRequestsRef, where('requesterId', '==', profile.uid), where('status', '==', 'accepted'));
+      }
+
+      const querySnapshot = await getDocs(q);
+      const userIdsToFetch: string[] = [];
+      querySnapshot.forEach(docSnap => {
+        const data = docSnap.data() as FollowRequestDocument;
+        if (type === 'followers') {
+          userIdsToFetch.push(data.requesterId);
+        } else {
+          userIdsToFetch.push(data.recipientId);
+        }
+      });
+
+      if (userIdsToFetch.length === 0) {
+        setFollowListUsers([]);
+        setLoadingFollowList(false);
+        return;
+      }
+      
+      const fetchedProfiles: UserProfile[] = [];
+      // Firestore 'in' query supports up to 30 elements. If more, need multiple queries.
+      const MAX_IN_QUERY_SIZE = 30; 
+      for (let i = 0; i < userIdsToFetch.length; i += MAX_IN_QUERY_SIZE) {
+          const chunk = userIdsToFetch.slice(i, i + MAX_IN_QUERY_SIZE);
+          if (chunk.length > 0) {
+            const profilesQuery = query(collection(db, 'profiles'), where('uid', 'in', chunk));
+            const profilesSnapshot = await getDocs(profilesQuery);
+            profilesSnapshot.forEach(profileDoc => {
+                 if (profileDoc.exists()) {
+                    fetchedProfiles.push(profileDoc.data() as UserProfile);
+                }
+            });
+          }
+      }
+      setFollowListUsers(fetchedProfiles);
+
+    } catch (error: any) {
+      console.error(`Error fetching ${type}:`, error);
+      toast({ title: `Error Fetching ${type}`, description: error.message, variant: "destructive" });
+      setFollowListUsers([]);
+    } finally {
+      setLoadingFollowList(false);
+    }
+  };
+
 
   const handleDeleteRequest = (post: Post) => {
     setPostToDelete(post);
@@ -338,7 +365,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     try {
       const postRef = doc(db, 'posts', postToDelete.id);
 
-      // Delete comments subcollection
       const commentsRef = collection(postRef, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
       const commentBatch = writeBatch(db);
@@ -347,19 +373,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       });
       await commentBatch.commit();
 
-      // Delete image from storage (if exists)
       if (postToDelete.imagePath) {
-        // const imageFileRef = storageRef(storage, postToDelete.imagePath); // Corrected function name
+        // const imageFileRef = storageRef(storage, postToDelete.imagePath); 
         // await deleteObject(imageFileRef).catch(storageError => {
         // console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
-        // // toast({ title: "Storage Warning", description: "Could not delete image file, but post will be deleted.", variant: "default", duration: 5000 });
         // });
       }
-      // Delete the post document
       await deleteDoc(postRef);
-
-      // Update local state (this might be handled by onSnapshot if listening to posts)
-      // setPosts(prevPosts => prevPosts.filter(p => p.id !== postToDelete.id));
       toast({ title: "Post Deleted", description: "Your post has been successfully deleted." });
     } catch (error: any) {
       console.error("Error deleting post:", error);
@@ -371,7 +391,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     }
   };
 
-  // Simplified Skeleton for diagnostic, actual skeleton removed from main render path
   const ProfileSkeleton = () => (
     <div className="w-full">
       <div className="bg-muted/30 p-0 relative border-b border-border">
@@ -431,8 +450,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
      return (
       <MainLayout>
         <div className="text-center w-full">
-            <div className="w-full shadow-lg h-full flex flex-col items-center justify-center bg-card rounded-lg"> {/* Added bg-card and rounded-lg */}
-              <div className="p-12"> {/* Added padding */}
+            <div className="w-full shadow-lg h-full flex flex-col items-center justify-center bg-card rounded-lg">
+              <div className="p-12">
                 <h2 className="text-2xl font-semibold">Profile Not Found</h2>
                 <p className="text-muted-foreground">The user profile you are looking for does not exist or could not be loaded.</p>
               </div>
@@ -445,35 +464,29 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const handleProfileUpdate = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
     if (currentUser && updatedProfile.uid === currentUser.uid) {
-        reloadUser(); // This reloads the AuthContext's user
+        reloadUser(); 
     }
   };
 
  const FollowButtonComponent = () => {
-    // If profile is private and not yet accepted, show 'Requested'
-    // This part needs follow request status logic if implementing private profiles fully
-
     if (isProcessingFollow) {
         return <Button disabled className="w-full sm:w-auto"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
     }
     switch (followStatus) {
         case 'following':
             return <Button variant="outline" onClick={handleFollowToggle} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
-        // case 'requested': // For private profiles
-        //     return <Button variant="outline" onClick={handleCancelFollowRequest} className="w-full sm:w-auto"><Clock className="mr-2 h-4 w-4" />Requested</Button>;
         case 'not_following':
         default:
             return <Button onClick={handleFollowToggle} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
     }
  };
 
-  const canMessage = !isOwnProfile; // && (followStatus === 'following' || !profile.isPrivate); // Add logic for private profiles if needed
+  const canMessage = !isOwnProfile; 
 
 
   return (
     <MainLayout>
       <div className="w-full">
-          {/* Profile Header Section - Removed Card wrapper */}
           <div className="bg-muted/20 p-0 relative border-b border-border">
             <div className="relative h-48 w-full md:h-64">
               <Image
@@ -518,13 +531,16 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
 
             <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
-              <span className="text-foreground font-medium"><strong>{0}</strong> Posts</span> {/* Posts count remains 0 due to diagnostic changes */}
-              <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
-              <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
+              <span className="text-foreground font-medium"><strong>{0}</strong> Posts</span> 
+              <button onClick={() => fetchFollowList('followers')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5">
+                <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers
+              </button>
+              <button onClick={() => fetchFollowList('following')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5">
+                <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following
+              </button>
             </div>
           </div>
 
-          {/* Tabs Section - Removed Card or CardContent wrapper */}
           <Tabs defaultValue="posts" className="w-full px-4 sm:px-6 pb-6 bg-background">
             <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
               <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
@@ -532,31 +548,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
               <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
             </TabsList>
             <TabsContent value="posts" className="mt-6 w-full min-w-0 overflow-y-auto" forceMount>
-              {/* {loadingPosts && <LoadingPostsPlaceholder />}
-              {!loadingPosts && posts.length === 0 && <NoPostsPlaceholder />}
-              {!loadingPosts && posts.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full min-w-0">
-                  {posts.map((post) => (
-                    <div key={post.id} className="relative aspect-square group min-w-0">
-                       <Image src={post.imageUrl || "https://placehold.co/300x300.png"} alt={post.caption || "User post"} fill style={{objectFit:"cover"}} className="rounded-md" data-ai-hint="user content" />
-                       {isOwnProfile && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 bg-black/40 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                              <MoreHorizontal size={16} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                       )}
-                    </div>
-                  ))}
-                </div>
-              )} */}
               <NoPostsPlaceholder />
             </TabsContent>
             <TabsContent value="media" className="mt-6 w-full min-w-0 overflow-y-auto" forceMount>
@@ -575,6 +566,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             onProfileUpdate={handleProfileUpdate}
           />
         )}
+        <FollowListDialog
+            open={isFollowListDialogOpen}
+            onOpenChange={setIsFollowListDialogOpen}
+            title={followListTitle}
+            users={followListUsers}
+            loading={loadingFollowList}
+        />
          {postToDelete && (
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent>
