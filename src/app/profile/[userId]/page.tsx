@@ -186,7 +186,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setIsProcessingFollow(true);
     const batch = writeBatch(db);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-    const targetUserProfileRef = doc(db, 'profiles', profile.uid);
+    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); // Not used for target's follower count update
 
     try {
       if (followStatus === 'following') {
@@ -195,6 +195,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           batch.delete(followRequestRef);
         }
         batch.update(currentUserProfileRef, { followingCount: increment(-1) });
+        // Client no longer attempts to update target's followersCount
         // batch.update(targetUserProfileRef, { followersCount: increment(-1) }); 
         await batch.commit();
         setFollowStatus('not_following');
@@ -211,6 +212,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         };
         batch.set(followRequestRef, newRequestData);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
+        // Client no longer attempts to update target's followersCount
         // batch.update(targetUserProfileRef, { followersCount: increment(1) }); 
 
         const notificationRef = doc(collection(db, 'notifications'));
@@ -232,6 +234,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         toast({ title: "Followed", description: `You are now following ${profile.displayName}.` });
       }
       await reloadUser(); 
+      // Fetch the target profile again to get its potentially updated follower count (if managed by backend)
+      const targetUserProfileRef = doc(db, 'profiles', profile.uid);
       const updatedTargetProfileSnap = await getDoc(targetUserProfileRef);
       if (updatedTargetProfileSnap.exists()) {
         setProfile(updatedTargetProfileSnap.data() as UserProfile);
@@ -240,7 +244,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     } catch (error: any) {
       console.error("Error in handleFollowToggle:", error);
       toast({ title: "Operation Failed", description: error.message || "Could not perform follow/unfollow action.", variant: "destructive" });
-      await checkFollowStatus();
+      await checkFollowStatus(); // Re-check status in case of failure
     } finally {
       setIsProcessingFollow(false);
     }
@@ -343,7 +347,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         message: error.message,
         code: error.code,
         details: error.details,
-        fullError: error, // Log the full error object
+        fullError: error, 
       });
       toast({ title: `Error Fetching ${type}`, description: error.message || `An unknown error occurred. Please check the console for more details.`, variant: "destructive" });
       setFollowListUsers([]);
@@ -536,12 +540,24 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
             <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
               <span className="text-foreground font-medium"><strong>{0}</strong> Posts</span> 
-              <button onClick={() => fetchFollowList('followers')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5">
-                <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers
-              </button>
-              <button onClick={() => fetchFollowList('following')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5">
-                <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following
-              </button>
+              {isOwnProfile ? (
+                <button onClick={() => fetchFollowList('followers')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5">
+                  <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers
+                </button>
+              ) : (
+                <span>
+                  <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers
+                </span>
+              )}
+              {isOwnProfile ? (
+                <button onClick={() => fetchFollowList('following')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5">
+                  <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following
+                </button>
+              ) : (
+                <span>
+                  <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following
+                </span>
+              )}
             </div>
           </div>
 
