@@ -47,6 +47,16 @@ interface UserProfile extends AuthContextUserProfile {
 type FollowStatus = 'not_following' | 'following';
 
 
+const LoadingPostsPlaceholder = () => (
+ <div className="py-12 text-center w-full">
+    <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
+    <p className="mt-4 text-lg font-semibold text-foreground">Loading Posts...</p>
+    <p className="mt-1 text-sm text-muted-foreground">
+      Please wait a moment.
+    </p>
+  </div>
+);
+
 const NoMediaPlaceholder = () => (
   <div className="py-12 text-center w-full">
     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -73,16 +83,6 @@ const NoPostsPlaceholder = () => (
     <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
     <p className="mt-1 text-sm text-muted-foreground">
       This user hasn&apos;t shared any posts.
-    </p>
-  </div>
-);
-
-const LoadingPostsPlaceholder = () => (
- <div className="py-12 text-center w-full">
-    <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
-    <p className="mt-4 text-lg font-semibold text-foreground">Loading Posts...</p>
-    <p className="mt-1 text-sm text-muted-foreground">
-      Please wait a moment.
     </p>
   </div>
 );
@@ -162,38 +162,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         toast({ title: "Error fetching profile", description: error.message, variant: "destructive" });
         setLoadingProfile(false);
       });
-
-      // Commented out posts fetching logic for diagnostic
-      /*
-      const postsCollectionRef = collection(db, 'posts');
-      const q = query(postsCollectionRef, where('userId', '==', userId), where('isStory', '!=', true), orderBy('createdAt', 'desc'));
-      setLoadingPosts(true);
-      const unsubscribePosts = onSnapshot(q, (snapshot) => {
-        const fetchedPosts = snapshot.docs.map((docSnapshot) => {
-          const data = docSnapshot.data();
-          return {
-            id: docSnapshot.id, ...data,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
-            imagePath: data.imagePath || null,
-          } as Post;
-        });
-        setPosts(fetchedPosts);
-        setLoadingPosts(false);
-      }, (error) => {
-        console.error(`Error fetching posts for user ${userId}:`, error);
-        setLoadingPosts(false);
-        toast({ title: "Error fetching posts", description: error.message, variant: "destructive" });
-      });
-      */
-
-      // Immediately set posts to empty and loading to false for diagnostic
+      
+      // DIAGNOSTIC: Make Posts tab static
       // setPosts([]);
       // setLoadingPosts(false);
 
-
       return () => {
         unsubscribeProfile();
-        // unsubscribePosts(); // No longer needed as it's commented out
       };
     }
   }, [userId, toast]);
@@ -337,11 +312,11 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       await commentBatch.commit();
 
       if (postToDelete.imagePath) {
-        const imageFileRef = storageRef(storage, postToDelete.imagePath);
-        await deleteObject(imageFileRef).catch(storageError => {
-          console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
-          toast({ title: "Storage Warning", description: "Could not delete image file, but post will be deleted.", variant: "default", duration: 5000 });
-        });
+        // const imageFileRef = storageRef(storage, postToDelete.imagePath); // storageRef is from firebase/storage
+        // await deleteObject(imageFileRef).catch(storageError => {
+        // console.warn("Error deleting image from storage, but proceeding with post deletion:", storageError);
+        // toast({ title: "Storage Warning", description: "Could not delete image file, but post will be deleted.", variant: "default", duration: 5000 });
+        // });
       }
       await deleteDoc(postRef);
       toast({ title: "Post Deleted", description: "Your post has been successfully deleted." });
@@ -470,7 +445,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 pt-16 sm:pt-20 px-4 sm:px-6 pb-6 overflow-y-scroll">
+            <CardContent className="flex-1 pt-16 sm:pt-20 px-4 sm:px-6 pb-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
                 <div className="mb-3 sm:mb-0">
                   <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
@@ -494,8 +469,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
               <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
 
               <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
-                {/* Changed posts.length to 0 for diagnostic */}
-                <span><strong className="text-foreground font-medium">{0}</strong> Posts</span>
+                <span className="text-foreground font-medium"><strong>{0}</strong> Posts</span>
                 <span><strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers</span>
                 <span><strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following</span>
               </div>
@@ -508,14 +482,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 </TabsList>
                 <TabsContent
                   value="posts"
-                  className="mt-6 w-full min-w-0"
+                  className="mt-6 w-full min-w-0 overflow-y-auto"
                 >
                   <NoPostsPlaceholder />
                 </TabsContent>
-                <TabsContent value="media" className="mt-6 w-full min-w-0">
+                <TabsContent value="media" className="mt-6 w-full min-w-0 overflow-y-auto">
                   <NoMediaPlaceholder />
                 </TabsContent>
-                <TabsContent value="likes" className="mt-6 w-full min-w-0">
+                <TabsContent value="likes" className="mt-6 w-full min-w-0 overflow-y-auto">
                    <NoLikesPlaceholder />
                 </TabsContent>
               </Tabs>
