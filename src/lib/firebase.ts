@@ -8,6 +8,7 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type Storage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyAhZUuorc5eNTM-Ui1biqfzJ4lPJD1RXgY",
   authDomain: "nexchat-1209.firebaseapp.com",
