@@ -3,11 +3,30 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: var(--font-body), sans-serif;
-}
-
 @layer base {
+  html, body {
+    padding: 0 !important;
+    margin: 0 !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    overflow-y: scroll !important; /* Force scrollbar, with !important */
+    box-sizing: border-box;
+  }
+  *, *:before, *:after { /* Apply border-box to all elements */
+    box-sizing: inherit;
+  }
+
+  body {
+    font-family: var(--font-body), sans-serif;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    min-height: 100vh;
+    line-height: 1.5; /* Added a sensible default line-height */
+  }
+
   :root {
     --background: 45 30% 98.5%; /* Slightly brighter Very Light Warm Gray/Beige */
     --foreground: 45 10% 18%; /* Slightly darker Warm Gray/Near Black */
@@ -45,7 +64,6 @@ body {
     --sidebar-text-debug-color: 45 10% 18%; /* Foreground for AppSidebar content */
     --sidebar-border: var(--border); /* Match general border */
     
-    /* ADD THIS FOR MAIN CONTENT DEBUG */
     --main-content-debug-background: 240 100% 50%; /* Bright Blue for Debug */
 
     --sidebar-active: 90 45% 58%; /* Accent Green for active items */
@@ -102,7 +120,6 @@ body {
     --sidebar-text-debug-color: 45 20% 90%; /* Foreground for AppSidebar content */
     --sidebar-border: var(--border); /* Match general border */
     
-    /* ADD THIS FOR MAIN CONTENT DEBUG - DARK MODE */
     --main-content-debug-background: 240 80% 40%; /* Slightly Darker Bright Blue for Debug */
     
     --sidebar-active: 90 48% 68%; /* Accent Green for dark mode */
@@ -116,10 +133,9 @@ body {
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border; /* This was already here, keep it */
   }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
+  /* Removed body selector from here as it's defined above */
 }
+
+  
