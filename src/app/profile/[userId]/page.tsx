@@ -323,7 +323,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       }
       
       const fetchedProfiles: UserProfile[] = [];
-      // Firestore 'in' query supports up to 30 elements. If more, need multiple queries.
       const MAX_IN_QUERY_SIZE = 30; 
       for (let i = 0; i < userIdsToFetch.length; i += MAX_IN_QUERY_SIZE) {
           const chunk = userIdsToFetch.slice(i, i + MAX_IN_QUERY_SIZE);
@@ -340,8 +339,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       setFollowListUsers(fetchedProfiles);
 
     } catch (error: any) {
-      console.error(`Error fetching ${type}:`, error);
-      toast({ title: `Error Fetching ${type}`, description: error.message, variant: "destructive" });
+      console.error(`Error fetching ${type} for profile ${profile?.uid}:`, {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        fullError: error, // Log the full error object
+      });
+      toast({ title: `Error Fetching ${type}`, description: error.message || `An unknown error occurred. Please check the console for more details.`, variant: "destructive" });
       setFollowListUsers([]);
     } finally {
       setLoadingFollowList(false);
