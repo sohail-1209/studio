@@ -2,21 +2,28 @@
 // src/components/layout/MobileHeader.tsx
 'use client';
 
-import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useSidebar } from '@/components/ui/sidebar'; // Import useSidebar
 import { Logo } from '@/components/shared/Logo';
-import { Button } from '@/components/ui/button'; // SidebarTrigger is essentially a Button
+import { Button } from '@/components/ui/button'; 
 import { PanelLeft } from 'lucide-react';
 
 export function MobileHeader() {
+  const { setIsMobileSheetOpen } = useSidebar(); // Get setter for mobile sheet
+
   return (
     <header className="md:hidden sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6">
       <div className="flex items-center">
-        <SidebarTrigger asChild>
-          <Button variant="ghost" size="icon" className="mr-2 -ml-2">
-            <PanelLeft className="h-6 w-6" />
-            <span className="sr-only">Toggle Sidebar</span>
-          </Button>
-        </SidebarTrigger>
+        {/* This Button now acts as the SheetTrigger for mobile */}
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            className="mr-2 -ml-2" 
+            onClick={() => setIsMobileSheetOpen(true)}
+            aria-label="Open sidebar"
+        >
+          <PanelLeft className="h-6 w-6" />
+          <span className="sr-only">Open Sidebar</span>
+        </Button>
       </div>
       <div className="flex items-center">
         <Logo iconSize={28} textSize="text-xl" />

@@ -26,6 +26,7 @@ import {
   PlusCircle,
   Moon,
   Sun,
+  PanelLeft, // Icon for desktop trigger
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
@@ -39,7 +40,7 @@ export function AppSidebar() {
   const { user, logout, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const [currentTheme, setCurrentTheme] = useState('light');
-  const { state: sidebarState } = useSidebar(); // Get sidebar state for dynamic rendering
+  const { isDesktopCollapsed, isMobileSheetOpen } = useSidebar(); // Get sidebar state
 
   useEffect(() => {
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -93,40 +94,47 @@ export function AppSidebar() {
     { href: '/explore', label: 'Explore', icon: Compass },
     { href: '/messages', label: 'Messages', icon: MessageSquare },
     { href: '/notifications', label: 'Notifications', icon: Bell },
-    { href: '/create', label: 'Create', icon: PlusCircle, className: "md:hidden" }, // Mobile only create
+    // Create button is now part of MobileHeader or a main page button, not duplicated in sidebar for mobile
     { href: `/profile/${user?.uid || ''}`, label: 'Profile', icon: UserCircle, requiresAuth: true },
   ];
+  
+  // For mobile sheet, we always want labels. For desktop, respect isDesktopCollapsed.
+  // However, this component is used for BOTH desktop and mobile sheet content.
+  // So, isCollapsed will refer to the *desktop* collapsed state.
+  // The mobile sheet is either open (full) or closed (not visible).
+  const showText = !isDesktopCollapsed || isMobileSheetOpen;
 
-  if (authLoading) {
+
+  if (authLoading && !isMobileSheetOpen) { // Avoid skeleton in open mobile sheet initially
     return (
-      <div className="flex flex-col h-full p-2">
-        <SidebarHeader className="p-1 mb-1">
-          <Logo iconSize={30} textSize="text-2xl" />
+      <div className={cn("flex flex-col h-full p-2", isMobileSheetOpen && "pt-8")}>
+        <SidebarHeader className="p-1 mb-1 flex items-center justify-between">
+          <Logo iconSize={30} textSize="text-2xl" className={cn(isDesktopCollapsed && !isMobileSheetOpen ? "hidden" : "flex")} />
+          {!isMobileSheetOpen && <SidebarTrigger />}
         </SidebarHeader>
         <SidebarSeparator className="my-1" />
         <SidebarContent className="flex-1">
           <SidebarMenu>
             {[...Array(5)].map((_, i) => (
-              <SidebarMenuSkeleton key={`skel-${i}`} showIcon />
+              <SidebarMenuSkeleton key={`skel-${i}`} showIcon={showText} />
             ))}
           </SidebarMenu>
         </SidebarContent>
         <SidebarSeparator className="my-1" />
         <SidebarFooter className="p-1">
-          <SidebarMenuSkeleton showIcon />
+          <SidebarMenuSkeleton showIcon={showText} />
         </SidebarFooter>
       </div>
     );
   }
 
-  const isCollapsed = sidebarState === 'collapsed';
 
   return (
-    <div className="flex flex-col h-full p-2">
-      <SidebarHeader className={cn("p-1 mb-1 flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
-         <Logo iconSize={30} textSize="text-2xl" className={cn(isCollapsed ? "hidden" : "flex")} />
-         <Logo iconSize={30} textSize="text-2xl" className={cn("!gap-0", isCollapsed ? "flex" : "hidden")} /> {/* Icon only for collapsed */}
-         <SidebarTrigger className="hidden md:flex" /> {/* Desktop collapse trigger, always visible unless mobile */}
+    <div className={cn("flex flex-col h-full p-2", isMobileSheetOpen && "pt-8")}>
+      <SidebarHeader className={cn("p-1 mb-1 flex items-center", showText ? "justify-between" : "justify-center")}>
+         <Logo iconSize={30} textSize="text-2xl" className={cn(!showText ? "hidden" : "flex")} />
+         {!showText && <Logo iconSize={30} className="!gap-0" />} {/* Icon only for collapsed */}
+         {!isMobileSheetOpen && <SidebarTrigger />} {/* Desktop collapse trigger */}
       </SidebarHeader>
       <SidebarSeparator className="my-1" />
 
@@ -139,15 +147,15 @@ export function AppSidebar() {
             if (item.label === 'Profile' && !user) return null;
 
             return (
-              <SidebarMenuItem key={item.label} className={item.className}>
-                <Link href={href}>
+              <SidebarMenuItem key={item.label}>
+                <Link href={href} onClick={item.label === 'Create' && isMobileSheetOpen ? () => useSidebar().setIsMobileSheetOpen(false) : undefined}>
                   <SidebarMenuButton
                     isActive={isActive}
-                    tooltip={isCollapsed ? item.label : undefined}
-                    className={cn(isCollapsed && "justify-center")}
+                    tooltip={!showText ? item.label : undefined}
+                    className={cn(!showText && "justify-center")}
                   >
                     <item.icon />
-                    <span className={cn(isCollapsed && "sr-only md:hidden")}>{item.label}</span>
+                    {showText && <span>{item.label}</span>}
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -159,21 +167,21 @@ export function AppSidebar() {
       <SidebarFooter className="p-1 space-y-1">
         <SidebarMenu>
           <SidebarMenuItem>
-              <SidebarMenuButton onClick={toggleTheme} className={cn("w-full", isCollapsed && "justify-center")} tooltip={isCollapsed ? (currentTheme === 'light' ? 'Switch to Dark' : 'Switch to Light') : undefined}>
+              <SidebarMenuButton onClick={toggleTheme} className={cn("w-full", !showText && "justify-center")} tooltip={!showText ? (currentTheme === 'light' ? 'Switch to Dark' : 'Switch to Light') : undefined}>
                 {currentTheme === 'light' ? <Moon /> : <Sun />}
-                <span className={cn(isCollapsed && "sr-only md:hidden")}>Switch to {currentTheme === 'light' ? 'Dark' : 'Light'}</span>
+                {showText && <span>Switch to {currentTheme === 'light' ? 'Dark' : 'Light'}</span>}
               </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <Link href="/settings">
-              <SidebarMenuButton isActive={pathname === '/settings'} className={cn(isCollapsed && "justify-center")} tooltip={isCollapsed ? "Settings" : undefined}>
+              <SidebarMenuButton isActive={pathname === '/settings'} className={cn(!showText && "justify-center")} tooltip={!showText ? "Settings" : undefined}>
                 <Settings />
-                <span className={cn(isCollapsed && "sr-only md:hidden")}>Settings</span>
+                {showText && <span>Settings</span>}
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
-          {user && (
-            <SidebarMenuItem className={cn(isCollapsed && "hidden")}> {/* Hide detailed user info when collapsed */}
+          {user && showText && (
+            <SidebarMenuItem> 
               <Link href={`/profile/${user.uid}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sidebar-hover cursor-pointer w-full text-sidebar-foreground hover:text-sidebar-hover-foreground">
                 <Avatar className="h-8 w-8">
                   {user.photoURL ? (
@@ -189,10 +197,10 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuItem>
           )}
-          {user && ( // Show compact user avatar for collapsed sidebar
-            <SidebarMenuItem className={cn(!isCollapsed && "hidden")}>
+          {user && !showText && ( 
+            <SidebarMenuItem>
                <Link href={`/profile/${user.uid}`}>
-                <SidebarMenuButton className={cn("justify-center h-auto py-1.5")} tooltip={isCollapsed ? "Profile" : undefined}>
+                <SidebarMenuButton className={cn("justify-center h-auto py-1.5")} tooltip="Profile">
                     <Avatar className="h-8 w-8">
                         {user.photoURL ? (
                             <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
@@ -200,16 +208,15 @@ export function AppSidebar() {
                             <AvatarFallback className="bg-muted text-muted-foreground">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                         )}
                     </Avatar>
-                    <span className="sr-only md:hidden">Profile</span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
           )}
           {user && (
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={logout} className={cn("w-full hover:!bg-destructive/10 hover:!text-destructive", isCollapsed && "justify-center")} tooltip={isCollapsed ? "Logout" : undefined}>
+              <SidebarMenuButton onClick={logout} className={cn("w-full hover:!bg-destructive/10 hover:!text-destructive", !showText && "justify-center")} tooltip={!showText ? "Logout" : undefined}>
                 <LogOut />
-                <span className={cn(isCollapsed && "sr-only md:hidden")}>Logout</span>
+                {showText && <span>Logout</span>}
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
