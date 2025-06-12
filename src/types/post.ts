@@ -31,10 +31,12 @@ export interface PostDocument {
   createdAt: FieldValue;
   dataAiHint?: string;
   isStory?: boolean; // Flag to indicate if this post is a story
+  authorIsPrivate?: boolean; // Added for public/private account feature
 }
 
 export interface Post extends Omit<PostDocument, 'createdAt'> {
   id: string;
   createdAt: Date;
   isStory?: boolean; // Flag to indicate if this post is a story
+  authorIsPrivate?: boolean; // Added for public/private account feature
 }

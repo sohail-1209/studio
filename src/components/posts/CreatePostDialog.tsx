@@ -1,3 +1,4 @@
+
 // src/components/posts/CreatePostDialog.tsx
 'use client';
 
@@ -48,7 +49,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isStory, setIsStory] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useAuth(); // User object from AuthContext now includes isPrivate
 
   const {
     register,
@@ -158,6 +159,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
         createdAt: serverTimestamp(),
         dataAiHint: selectedFile ? 'user uploaded content' : undefined,
         isStory: isStory,
+        authorIsPrivate: user.isPrivate || false, // Add author's privacy status
       };
 
       await addDoc(collection(db, 'posts'), postData);

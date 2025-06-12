@@ -10,11 +10,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { SettingsIcon, Edit3, Palette, ShieldCheck, LogOut, AlertTriangle, Moon, Sun, Loader2, Trash2 } from 'lucide-react';
+import { SettingsIcon, Edit3, Palette, ShieldCheck, LogOut, AlertTriangle, Moon, Sun, Loader2, Trash2, Lock, Unlock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/contexts/AuthContext';
 import { db, storage, auth } from '@/lib/firebase'; // Ensure auth is imported
-import { doc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
 import { sendPasswordResetEmail, deleteUser as deleteAuthUser } from 'firebase/auth'; // Import deleteUser
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
@@ -49,6 +49,8 @@ export default function SettingsPage() {
   const [isReauthDialogOpen, setIsReauthDialogOpen] = useState(false);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isPrivateAccount, setIsPrivateAccount] = useState(false);
+  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
 
 
   useEffect(() => {
@@ -80,7 +82,9 @@ export default function SettingsPage() {
         const profileRef = doc(db, 'profiles', currentUser.uid);
         const profileSnap = await getDoc(profileRef);
         if (profileSnap.exists()) {
-          setUserProfileData(profileSnap.data() as UserProfile);
+          const data = profileSnap.data() as UserProfile;
+          setUserProfileData(data);
+          setIsPrivateAccount(data.isPrivate || false);
         } else {
           toast({ title: "Profile not found", description: "Could not load your profile data.", variant: "destructive" });
         }
@@ -101,9 +105,35 @@ export default function SettingsPage() {
 
   const handleProfileUpdate = async (updatedProfile: UserProfile) => {
     setUserProfileData(updatedProfile);
-    await reloadUser();
+    setIsPrivateAccount(updatedProfile.isPrivate || false);
+    await reloadUser(); // This will re-fetch from AuthContext and update the global state
     toast({ title: "Profile Updated", description: "Your settings page reflects the latest changes." });
   };
+  
+  const handlePrivacyToggle = async (isPrivate: boolean) => {
+    if (!currentUser || !userProfileData) return;
+    setIsUpdatingPrivacy(true);
+    try {
+      const profileRef = doc(db, 'profiles', currentUser.uid);
+      await updateDoc(profileRef, { isPrivate });
+      setIsPrivateAccount(isPrivate);
+      // Update local state in AuthContext by calling reloadUser or directly setting user state if possible
+      // For now, rely on reloadUser which re-fetches profile
+      await reloadUser();
+      toast({
+        title: "Privacy Setting Updated",
+        description: `Your account is now ${isPrivate ? 'private' : 'public'}.`,
+      });
+    } catch (error: any) {
+      console.error("Error updating privacy setting:", error);
+      toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+      // Revert UI optimistic update if needed
+      setIsPrivateAccount(!isPrivate);
+    } finally {
+      setIsUpdatingPrivacy(false);
+    }
+  };
+
 
   const handleChangePassword = async () => {
     if (!firebaseUser || !firebaseUser.email) {
@@ -265,6 +295,33 @@ export default function SettingsPage() {
                 )}
               </section>
 
+              <Separator />
+
+              <section>
+                <h2 className="text-xl font-semibold text-foreground mb-3">Account Privacy</h2>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="privacy-toggle" className="text-base">
+                      Private Account
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      When your account is private, only people you approve can see your posts.
+                    </p>
+                  </div>
+                   {loadingProfile ? (
+                    <Skeleton className="h-6 w-12" />
+                  ) : (
+                    <Switch
+                      id="privacy-toggle"
+                      checked={isPrivateAccount}
+                      onCheckedChange={handlePrivacyToggle}
+                      disabled={isUpdatingPrivacy}
+                      aria-label="Toggle account privacy"
+                    />
+                  )}
+                </div>
+              </section>
+              
               <Separator />
 
               <section>

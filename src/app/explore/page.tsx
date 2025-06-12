@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 // Standard debounce function
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
@@ -44,6 +45,7 @@ export default function ExplorePage() {
   const [isSearchingUserExact, setIsSearchingUserExact] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth(); // Get current user for potential filtering
 
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -57,12 +59,22 @@ export default function ExplorePage() {
       setLoadingRecentPosts(true);
       try {
         const postsColRef = collection(db, 'posts');
+        // Fetch posts that are not stories AND (authorIsPrivate is false OR authorIsPrivate is not set)
+        // Firestore limitation: Cannot query for "not false" or "null or false" easily.
+        // The most straightforward query is for `authorIsPrivate == false`.
+        // Posts without `authorIsPrivate` (older posts) will be missed by this query.
+        // A more complex solution would be needed to include them or migrate old data.
+        // For now, prioritize showing explicitly public posts.
         const q = query(
           postsColRef,
           where('isStory', '!=', true),
+          where('authorIsPrivate', '==', false), // Only fetch posts from public accounts
           orderBy('createdAt', 'desc'),
           limit(24)
         );
+        // If you also want to include posts where authorIsPrivate is not set (older posts):
+        // This would require two separate queries and merging results, or a more complex data model.
+        // For simplicity, we'll stick to `authorIsPrivate == false` for now.
 
         const querySnapshot = await getDocs(q);
         const fetchedPosts = querySnapshot.docs
@@ -74,10 +86,10 @@ export default function ExplorePage() {
               createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(),
             } as Post;
           })
-          .filter(post => post.imageUrl);
+          .filter(post => post.imageUrl); // Ensure post has an image to display
 
         setPosts(fetchedPosts);
-        console.log("ExplorePage: Fetched recent posts:", fetchedPosts.length);
+        console.log("ExplorePage: Fetched recent posts (public only):", fetchedPosts.length);
       } catch (error) {
         console.error("Error fetching explore posts:", error);
         toast({
@@ -91,7 +103,7 @@ export default function ExplorePage() {
     };
 
     fetchExplorePosts();
-  }, [toast]);
+  }, [toast, currentUser]); // currentUser might be used later for more complex filtering
 
   const handleExactUsernameSearch = async (e?: FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
@@ -191,7 +203,7 @@ export default function ExplorePage() {
     } finally {
       setLoadingSuggestions(false);
     }
-  }, [toast]);
+  }, []); // Removed toast from dependencies as it's stable
 
   const debouncedFetchUserSuggestions = useMemo(() => {
     console.log("ExplorePage: Creating new debouncedFetchUserSuggestions function.");

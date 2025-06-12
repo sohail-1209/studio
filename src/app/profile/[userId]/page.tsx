@@ -9,11 +9,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus } from 'lucide-react';
+import { UserPlus, MessageCircle, MoreHorizontal, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment } from 'firebase/firestore';
-import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext';
+import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext'; // Renamed to avoid conflict
 import type { Post } from '@/types/post';
 import type { FollowRequest, FollowRequestDocument } from '@/types/follow';
 import type { NotificationDocument } from '@/types/notification';
@@ -39,10 +39,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 
-interface UserProfile extends AuthContextUserProfile {
+interface UserProfile extends AuthContextUserProfile { // Keep this name for the page-specific extended profile
   coverPhotoURL?: string;
   followersCount?: number;
   followingCount?: number;
+  isPrivate?: boolean; // Added for privacy feature
 }
 
 type FollowStatus = 'not_following' | 'pending_them' | 'pending_me' | 'following' | 'follow_back';
@@ -63,7 +64,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const [isMessaging, setIsMessaging] = useState(false);
   const [isProcessingFollow, setIsProcessingFollow] = useState(false);
   const [followStatus, setFollowStatus] = useState<FollowStatus>('not_following');
-  const [existingRequestId, setExistingRequestId] = useState<string | null>(null);
+  const [existingRequestId, setExistingRequestId] = useState<string | null>(null); // ID of request *sent by current user*
 
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -73,7 +74,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const isOwnProfile = currentUser?.uid === userId;
 
   const checkFollowStatus = useCallback(async () => {
-    if (!currentUser || !userId || isOwnProfile) {
+    if (!currentUser || !userId || isOwnProfile || !profile) { // Added !profile check
       setFollowStatus('not_following');
       setExistingRequestId(null);
       setIsProcessingFollow(false);
@@ -81,68 +82,69 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     }
 
     setIsProcessingFollow(true);
-    setFollowStatus('not_following');
+    setFollowStatus('not_following'); // Reset before check
     setExistingRequestId(null);
 
     try {
       const followRequestsRef = collection(db, 'followRequests');
-
-      // Check if current user has sent a request to the profile user
-      const qSent = query(
+      
+      // Check if current user has sent a request to the profile user OR if they are already accepted (following)
+      const qSentOrFollowing = query(
         followRequestsRef,
         where('requesterId', '==', currentUser.uid),
         where('recipientId', '==', userId),
         limit(1)
       );
-      const sentSnapshot = await getDocs(qSent);
+      const sentOrFollowingSnapshot = await getDocs(qSentOrFollowing);
 
-      if (!sentSnapshot.empty) {
-        const request = sentSnapshot.docs[0].data() as FollowRequestDocument;
-        const requestId = sentSnapshot.docs[0].id;
+      if (!sentOrFollowingSnapshot.empty) {
+        const request = sentOrFollowingSnapshot.docs[0].data() as FollowRequestDocument;
+        const requestId = sentOrFollowingSnapshot.docs[0].id;
         if (request.status === 'pending') {
           setFollowStatus('pending_them');
           setExistingRequestId(requestId);
         } else if (request.status === 'accepted') {
           setFollowStatus('following');
-          setExistingRequestId(requestId); // Crucial for unfollow
-        } else {
+          setExistingRequestId(requestId); // Important for unfollow
+        } else { // declined or other status, treat as not_following
           setFollowStatus('not_following');
         }
         setIsProcessingFollow(false);
         return;
       }
 
-      // Check if profile user has sent a request to the current user
+      // If not following and no request sent by current user, check if profile user has sent a request to current user
       const qReceived = query(
         followRequestsRef,
-        where('requesterId', '==', userId),
-        where('recipientId', '==', currentUser.uid),
+        where('requesterId', '==', userId), // Profile user is requester
+        where('recipientId', '==', currentUser.uid), // Current user is recipient
         limit(1)
       );
       const receivedSnapshot = await getDocs(qReceived);
 
       if (!receivedSnapshot.empty) {
         const request = receivedSnapshot.docs[0].data() as FollowRequestDocument;
+        // const receivedRequestId = receivedSnapshot.docs[0].id; // ID of the request profile user sent to current user
         if (request.status === 'pending') {
-          setFollowStatus('pending_me');
-          // Do NOT set existingRequestId here, as this ID is for the request received by current user,
-          // not the one sent by them.
+          setFollowStatus('pending_me'); // Profile user sent request to me, I haven't accepted yet
         } else if (request.status === 'accepted') {
-          setFollowStatus('follow_back'); // They follow current user, current user does not (yet) follow them
-        } else {
+          // This means profile user follows current user. Current user does NOT follow profile user back yet.
+          setFollowStatus('follow_back');
+        } else { // declined from their side or other, treat as not_following
           setFollowStatus('not_following');
         }
       } else {
+        // No request in either direction
         setFollowStatus('not_following');
       }
     } catch (error: any) {
         console.error("Error checking follow status:", error);
         toast({ title: "Network Error", description: `Could not check follow status: ${error.message || 'Please try again.'}`, variant: "destructive"});
-        setFollowStatus('not_following');
+        setFollowStatus('not_following'); // Default to a safe state
     } finally {
         setIsProcessingFollow(false);
     }
-  }, [currentUser, userId, isOwnProfile, toast]);
+  }, [currentUser, userId, isOwnProfile, profile, toast]);
 
 
   useEffect(() => {
@@ -151,7 +153,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       const profileRef = doc(db, 'profiles', userId);
       const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
         if (docSnap.exists()) {
-          setProfile(docSnap.data() as UserProfile);
+          const data = docSnap.data() as UserProfile;
+          setProfile({ ...data, isPrivate: data.isPrivate || false }); // Ensure isPrivate default
         } else {
           console.warn("No such profile for userId:", userId);
           toast({ title: "Profile not found", variant: "destructive" });
@@ -164,10 +167,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingProfile(false);
       });
 
+      // Post fetching logic will be adjusted based on profile privacy later
+      // For now, fetch all posts then filter in UI if private and not followed
       setLoadingPosts(true);
       const postsQuery = query(
         collection(db, 'posts'),
         where('userId', '==', userId),
+        where('isStory', '!=', true), // Exclude stories from profile posts tab
         orderBy('createdAt', 'desc')
       );
 
@@ -178,9 +184,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           createdAt: (docSnap.data().createdAt as Timestamp)?.toDate ? (docSnap.data().createdAt as Timestamp).toDate() : new Date(),
           imagePath: docSnap.data().imagePath || null,
         } as Post));
-
-        const regularPosts = userContent.filter(post => post.isStory !== true);
-        setPosts(regularPosts);
+        setPosts(userContent);
         setLoadingPosts(false);
       }, (error) => {
         console.error("Error fetching posts:", error);
@@ -197,129 +201,181 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setLoadingPosts(false);
       });
 
-      if (currentUser && userId && !isOwnProfile) {
-        checkFollowStatus();
-      }
-
       return () => {
         unsubscribeProfile();
         unsubscribePosts();
       };
     }
-  }, [userId, toast, currentUser, isOwnProfile, checkFollowStatus]);
+  }, [userId, toast]);
 
-  const handleFollowRequest = async () => {
-    if (!currentUser || !profile || isOwnProfile || isProcessingFollow || followStatus === 'pending_them' || followStatus === 'following') return;
+  // Effect to check follow status once profile and currentUser are loaded
+  useEffect(() => {
+    if (profile && currentUser && !isOwnProfile) {
+      checkFollowStatus();
+    }
+  }, [profile, currentUser, isOwnProfile, checkFollowStatus]);
+
+
+  const handleFollowRequestOrToggle = async () => {
+    if (!currentUser || !profile || isOwnProfile || isProcessingFollow) return;
 
     setIsProcessingFollow(true);
-    const batch = writeBatch(db);
-    const newRequestRef = doc(collection(db, 'followRequests'));
+    
+    if (profile.isPrivate) { // Request to follow private account
+      if (followStatus === 'not_following' || followStatus === 'follow_back') {
+        // Send follow request
+        const batch = writeBatch(db);
+        const newRequestRef = doc(collection(db, 'followRequests'));
+        const newRequestId = `${currentUser.uid}_${profile.uid}`; // Use composite ID for easier querying
+        const newRequestDocRef = doc(db, 'followRequests', newRequestId);
 
-    try {
-      const newRequestData: FollowRequestDocument = {
-        requesterId: currentUser.uid,
-        requesterDisplayName: currentUser.displayName,
-        requesterAvatarUrl: currentUser.photoURL,
-        recipientId: profile.uid,
-        recipientDisplayName: profile.displayName,
-        recipientAvatarUrl: profile.photoURL,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      batch.set(newRequestRef, newRequestData);
+        try {
+          const existingRequestSnap = await getDoc(newRequestDocRef);
+          if (existingRequestSnap.exists() && existingRequestSnap.data()?.status === 'pending') {
+             toast({ title: "Request Already Sent", description: `Your request to follow ${profile.displayName || 'this user'} is pending.` });
+             setIsProcessingFollow(false);
+             setFollowStatus('pending_them'); // Ensure UI matches
+             setExistingRequestId(newRequestId);
+             return;
+          }
 
-      const notificationRef = doc(collection(db, 'notifications'));
-      const notificationData: Omit<NotificationDocument, 'createdAt' | 'actionTaken'> = {
-          recipientId: profile.uid,
-          actorId: currentUser.uid,
-          actorDisplayName: currentUser.displayName,
-          actorAvatarUrl: currentUser.photoURL,
-          type: 'follow_request',
-          followRequestId: newRequestRef.id,
-          isRead: false,
-      };
-      batch.set(notificationRef, {...notificationData, createdAt: serverTimestamp()});
+          const newRequestData: FollowRequestDocument = {
+            requesterId: currentUser.uid,
+            requesterDisplayName: currentUser.displayName,
+            requesterAvatarUrl: currentUser.photoURL,
+            recipientId: profile.uid,
+            recipientDisplayName: profile.displayName,
+            recipientAvatarUrl: profile.photoURL,
+            status: 'pending',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          };
+          batch.set(newRequestDocRef, newRequestData);
 
-      await batch.commit();
+          const notificationRef = doc(collection(db, 'notifications'));
+          const notificationData: Omit<NotificationDocument, 'createdAt' | 'actionTaken'> = {
+              recipientId: profile.uid,
+              actorId: currentUser.uid,
+              actorDisplayName: currentUser.displayName,
+              actorAvatarUrl: currentUser.photoURL,
+              type: 'follow_request',
+              followRequestId: newRequestDocRef.id,
+              isRead: false,
+          };
+          batch.set(notificationRef, {...notificationData, createdAt: serverTimestamp()});
 
-      setFollowStatus('pending_them');
-      setExistingRequestId(newRequestRef.id);
-      toast({ title: "Follow Request Sent", description: `Your request to follow ${profile.displayName || 'this user'} has been sent.` });
-    } catch (error: any) {
-      console.error("Error sending follow request:", error);
-      toast({ title: "Request Error", description: error.message || "Could not send follow request.", variant: "destructive" });
-    } finally {
-      setIsProcessingFollow(false);
-    }
-  };
+          await batch.commit();
+          setFollowStatus('pending_them');
+          setExistingRequestId(newRequestDocRef.id);
+          toast({ title: "Follow Request Sent", description: `Your request to follow ${profile.displayName || 'this user'} has been sent.` });
+        } catch (error: any) {
+          console.error("Error sending follow request:", error);
+          toast({ title: "Request Error", description: error.message || "Could not send follow request.", variant: "destructive" });
+        }
+      } else if (followStatus === 'pending_them' && existingRequestId) { // Cancel pending request
+        try {
+          const requestRef = doc(db, 'followRequests', existingRequestId);
+          await deleteDoc(requestRef);
+          // Optionally delete notification (more complex, skip for now)
+          setFollowStatus('not_following');
+          setExistingRequestId(null);
+          toast({ title: "Follow Request Cancelled" });
+        } catch (error: any) {
+          console.error("Error cancelling follow request:", error);
+          toast({ title: "Cancellation Error", description: error.message, variant: "destructive" });
+        }
+      } else if (followStatus === 'following' && existingRequestId) { // Unfollow (cancel accepted request)
+         try {
+            const requestRef = doc(db, 'followRequests', existingRequestId);
+            const batchUnfollow = writeBatch(db);
+            batchUnfollow.delete(requestRef); // Delete the 'accepted' request doc
 
-  const handleCancelFollowRequest = async () => {
-    if (!currentUser || !profile || !existingRequestId || isProcessingFollow || followStatus !== 'pending_them') {
-        console.warn("Cannot cancel request. Conditions not met:", { currentUser, profile, existingRequestId, isProcessingFollow, followStatus });
-        return;
-    }
-    setIsProcessingFollow(true);
-    try {
-        const requestRef = doc(db, 'followRequests', existingRequestId);
-        await deleteDoc(requestRef);
+            // Decrement counts (ideally via cloud function for atomicity on target user)
+            const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
+            batchUnfollow.update(currentUserProfileRef, { followingCount: increment(-1) });
+            const targetUserProfileRef = doc(db, 'profiles', profile.uid);
+            batchUnfollow.update(targetUserProfileRef, { followersCount: increment(-1) });
 
-        setFollowStatus('not_following');
-        setExistingRequestId(null);
-        toast({ title: "Follow Request Cancelled" });
-    } catch (error: any) {
-        console.error("Error cancelling follow request:", error);
-        toast({ title: "Cancellation Error", description: error.message || "Could not cancel follow request.", variant: "destructive" });
-    } finally {
-        setIsProcessingFollow(false);
-    }
-  };
-
-  const handleUnfollowUser = async () => {
-    if (!currentUser || !profile || !existingRequestId || isProcessingFollow || followStatus !== 'following') {
-      console.warn("Cannot unfollow. Conditions not met:", {currentUser, profile, existingRequestId, isProcessingFollow, followStatus});
-      return;
-    }
-    setIsProcessingFollow(true);
-
-    const batch = writeBatch(db);
-    const followRequestRef = doc(db, 'followRequests', existingRequestId);
-    const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-    // We will NOT attempt to update the target user's followersCount from the client due to permissions.
-
-    try {
-      batch.delete(followRequestRef);
-      batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-      // NOTE: The target user's (profile.uid) followersCount is NOT decremented here by the current user.
-      // This should ideally be handled by a Cloud Function for atomicity and permissions.
-
-      await batch.commit();
-
-      setFollowStatus('not_following');
-      setExistingRequestId(null);
-      toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName || 'this user'}.` });
-      // Manually trigger a re-check or rely on onSnapshot for profile to update local state if counts change
-      if (profile.uid === currentUser.uid) { // If unfollowing self (edge case, though UI prevents this)
-         await reloadUser(); // Reload current user's profile if counts might change on it
+            await batchUnfollow.commit();
+            setFollowStatus('not_following');
+            setExistingRequestId(null);
+            toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName || 'this user'}.` });
+        } catch (error: any)
+         {
+            console.error("Error unfollowing (private):", error);
+            toast({ title: "Unfollow Error", description: error.message, variant: "destructive"});
+         }
       }
-    } catch (error: any) {
-      console.error("Error unfollowing user:", error);
-      toast({ title: "Unfollow Error", description: error.message || "Could not unfollow user.", variant: "destructive" });
-      checkFollowStatus(); // Re-check status to reflect potential partial success/failure.
-    } finally {
-      setIsProcessingFollow(false);
+    } else { // Public account: direct follow/unfollow
+      const followDocId = `${currentUser.uid}_${profile.uid}`;
+      const followRequestRef = doc(db, 'followRequests', followDocId);
+      const batchPublic = writeBatch(db);
+
+      if (followStatus === 'following') { // Unfollow public account
+        batchPublic.delete(followRequestRef);
+        batchPublic.update(doc(db, 'profiles', currentUser.uid), { followingCount: increment(-1) });
+        batchPublic.update(doc(db, 'profiles', profile.uid), { followersCount: increment(-1) });
+        
+        try {
+            await batchPublic.commit();
+            setFollowStatus('not_following');
+            setExistingRequestId(null);
+            toast({ title: "Unfollowed" });
+        } catch (error: any) {
+            console.error("Error unfollowing public account:", error);
+            toast({ title: "Unfollow Error", description: error.message, variant: "destructive" });
+        }
+
+      } else { // Follow public account
+        const newRequestData: FollowRequestDocument = {
+            requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
+            recipientId: profile.uid, recipientDisplayName: profile.displayName, recipientAvatarUrl: profile.photoURL,
+            status: 'accepted', // Directly accept for public profiles
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        };
+        batchPublic.set(followRequestRef, newRequestData);
+        batchPublic.update(doc(db, 'profiles', currentUser.uid), { followingCount: increment(1) });
+        batchPublic.update(doc(db, 'profiles', profile.uid), { followersCount: increment(1) });
+        
+        // Create a 'follow_accept' notification for public follows as well for consistency (optional)
+        const notificationRef = doc(collection(db, 'notifications'));
+        const notificationData: Omit<NotificationDocument, 'createdAt'> = {
+          recipientId: profile.uid, actorId: currentUser.uid, actorDisplayName: currentUser.displayName, actorAvatarUrl: currentUser.photoURL,
+          type: 'follow_accept', originalFollowRequestId: followDocId, isRead: false,
+        };
+        batchPublic.set(notificationRef, {...notificationData, createdAt: serverTimestamp()});
+
+        try {
+            await batchPublic.commit();
+            setFollowStatus('following');
+            setExistingRequestId(followDocId);
+            toast({ title: "Followed Successfully" });
+        } catch (error: any) {
+            console.error("Error following public account:", error);
+            toast({ title: "Follow Error", description: error.message, variant: "destructive" });
+        }
+      }
     }
+    setIsProcessingFollow(false);
   };
 
 
   const handleMessageUser = async () => {
     if (!currentUser || !profile || currentUser.uid === profile.uid || isMessaging) return;
 
-    const canActuallyMessage = followStatus === 'following' || followStatus === 'follow_back';
-    if (!canActuallyMessage) {
-        toast({ title: "Cannot Message", description: `You need to be connected to message ${profile.displayName || 'this user'}.`, variant: "default" });
+    // Allow messaging if following, or if the account is public (even if not following yet)
+    const canMessage = followStatus === 'following' || (profile && !profile.isPrivate);
+
+    if (!canMessage && profile && profile.isPrivate) {
+        toast({ title: "Cannot Message", description: `You need to be following ${profile.displayName || 'this user'} to send them a message as their account is private.`, variant: "default" });
         return;
     }
+     if (!canMessage && profile && !profile.isPrivate){
+       // This case should ideally not be blocked by the button's disabled state,
+       // but if it is, this message would show.
+       // For public profiles, messaging is usually allowed regardless of follow status.
+     }
+
 
     setIsMessaging(true);
     const chatId = [currentUser.uid, profile.uid].sort().join('_');
@@ -483,22 +539,41 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     if (isProcessingFollow) {
         return <Button disabled className="w-full sm:w-auto"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</Button>;
     }
-    switch (followStatus) {
-        case 'pending_them':
-            return <Button variant="outline" onClick={handleCancelFollowRequest} className="w-full sm:w-auto"><Clock className="mr-2 h-4 w-4" />Cancel Request</Button>;
-        case 'following':
-            return <Button variant="outline" onClick={handleUnfollowUser} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
-        case 'pending_me':
-            return <Button onClick={() => router.push('/notifications')} className="w-full sm:w-auto"><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
-        case 'follow_back':
-            return <Button onClick={handleFollowRequest} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow Back</Button>;
-        case 'not_following':
-        default:
-            return <Button onClick={handleFollowRequest} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
+    if (profile.isPrivate) {
+        switch (followStatus) {
+            case 'pending_them':
+                return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><Clock className="mr-2 h-4 w-4" />Requested</Button>;
+            case 'following':
+                return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
+            case 'pending_me': // They sent a request to me for their private account (this state is less common for *this* button)
+                 // User should accept from notifications. This button could be "Follow Back" if they also want to follow.
+                return <Button onClick={() => router.push('/notifications')} className="w-full sm:w-auto"><UserCheck className="mr-2 h-4 w-4" />Respond to Request</Button>;
+            case 'not_following':
+            case 'follow_back': // They follow me, I don't follow them yet (or request was declined/cancelled)
+            default:
+                return <Button onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Request Follow</Button>;
+        }
+    } else { // Public profile
+        switch (followStatus) {
+            case 'following':
+                return <Button variant="outline" onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserMinus className="mr-2 h-4 w-4" />Following</Button>;
+            case 'not_following':
+            case 'follow_back': // They follow me, I don't follow them (public account)
+            case 'pending_them': // Should not happen for public, but if it does, treat as not_following
+            case 'pending_me': // They follow me, I don't follow them (public account)
+            default:
+                return <Button onClick={handleFollowRequestOrToggle} className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" />Follow</Button>;
+        }
     }
  };
+  // Determine if current user can see posts:
+  // 1. If it's their own profile
+  // 2. If the profile is public
+  // 3. If the profile is private AND current user is 'following' (accepted request)
+  const canViewPosts = isOwnProfile || !profile.isPrivate || (profile.isPrivate && followStatus === 'following');
 
-  const canMessage = followStatus === 'following' || followStatus === 'follow_back';
+  const canMessage = isOwnProfile ? false : (followStatus === 'following' || (!profile.isPrivate && (followStatus === 'not_following' || followStatus === 'follow_back')));
+
 
   return (
     <MainLayout>
@@ -563,7 +638,16 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                       {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md" />)}
                     </div>
                   )}
-                  {!loadingPosts && posts.length === 0 && (
+                  {!loadingPosts && !canViewPosts && profile.isPrivate && (
+                     <div className="py-12 text-center">
+                      <ShieldAlert className="mx-auto h-12 w-12 text-muted-foreground" />
+                      <p className="mt-4 text-lg font-semibold text-foreground">This Account is Private</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Follow this account to see their posts.
+                      </p>
+                    </div>
+                  )}
+                  {!loadingPosts && canViewPosts && posts.length === 0 && (
                     <div className="py-12 text-center">
                       <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                       <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
@@ -572,7 +656,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                       </p>
                     </div>
                   )}
-                  {!loadingPosts && posts.length > 0 && (
+                  {!loadingPosts && canViewPosts && posts.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
                       {posts.map(post => (
                         <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
@@ -599,7 +683,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               )}
-                              {/* You can add post stats like likes/comments here if desired */}
                            </div>
                         </div>
                       ))}

@@ -19,6 +19,7 @@ export interface UserProfile {
   coverPhotoURL?: string;
   followersCount?: number;
   followingCount?: number;
+  isPrivate?: boolean; // Added for public/private account feature
 }
 
 interface AuthContextType {
@@ -46,7 +47,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         console.log(`AuthContext: Profile FOUND in Firestore for UID: ${fbUser.uid}`);
-        return userSnap.data() as UserProfile;
+        const profileData = userSnap.data() as UserProfile;
+        // Ensure isPrivate defaults to false if not set
+        return { ...profileData, isPrivate: profileData.isPrivate || false };
       } else {
         console.warn(`AuthContext: Profile NOT FOUND for UID: ${fbUser.uid}. Creating new profile.`);
         const derivedDisplayName = fbUser.displayName || fbUser.email?.split('@')[0] || 'Anonymous';
@@ -63,6 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           bio: '',
           followersCount: 0,
           followingCount: 0,
+          isPrivate: false, // Default to public
         };
         await setDoc(userRef, newUserProfile);
         console.log(`AuthContext: CREATED and returning new profile for UID: ${fbUser.uid}`);
