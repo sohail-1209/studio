@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import { Spinner } from '@/components/shared/Spinner';
 import {
   SidebarProvider,
-  Sidebar as UISidebar, // Renaming to avoid conflict with semantic HTML5 aside
+  Sidebar as UISidebar,
   SidebarInset,
 } from '@/components/ui/sidebar';
 
@@ -18,6 +18,7 @@ interface MainLayoutProps {
   children: ReactNode;
 }
 
+// This component assumes Firebase initialization is handled and auth state is available
 function LayoutContent({ children }: MainLayoutProps) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -37,30 +38,29 @@ function LayoutContent({ children }: MainLayoutProps) {
   }
 
   if (!user) {
-    return null; // Should be redirected by useEffect
+    // This case should ideally be handled by the redirect in useEffect,
+    // but it's a fallback.
+    return null;
   }
 
-  // FORCED DESKTOP LAYOUT - SidebarProvider is configured to keep sidebar open & expanded
+  // Forced desktop layout for debugging navbar visibility
   return (
     <div className="flex min-h-screen bg-background">
-      {/* UISidebar is the <aside> from src/components/ui/sidebar.tsx */}
-      <UISidebar> 
+      <UISidebar> {/* This is the Sidebar component from ui/sidebar.tsx */}
         <AppSidebar />
       </UISidebar>
-      
-      {/* SidebarInset is the flex-1 content area from src/components/ui/sidebar.tsx */}
-      <SidebarInset> 
-        <main className="w-full flex-1 p-4 sm:p-6 lg:p-8">
+      <SidebarInset> {/* This is the SidebarInset component from ui/sidebar.tsx */}
+        {/* This div wraps the actual page content */}
+        <div className="flex-1 w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
           {children}
-        </main>
+        </div>
       </SidebarInset>
     </div>
   );
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  // Force 'open' to true and onOpenChange to a no-op.
-  // The SidebarProvider is simplified to always reflect an "open" and "desktop" state.
+  // Forced open and desktop context for debugging navbar visibility
   return (
     <SidebarProvider open={true} onOpenChange={() => {}}>
       <LayoutContent>{children}</LayoutContent>
