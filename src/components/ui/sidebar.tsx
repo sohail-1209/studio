@@ -18,20 +18,19 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const SIDEBAR_WIDTH = "var(--sidebar-width, 16rem)"
+const SIDEBAR_WIDTH = "var(--sidebar-width, 16rem)" // Kept for reference, but overridden below for debug
 const SIDEBAR_WIDTH_ICON = "var(--sidebar-width-icon, 3.75rem)"
 const SIDEBAR_WIDTH_MOBILE = "var(--sidebar-width-mobile, 16rem)"
-const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 
 type SidebarContextType = {
-  state: "expanded" // Forced to expanded
-  open: true // Forced to true
-  setOpen: (open: boolean) => void // No-op
-  openMobile: boolean // Forced to false
-  setOpenMobile: (open: boolean) => void // No-op
-  isMobile: false // Forced to false
-  toggleSidebar: () => void // No-op
+  state: "expanded" 
+  open: true 
+  setOpen: (open: boolean) => void 
+  openMobile: boolean 
+  setOpenMobile: (open: boolean) => void 
+  isMobile: false 
+  toggleSidebar: () => void 
 }
 
 const SidebarContext = React.createContext<SidebarContextType | null>(null)
@@ -47,8 +46,8 @@ function useSidebar() {
 const SidebarProvider = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
-    open: true // Type changed to literal true
-    onOpenChange: (open: boolean) => void // Still expect it, but won't use it to change state
+    open: true 
+    onOpenChange: (open: boolean) => void 
   }
 >(
   (
@@ -65,11 +64,11 @@ const SidebarProvider = React.forwardRef<
       () => ({
         state: "expanded",
         open: true,
-        setOpen: () => {}, // No-op
+        setOpen: () => {}, 
         isMobile: false,
         openMobile: false,
-        setOpenMobile: () => {}, // No-op
-        toggleSidebar: () => {}, // No-op
+        setOpenMobile: () => {}, 
+        toggleSidebar: () => {}, 
       }),
       []
     );
@@ -114,18 +113,16 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    // const { open } = useSidebar(); // 'open' is always true from context
-
     return (
       <aside
         ref={ref}
         className={cn(
-          "flex flex-col h-screen sticky top-0 z-30", // Added z-30
-          "bg-sidebar text-sidebar-foreground border-r border-sidebar-border",
-          "w-[var(--sidebar-width)] flex-shrink-0", // Use expanded width directly and prevent shrinking
+          "flex flex-col h-screen sticky top-0 z-50", 
+          "!bg-red-500 text-white", // Forceful red background, white text for debug
+          "!w-64 flex-shrink-0 border-r-4 border-black", // Forceful width, flex-shrink, and thick black border
           className
         )}
-        data-state={"expanded"} // Hardcoded state
+        data-state={"expanded"} 
         {...props}
       >
         <div
@@ -145,13 +142,10 @@ const SidebarTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, children, asChild, ...props }, ref) => {
-  // const { toggleSidebar } = useSidebar(); // Toggle is no-op
-
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (onClick) {
       onClick(event);
     }
-    // toggleSidebar(); // No-op
   };
 
   if (asChild) {
@@ -181,7 +175,7 @@ const SidebarTrigger = React.forwardRef<
       className={cn("h-7 w-7", className)}
       onClick={handleClick}
       {...props}
-      style={{ display: 'none' }} // Hide trigger as sidebar is always open
+      style={{ display: 'none' }} 
     >
       <PanelLeft />
       <span className="sr-only">Toggle Sidebar</span>
@@ -195,15 +189,12 @@ const SidebarRail = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button">
 >(({ className, ...props }, ref) => {
-  // const { toggleSidebar } = useSidebar() // No-op
-
   return (
     <button
       ref={ref}
       data-sidebar="rail"
       aria-label="Toggle Sidebar"
       tabIndex={-1}
-      // onClick={toggleSidebar} // No-op
       title="Toggle Sidebar"
       className={cn(
         "absolute inset-y-0 z-20 w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-border flex",
@@ -211,7 +202,7 @@ const SidebarRail = React.forwardRef<
         "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
         className
       )}
-      style={{ display: 'none' }} // Hide rail as sidebar is always open
+      style={{ display: 'none' }} 
       {...props}
     />
   )
@@ -226,7 +217,8 @@ const SidebarInset = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "flex-1 flex flex-col overflow-y-auto bg-background", 
+        "flex-1 flex flex-col overflow-y-auto",
+        "!bg-blue-500", // Forceful blue background for main content area
         className
       )}
       {...props}
@@ -338,8 +330,6 @@ const SidebarGroupLabel = React.forwardRef<
   React.ComponentProps<"div"> & { asChild?: boolean }
 >(({ className, asChild = false, ...props }, ref) => {
   const Comp = asChild ? Slot : "div"
-  // const { open } = useSidebar(); // 'open' is always true
-
   return (
     <Comp
       ref={ref}
@@ -359,8 +349,6 @@ const SidebarGroupAction = React.forwardRef<
   React.ComponentProps<"button"> & { asChild?: boolean }
 >(({ className, asChild = false, ...props }, ref) => {
   const Comp = asChild ? Slot : "button"
-  // const { open } = useSidebar(); // 'open' is always true
-
   return (
     <Comp
       ref={ref}
@@ -416,11 +404,11 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-ring transition-[width,height,padding] hover:bg-sidebar-hover hover:text-sidebar-hover-foreground focus-visible:ring-1 active:bg-sidebar-active active:text-sidebar-active-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-active data-[active=true]:font-medium data-[active=true]:text-sidebar-active-foreground data-[state=open]:hover:bg-sidebar-hover data-[state=open]:hover:text-sidebar-hover-foreground",
+  "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-ring transition-[width,height,padding] hover:bg-white/10 focus-visible:ring-1 active:bg-white/20 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white/20 data-[active=true]:font-medium data-[state=open]:hover:bg-white/10",
   {
     variants: {
       variant: {
-        default: "text-sidebar-foreground",
+        default: "text-white", // Default text white for debug against red
       },
       size: {
         default: "h-9 text-sm px-2.5",
@@ -449,7 +437,7 @@ const SidebarMenuButton = React.forwardRef<
       isActive = false,
       variant = "default",
       size = "default",
-      tooltip, // Tooltip logic will be ignored as sidebar is always open
+      tooltip, 
       className,
       children,
       ...props
@@ -457,15 +445,13 @@ const SidebarMenuButton = React.forwardRef<
     ref
   ) => {
     const Comp = asChild ? Slot : "button"
-    // const { open } = useSidebar(); // 'open' is always true
-
     return (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        data-sidebar-state={"expanded"} // Hardcoded
+        data-sidebar-state={"expanded"} 
         className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
         {...props}
       >
@@ -484,8 +470,6 @@ const SidebarMenuAction = React.forwardRef<
   }
 >(({ className, asChild = false, showOnHover = false, ...props }, ref) => {
   const Comp = asChild ? Slot : "button"
-  // const { open } = useSidebar(); // 'open' is always true
-
   return (
     <Comp
       ref={ref}
@@ -507,7 +491,6 @@ const SidebarMenuBadge = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
-  // const { open } = useSidebar(); // 'open' is always true
   return (
   <div
     ref={ref}
@@ -563,7 +546,6 @@ const SidebarMenuSub = React.forwardRef<
   HTMLUListElement,
   React.ComponentProps<"ul">
 >(({ className, ...props }, ref) => {
-  // const { open } = useSidebar(); // 'open' is always true
   return (
   <ul
     ref={ref}
@@ -592,8 +574,6 @@ const SidebarMenuSubButton = React.forwardRef<
   }
 >(({ asChild = false, size = "default", isActive, className, ...props }, ref) => {
   const Comp = asChild ? Slot : "a" 
-  // const { open } = useSidebar(); // 'open' is always true
-
   return (
     <Comp
       ref={ref}
@@ -639,3 +619,5 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
+    
