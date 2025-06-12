@@ -157,7 +157,7 @@ const MobileSheetSidebar = ({ children }: { children: React.ReactNode }) => {
     return (
         <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
             <SheetContent side="left" className="md:hidden w-[var(--sidebar-width-mobile)] p-0 overflow-y-auto">
-                 <SheetHeader className="p-0 sr-only"> {/* Header can be sr-only if title is, or removed if not needed for layout */}
+                 <SheetHeader className="p-0 sr-only">
                     <SheetTitle className="sr-only">Main Navigation</SheetTitle>
                  </SheetHeader>
                 <div className="flex flex-col h-full">
@@ -225,7 +225,7 @@ const SidebarInset = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "flex-1 flex flex-col bg-background overflow-y-auto w-full min-w-0 overflow-x-hidden", 
+        "flex-1 flex flex-col bg-background overflow-y-scroll w-full min-w-0 overflow-x-hidden", // Changed to overflow-y-scroll
         className
       )}
       {...props}

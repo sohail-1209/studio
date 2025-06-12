@@ -45,6 +45,50 @@ interface UserProfile extends AuthContextUserProfile {
 
 type FollowStatus = 'not_following' | 'following';
 
+// Placeholder for Media
+const NoMediaPlaceholder = () => (
+  <div className="py-12 text-center w-full">
+    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+    <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
+    <p className="mt-1 text-sm text-muted-foreground">
+      This user hasn&apos;t shared any media yet, or this tab is under construction.
+    </p>
+  </div>
+);
+
+// Placeholder for Likes
+const NoLikesPlaceholder = () => (
+  <div className="py-12 text-center w-full">
+    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+    <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>
+    <p className="mt-1 text-sm text-muted-foreground">
+        This user hasn&apos;t liked any posts, or this tab is under construction.
+    </p>
+  </div>
+);
+
+// Placeholder for Posts when posts.length === 0
+const NoPostsPlaceholder = () => (
+  <div className="py-12 text-center w-full">
+    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+    <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
+    <p className="mt-1 text-sm text-muted-foreground">
+      This user hasn&apos;t shared any posts.
+    </p>
+  </div>
+);
+
+// Loading state for posts
+const LoadingPostsPlaceholder = () => (
+  <div className="py-12 text-center w-full">
+    <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
+    <p className="mt-4 text-lg font-semibold text-foreground">Loading Posts...</p>
+    <p className="mt-1 text-sm text-muted-foreground">
+      Please wait a moment.
+    </p>
+  </div>
+);
+
 
 export default function UserProfilePage({ params: paramsPromise }: { params: { userId: string } }) {
   const params = use(paramsPromise);
@@ -365,7 +409,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   if (loadingProfile || !userId) {
     return (
       <MainLayout>
-        <div className="h-[calc(100vh-theme(spacing.24))] w-full">
+        <div className="w-full">
             <ProfileSkeleton />
         </div>
       </MainLayout>
@@ -375,7 +419,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   if (!profile) {
      return (
       <MainLayout>
-        <div className="text-center h-[calc(100vh-theme(spacing.24))] w-full">
+        <div className="text-center w-full">
             <Card className="w-full shadow-lg h-full flex flex-col items-center justify-center">
               <CardContent className="p-12">
                 <h2 className="text-2xl font-semibold">Profile Not Found</h2>
@@ -412,8 +456,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   return (
     <MainLayout>
-      <div className="h-[calc(100vh-theme(spacing.24))] w-full">
-          <Card className="overflow-hidden shadow-lg w-full h-full flex flex-col">
+      <div className="w-full">
+          <Card className="overflow-hidden shadow-lg w-full flex flex-col">
             <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
               <div className="relative h-48 w-full md:h-64">
                 <Image
@@ -468,27 +512,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                   <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
                   <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
                 </TabsList>
-                <TabsContent value="posts" className="mt-6 w-full">
-                  {loadingPosts && (
-                    // Show a placeholder identical to "No Media" placeholder during loading for consistent height
-                    <div className="py-12 text-center w-full">
-                      <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
-                      <p className="mt-4 text-lg font-semibold text-foreground">Loading Posts...</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Please wait a moment.
-                      </p>
-                    </div>
-                  )}
-                  
-                  {!loadingPosts && posts.length === 0 && (
-                    <div className="py-12 text-center w-full">
-                      <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                      <p className="mt-4 text-lg font-semibold text-foreground">No posts yet</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        This user hasn&apos;t shared any posts.
-                      </p>
-                    </div>
-                  )}
+                <TabsContent value="posts" className="mt-6 w-full min-w-0">
+                  {loadingPosts && <LoadingPostsPlaceholder />}
+                  {!loadingPosts && posts.length === 0 && <NoPostsPlaceholder />}
                   {!loadingPosts && posts.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full min-w-0">
                       {posts.map(post => (
@@ -522,23 +548,11 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     </div>
                   )}
                 </TabsContent>
-                <TabsContent value="media" className="mt-6 w-full">
-                  <div className="py-12 text-center w-full">
-                    <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      This user hasn&apos;t shared any media yet, or this tab is under construction.
-                    </p>
-                  </div>
+                <TabsContent value="media" className="mt-6 w-full min-w-0">
+                  <NoMediaPlaceholder />
                 </TabsContent>
-                <TabsContent value="likes" className="mt-6 w-full">
-                   <div className="py-12 text-center w-full">
-                      <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                      <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                          This user hasn&apos;t liked any posts, or this tab is under construction.
-                      </p>
-                   </div>
+                <TabsContent value="likes" className="mt-6 w-full min-w-0">
+                   <NoLikesPlaceholder />
                 </TabsContent>
               </Tabs>
             </CardContent>
