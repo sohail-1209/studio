@@ -15,8 +15,8 @@ import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment } from 'firebase/firestore';
 import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext'; // Renamed to avoid conflict
 import type { Post } from '@/types/post';
-import type { FollowRequest, FollowRequestDocument } from '@/types/follow';
-import type { NotificationDocument } from '@/types/notification';
+// import type { FollowRequest, FollowRequestDocument } from '@/types/follow'; // No longer needed as privacy removed
+// import type { NotificationDocument } from '@/types/notification'; // No longer needed for follow_request notif
 import { useAuth } from '@/hooks/useAuth';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -37,16 +37,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from '@/lib/utils';
 
 
-interface UserProfile extends AuthContextUserProfile { // Keep this name for the page-specific extended profile
+interface UserProfile extends AuthContextUserProfile { 
   coverPhotoURL?: string;
   followersCount?: number;
   followingCount?: number;
-  // isPrivate?: boolean; // Removed as per previous request
 }
 
-type FollowStatus = 'not_following' | 'pending_them' | 'pending_me' | 'following' | 'follow_back';
+type FollowStatus = 'not_following' | 'following';
 
 
 export default function UserProfilePage({ params: paramsPromise }: { params: { userId: string } }) {
@@ -64,7 +64,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const [isMessaging, setIsMessaging] = useState(false);
   const [isProcessingFollow, setIsProcessingFollow] = useState(false);
   const [followStatus, setFollowStatus] = useState<FollowStatus>('not_following');
-  const [existingRequestId, setExistingRequestId] = useState<string | null>(null);
+  const [existingFollowDocId, setExistingFollowDocId] = useState<string | null>(null);
 
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -74,45 +74,36 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   const isOwnProfile = currentUser?.uid === userId;
 
   const checkFollowStatus = useCallback(async () => {
-    if (!currentUser || !userId || isOwnProfile || !profile) {
+    if (!currentUser || !userId || isOwnProfile) {
       setFollowStatus('not_following');
-      setExistingRequestId(null);
+      setExistingFollowDocId(null);
       setIsProcessingFollow(false);
       return;
     }
 
     setIsProcessingFollow(true);
-    setFollowStatus('not_following');
-    setExistingRequestId(null);
+    // All profiles are public, so "follow" means a direct "accepted" state.
+    // Check if a followRequests document exists for currentUser -> profileUser with status 'accepted'.
+    const followDocId = `${currentUser.uid}_${userId}`;
+    const followRequestRef = doc(db, 'followRequests', followDocId);
 
     try {
-      const followRequestsRef = collection(db, 'followRequests');
-
-      // Check if currentUser is ALREADY following the profile user
-      const qSentOrFollowing = query(
-        followRequestsRef,
-        where('requesterId', '==', currentUser.uid),
-        where('recipientId', '==', userId),
-        where('status', '==', 'accepted'), // Only check for accepted status (following)
-        limit(1)
-      );
-      const sentOrFollowingSnapshot = await getDocs(qSentOrFollowing);
-
-      if (!sentOrFollowingSnapshot.empty) {
+      const docSnap = await getDoc(followRequestRef);
+      if (docSnap.exists() && docSnap.data()?.status === 'accepted') {
         setFollowStatus('following');
-        setExistingRequestId(sentOrFollowingSnapshot.docs[0].id);
+        setExistingFollowDocId(followDocId);
       } else {
         setFollowStatus('not_following');
-        setExistingRequestId(null);
+        setExistingFollowDocId(null);
       }
     } catch (error: any) {
         console.error("Error checking follow status:", error);
         toast({ title: "Network Error", description: `Could not check follow status: ${error.message || 'Please try again.'}`, variant: "destructive"});
-        setFollowStatus('not_following'); // Default to not_following on error
+        setFollowStatus('not_following'); 
     } finally {
         setIsProcessingFollow(false);
     }
-  }, [currentUser, userId, isOwnProfile, profile, toast]);
+  }, [currentUser, userId, isOwnProfile, toast]);
 
 
   useEffect(() => {
@@ -122,7 +113,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data() as UserProfile;
-          setProfile(data); // Removed isPrivate logic here
+          setProfile(data); 
         } else {
           console.warn("No such profile for userId:", userId);
           toast({ title: "Profile not found", variant: "destructive" });
@@ -139,7 +130,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       const postsQuery = query(
         collection(db, 'posts'),
         where('userId', '==', userId),
-        where('isStory', '!=', true), // Exclude stories from profile posts tab
+        where('isStory', '!=', true), 
         orderBy('createdAt', 'desc')
       );
 
@@ -189,44 +180,46 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     setIsProcessingFollow(true);
     const batch = writeBatch(db);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-    const targetUserProfileRef = doc(db, 'profiles', profile.uid); // For incrementing target's followersCount
+    const targetUserProfileRef = doc(db, 'profiles', profile.uid);
 
     try {
       if (followStatus === 'following') { // Unfollow action
-        if (existingRequestId) {
-          const followRequestRef = doc(db, 'followRequests', existingRequestId);
+        if (existingFollowDocId) {
+          const followRequestRef = doc(db, 'followRequests', existingFollowDocId);
           batch.delete(followRequestRef);
         }
         batch.update(currentUserProfileRef, { followingCount: increment(-1) });
         batch.update(targetUserProfileRef, { followersCount: increment(-1) });
         await batch.commit();
         setFollowStatus('not_following');
-        setExistingRequestId(null);
+        setExistingFollowDocId(null);
         toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName}.` });
-      } else { // Follow action (since accounts are public, directly accept)
-        const newFollowRequestId = `${currentUser.uid}_${profile.uid}`;
-        const followRequestRef = doc(db, 'followRequests', newFollowRequestId);
-        const newRequestData: FollowRequestDocument = {
+      } else { // Follow action (status always 'accepted' now)
+        const newFollowDocId = `${currentUser.uid}_${profile.uid}`;
+        const followRequestRef = doc(db, 'followRequests', newFollowDocId);
+        const newRequestData = { // Removed FollowRequestDocument type as it had private profile logic
             requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
             recipientId: profile.uid, recipientDisplayName: profile.displayName, recipientAvatarUrl: profile.photoURL,
-            status: 'accepted', // Directly accepted as profiles are public
+            status: 'accepted', 
             createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         };
         batch.set(followRequestRef, newRequestData);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
         batch.update(targetUserProfileRef, { followersCount: increment(1) });
 
-        // Create a "follow_accept" notification
         const notificationRef = doc(collection(db, 'notifications'));
-        const notificationData: Omit<NotificationDocument, 'createdAt' | 'actionTaken'> = {
+        const notificationData = { // Removed NotificationDocument type to avoid isPrivate checks
             recipientId: profile.uid, actorId: currentUser.uid, actorDisplayName: currentUser.displayName, actorAvatarUrl: currentUser.photoURL,
-            type: 'follow_accept', originalFollowRequestId: newFollowRequestId, isRead: false,
+            type: 'follow_accept', // Changed from 'follow_request' to 'follow_accept' for direct follow
+            originalFollowRequestId: newFollowDocId, 
+            isRead: false,
+            createdAt: serverTimestamp()
         };
-        batch.set(notificationRef, { ...notificationData, createdAt: serverTimestamp() });
+        batch.set(notificationRef, notificationData);
 
         await batch.commit();
         setFollowStatus('following');
-        setExistingRequestId(newFollowRequestId);
+        setExistingFollowDocId(newFollowDocId);
         toast({ title: "Followed", description: `You are now following ${profile.displayName}.` });
       }
       await reloadUser();
@@ -238,7 +231,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     } catch (error: any) {
       console.error("Error in handleFollowToggle:", error);
       toast({ title: "Operation Failed", description: error.message || "Could not perform follow/unfollow action.", variant: "destructive" });
-      await checkFollowStatus(); // Re-fetch status
+      await checkFollowStatus(); 
     } finally {
       setIsProcessingFollow(false);
     }
@@ -362,8 +355,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             <TabsTrigger value="media">Media</TabsTrigger>
             <TabsTrigger value="likes">Likes</TabsTrigger>
           </TabsList>
-          <TabsContent value="posts" className="mt-6">
-             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
+          <TabsContent value="posts" className="mt-6 w-full">
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full">
                 {[...Array(6)].map((_, i) => (
                   <Skeleton key={i} className="aspect-square rounded-md" />
                 ))}
@@ -425,7 +418,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   return (
     <MainLayout>
       <div className="h-[calc(100vh-theme(spacing.24))] w-full">
-          <Card className="overflow-hidden shadow-lg w-full h-full flex flex-col"> {/* Added h-full flex flex-col to Card */}
+          <Card className="overflow-hidden shadow-lg w-full h-full flex flex-col">
             <CardHeader className="bg-muted/20 p-0 relative border-b border-border">
               <div className="relative h-48 w-full md:h-64">
                 <Image
@@ -445,7 +438,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 pt-16 sm:pt-20 px-4 sm:px-6 pb-6 overflow-y-auto"> {/* Added flex-1 and overflow-y-auto */}
+            <CardContent className="flex-1 pt-16 sm:pt-20 px-4 sm:px-6 pb-6 overflow-y-scroll">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
                 <div className="mb-3 sm:mb-0">
                   <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
@@ -475,14 +468,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
               </div>
 
               <Tabs defaultValue="posts" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 bg-muted/60">
-                  <TabsTrigger value="posts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Posts</TabsTrigger>
-                  <TabsTrigger value="media" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Media</TabsTrigger>
-                  <TabsTrigger value="likes" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Likes</TabsTrigger>
+                <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
+                  <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
+                  <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
+                  <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
                 </TabsList>
-                <TabsContent value="posts" className="mt-6">
+                <TabsContent value="posts" className="mt-6 w-full">
                   {loadingPosts && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full">
                       {[...Array(3)].map((_, i) => <Skeleton key={i} className="aspect-square rounded-md" />)}
                     </div>
                   )}
@@ -497,14 +490,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     </div>
                   )}
                   {!loadingPosts && posts.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2 w-full">
                       {posts.map(post => (
                         <div key={post.id} className="aspect-square relative rounded-md overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-xl">
                           <Image
                             src={post.imageUrl || "https://placehold.co/300x300.png?text=Post"}
                             alt={post.caption || `Post by ${profile.displayName}`}
                             fill
-                            style={{objectFit: 'cover'}}
+                            style={{objectFit: 'contain'}}
                             data-ai-hint={post.dataAiHint || "user content"}
                             className="transition-transform duration-300 group-hover:scale-105"
                           />
@@ -529,8 +522,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     </div>
                   )}
                 </TabsContent>
-                <TabsContent value="media" className="mt-6">
-                  <div className="py-12 text-center">
+                <TabsContent value="media" className="mt-6 w-full">
+                  <div className="py-12 text-center w-full">
                     <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                     <p className="mt-4 text-lg font-semibold text-foreground">No Media</p>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -538,8 +531,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
                     </p>
                   </div>
                 </TabsContent>
-                <TabsContent value="likes" className="mt-6">
-                   <div className="py-12 text-center">
+                <TabsContent value="likes" className="mt-6 w-full">
+                   <div className="py-12 text-center w-full">
                       <ImageIcon className="mx-auto h-12 w-12 text-muted-foreground" />
                       <p className="mt-4 text-lg font-semibold text-foreground">No Liked Posts</p>
                       <p className="mt-1 text-sm text-muted-foreground">
