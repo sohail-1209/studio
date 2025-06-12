@@ -61,12 +61,15 @@ export function SignupForm() {
         photoURL: firebaseUser.photoURL || `https://placehold.co/100x100.png?text=${data.username.charAt(0).toUpperCase()}`,
         username: data.username,
         bio: '',
+        followersCount: 0, // Initialize followersCount
+        followingCount: 0, // Initialize followingCount
       };
-      await setDoc(doc(db, 'profiles', firebaseUser.uid), newUserProfile); // Changed 'users' to 'profiles'
+      await setDoc(doc(db, 'profiles', firebaseUser.uid), newUserProfile);
 
       toast({ title: 'Signup Successful', description: 'Welcome to Synora!' });
       router.push('/'); // Redirect to feed or dashboard
     } catch (error: any) {
+      console.error("Signup Form Error Details:", error); // Added for better debugging
       toast({
         title: 'Signup Failed',
         description: error.message || 'An unexpected error occurred.',
@@ -137,4 +140,3 @@ export function SignupForm() {
     </form>
   );
 }
-
