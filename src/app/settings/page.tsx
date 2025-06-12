@@ -141,10 +141,20 @@ export default function SettingsPage() {
       const userId = currentUser.uid;
       const batch = writeBatch(db);
 
+      // Delete user's posts and their comments
       const postsQuery = query(collection(db, 'posts'), where('userId', '==', userId));
       const postsSnapshot = await getDocs(postsQuery);
       for (const postDoc of postsSnapshot.docs) {
         const postData = postDoc.data();
+        
+        // Delete comments subcollection for each post
+        const commentsRef = collection(postDoc.ref, 'comments');
+        const commentsSnapshot = await getDocs(commentsRef);
+        commentsSnapshot.docs.forEach(commentDoc => {
+          batch.delete(commentDoc.ref);
+        });
+
+        // Delete image from storage if it exists
         if (postData.imagePath) {
           try {
             const imageFileRef = storageRef(storage, postData.imagePath);
@@ -153,13 +163,21 @@ export default function SettingsPage() {
             console.warn(`Could not delete post image ${postData.imagePath}:`, storageError);
           }
         }
+        // Delete the post document itself
         batch.delete(postDoc.ref);
       }
 
+      // Delete user's notifications
       const notificationsQuery = query(collection(db, 'notifications'), where('recipientId', '==', userId));
       const notificationsSnapshot = await getDocs(notificationsQuery);
       notificationsSnapshot.forEach(doc => batch.delete(doc.ref));
+      // Also consider notifications where actorId is the user, if relevant (e.g. a notification sent *by* them that needs cleanup)
+      const actorNotificationsQuery = query(collection(db, 'notifications'), where('actorId', '==', userId));
+      const actorNotificationsSnapshot = await getDocs(actorNotificationsQuery);
+      actorNotificationsSnapshot.forEach(doc => batch.delete(doc.ref));
 
+
+      // Delete user's follow requests (sent and received)
       const followRequestsSentQuery = query(collection(db, 'followRequests'), where('requesterId', '==', userId));
       const followRequestsSentSnapshot = await getDocs(followRequestsSentQuery);
       followRequestsSentSnapshot.forEach(doc => batch.delete(doc.ref));
@@ -167,16 +185,23 @@ export default function SettingsPage() {
       const followRequestsReceivedQuery = query(collection(db, 'followRequests'), where('recipientId', '==', userId));
       const followRequestsReceivedSnapshot = await getDocs(followRequestsReceivedQuery);
       followRequestsReceivedSnapshot.forEach(doc => batch.delete(doc.ref));
+      
+      // Delete chats where user is a participant (optional, can be complex to decide if chats should be fully deleted)
+      // For simplicity, we'll skip chat deletion in this client-side example.
+      // A Cloud Function would be better for robust chat cleanup.
 
+      // Delete user's profile
       const profileRef = doc(db, 'profiles', userId);
       batch.delete(profileRef);
 
+      // Commit all Firestore deletions
       await batch.commit();
 
+      // Delete the Firebase Auth user
       await deleteAuthUser(firebaseUser);
 
       toast({ title: "Account Deleted", description: "Your account and associated data have been successfully deleted." });
-      // await logout(); // User will be signed out and onAuthStateChanged will redirect
+      // await logout(); // User will be signed out and onAuthStateChanged will redirect automatically
     } catch (error: any) {
       console.error("Error deleting account:", error);
       toast({ title: "Account Deletion Failed", description: error.message || "Could not delete your account. Please try again.", variant: "destructive" });
@@ -323,7 +348,7 @@ export default function SettingsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+                This action cannot be undone. This will permanently delete your account and remove all your data from our servers. This includes your profile, posts, comments on your posts, notifications, and follow relationships.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth'; // Added signOut
 import { auth } from '@/lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -40,7 +40,20 @@ export function LoginForm() {
   const onSubmit: SubmitHandler<LoginFormInputs> = async (data) => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      
+      if (!userCredential.user.emailVerified) {
+        await signOut(auth); // Sign out the user
+        toast({
+          title: 'Email Not Verified',
+          description: 'Please verify your email address before logging in. Check your inbox for the verification link.',
+          variant: 'destructive',
+          duration: 7000,
+        });
+        setLoading(false);
+        return; // Stop further execution
+      }
+
       toast({ title: 'Login Successful', description: 'Welcome back!' });
       router.push('/'); // Redirect to feed or dashboard
     } catch (error: any) {
@@ -103,4 +116,3 @@ export function LoginForm() {
     </form>
   );
 }
-
