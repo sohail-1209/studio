@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+// Sheet and SheetContent are no longer needed here as MainLayout handles mobile sheet
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -22,9 +22,9 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem" // Default expanded width (256px)
-const SIDEBAR_WIDTH_MOBILE = "16rem" // Width for mobile sheet (can be same as desktop)
-const SIDEBAR_WIDTH_ICON = "3.75rem" // Width for icon-only (60px), consistent with globals.css
+const SIDEBAR_WIDTH = "16rem"
+const SIDEBAR_WIDTH_MOBILE = "16rem"
+const SIDEBAR_WIDTH_ICON = "3.75rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContext = {
@@ -110,11 +110,11 @@ const SidebarProvider = React.forwardRef<
           const shouldBeOpen = cookieValue === "true";
           if(_open !== shouldBeOpen) _setOpen(shouldBeOpen);
         } else {
-           if(_open !== defaultOpen) _setOpen(defaultOpen); // Set to default if no cookie
+           if(_open !== defaultOpen) _setOpen(defaultOpen); 
         }
       }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Run once on mount to check cookie
+    }, []); 
 
 
     const toggleSidebar = React.useCallback(() => {
@@ -160,7 +160,7 @@ const SidebarProvider = React.forwardRef<
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH,
-                "--sidebar-width-icon": SIDEBAR_WIDTH_ICON, // SIDEBAR_WIDTH_ICON is now "3.75rem"
+                "--sidebar-width-icon": SIDEBAR_WIDTH_ICON, 
                 "--sidebar-width-mobile": SIDEBAR_WIDTH_MOBILE,
                 ...style,
               } as React.CSSProperties
@@ -193,20 +193,25 @@ const Sidebar = React.forwardRef<
     {
       side = "left",
       variant = "sidebar",
-      collapsible = "offcanvas",
+      collapsible = "icon", // Default to icon for desktop collapse if not specified
       className,
       children,
       ...props
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { state } = useSidebar(); // Only need 'state' (expanded/collapsed) for desktop
+
+    // This component now *only* renders the desktop sidebar.
+    // MainLayout.tsx handles the mobile Sheet rendering.
 
     if (collapsible === "none") {
+      // Always expanded desktop sidebar
       return (
         <div
           className={cn(
             "flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground",
+            "hidden md:flex", // Ensure it's for desktop
             className
           )}
           ref={ref}
@@ -217,54 +222,44 @@ const Sidebar = React.forwardRef<
       )
     }
 
-    if (isMobile) {
-      return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile}>
-          <SheetContent
-            data-sidebar="sidebar"
-            data-mobile="true"
-            className={cn("w-[--sidebar-width-mobile] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden", className)}
-            side={side}
-          >
-            <div className="flex h-full w-full flex-col">{children}</div>
-          </SheetContent>
-        </Sheet>
-      )
-    }
-
+    // Default desktop sidebar (collapsible to icon or offcanvas based on `collapsible` prop)
     return (
       <div
         ref={ref}
-        className={cn("group peer hidden md:block text-sidebar-foreground",
+        className={cn(
+            "group peer hidden md:block text-sidebar-foreground", // Ensures this is for desktop
+            className
         )}
-        data-state={state}
-        data-collapsible={state === "collapsed" ? collapsible : ""}
+        data-state={state} // 'expanded' or 'collapsed'
+        data-collapsible={state === "collapsed" && collapsible === "icon" ? "icon" : collapsible === "offcanvas" ? "offcanvas" : ""}
         data-variant={variant}
         data-side={side}
       >
+        {/* This div is a spacer to push content when the sidebar is visible */}
         <div
           className={cn(
             "duration-200 relative h-svh bg-transparent transition-[width] ease-linear",
-            "w-[--sidebar-width]",
-            "group-data-[collapsible=offcanvas]:w-0",
-            "group-data-[state=collapsed]:group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
+            "w-[--sidebar-width]", // Expanded width
+            "group-data-[collapsible=offcanvas]:w-0", // Collapsed to 0 if offcanvas
+            "group-data-[state=collapsed]:group-data-[collapsible=icon]:w-[--sidebar-width-icon]", // Collapsed to icon width
             variant === "floating" || variant === "inset"
               ? "group-data-[state=collapsed]:group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
               : "",
-            "group-data-[side=right]:rotate-180"
+            "group-data-[side=right]:rotate-180" // For right-sided sidebar
           )}
         />
+        {/* This div is the actual fixed sidebar */}
         <div
           className={cn(
             "duration-200 fixed inset-y-0 z-10 hidden h-svh transition-[left,right,width] ease-linear md:flex",
-            "w-[--sidebar-width]",
-            "group-data-[state=collapsed]:group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
+            "w-[--sidebar-width]", // Expanded width
+            "group-data-[state=collapsed]:group-data-[collapsible=icon]:w-[--sidebar-width-icon]", // Collapsed to icon width
             side === "left"
-              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
+              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]" // Offcanvas behavior
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-            variant === "floating" || variant === "inset"
+            variant === "floating" || variant === "inset" // Styling for floating/inset variants
               ? "p-2 group-data-[state=collapsed]:group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
-              : (state === "expanded" ? (side === "left" ? "border-r" : "border-l") : ""),
+              : (state === "expanded" ? (side === "left" ? "border-r" : "border-l") : ""), // Border for standard sidebar
              className
           )}
           {...props}
@@ -275,7 +270,7 @@ const Sidebar = React.forwardRef<
              variant === "floating" ? "rounded-lg border border-border shadow" : "",
             )}
           >
-            {children}
+            {children} {/* AppSidebar content */}
           </div>
         </div>
       </div>
