@@ -200,7 +200,7 @@ export default function IndividualPostPage({ params: paramsPromise }: { params: 
                         </div>
                     </Link>
                 </div>
-                 <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-muted-foreground hover:text-foreground" title="Go back">
+                 <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="text-muted-foreground hover:text-foreground" title="Go to Feed">
                     <ArrowLeft className="h-5 w-5" />
                  </Button>
             </div>
