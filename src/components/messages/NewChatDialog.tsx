@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Spinner } from '@/components/shared/Spinner';
 import { Search } from 'lucide-react';
 import Image from 'next/image';
+import type { ChatSessionDocument } from '@/types/chat';
 
 interface NewChatDialogProps {
   open: boolean;
@@ -97,9 +98,6 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
         chatSnap = await getDoc(chatDocRef);
       } catch (findError: any) {
         console.error("NewChatDialog: FirebaseError FINDING chat (getDoc):", findError);
-        console.error("Error Code:", findError.code);
-        console.error("Error Message:", findError.message);
-        console.error("Error Details (if any):", findError.details);
         toast({ 
           title: "Chat Find Error", 
           description: `Could not check for existing chat: ${findError.message || 'Please try again.'}`, 
@@ -114,7 +112,7 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
         router.push(`/messages/${chatId}`);
         onOpenChange(false); 
       } else {
-        const newChatData = {
+        const newChatData: ChatSessionDocument = { // Use ChatSessionDocument type
           userIds: [currentUser.uid, selectedUser.uid],
           userDetails: {
             [currentUser.uid]: {
@@ -131,28 +129,14 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           lastMessageTimestamp: null, 
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+          typing: { // Initialize typing status
+            [currentUser.uid]: false,
+            [selectedUser.uid]: false,
+          },
         };
 
         console.log('NewChatDialog: Pre-flight Data for New Chat Creation:');
-        console.log('Current User UID:', currentUser.uid);
-        console.log('Selected User UID:', selectedUser.uid);
-        console.log('Generated Chat ID:', chatId);
         console.log('Data to be written (newChatData):', JSON.stringify(newChatData, null, 2));
-
-        const clientSideRuleCheck = currentUser && currentUser.uid && newChatData.userIds.includes(currentUser.uid);
-        console.log(`NewChatDialog: Client-side rule check (currentUser.uid in newChatData.userIds): ${clientSideRuleCheck ? 'PASSED' : 'FAILED'}`);
-
-        if (!clientSideRuleCheck) {
-          console.error("NewChatDialog: CRITICAL - Client-side rule check FAILED. currentUser.uid is not in newChatData.userIds. Aborting Firestore write.");
-          toast({ 
-            title: "Client Data Error", 
-            description: "Could not prepare chat data correctly. Please report this issue.", 
-            variant: "destructive" 
-          });
-          setIsCreatingChat(false);
-          return;
-        }
-        console.log("NewChatDialog: Client-side rule check PASSED. Attempting Firestore write (setDoc)...");
         
         try {
           await setDoc(chatDocRef, newChatData);
@@ -161,9 +145,6 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
           onOpenChange(false);
         } catch (createError: any) {
           console.error("NewChatDialog: FirebaseError CREATING chat (setDoc):", createError);
-          console.error("Error Code:", createError.code);
-          console.error("Error Message:", createError.message);
-          console.error("Error Details (if any):", createError.details);
           toast({ 
             title: "Chat Creation Error", 
             description: `Could not start chat: ${createError.message || 'Please try again.'}`, 
@@ -172,8 +153,6 @@ export function NewChatDialog({ open, onOpenChange }: NewChatDialogProps) {
         }
       }
     } catch (error: any) {
-      // This outer catch is unlikely to be hit if inner ones handle specific Firebase errors,
-      // but it's good for unexpected issues.
       console.error("NewChatDialog: UNEXPECTED error in handleSelectUser:", error);
       toast({ 
         title: "Unexpected Error", 

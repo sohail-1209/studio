@@ -32,6 +32,9 @@ export interface ChatSessionDocument {
   lastMessageSenderId: string | null;
   lastMessageTimestamp: FieldValue | null; // For updating with serverTimestamp
   updatedAt: FieldValue; // For sorting chats, use serverTimestamp
+  typing?: { // Optional map to store typing status for each user in the chat
+    [userId: string]: boolean; // e.g., { "uid1": true, "uid2": false }
+  };
 }
 
 export interface ChatSession extends Omit<ChatSessionDocument, 'lastMessageTimestamp' | 'updatedAt'> {
@@ -39,4 +42,8 @@ export interface ChatSession extends Omit<ChatSessionDocument, 'lastMessageTimes
   lastMessageTimestamp: Date | null; // Converted for display
   updatedAt: Date; // Converted for display
   otherUser?: ChatSessionUserDetail & { uid: string };
+  typing?: {
+    [userId: string]: boolean;
+  };
 }
+

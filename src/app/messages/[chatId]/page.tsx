@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Paperclip, Send, Phone, Video, Smile, XCircle, Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useEffect, useState, use, useRef, ChangeEvent } from 'react';
+import { useEffect, useState, use, useRef, ChangeEvent, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
 import {
@@ -50,6 +50,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
+const TYPING_TIMEOUT_MS = 3000; // 3 seconds
+
 export default function ChatPage({ params: paramsPromise }: { params: { chatId: string } }) {
   const params = use(paramsPromise);
   const { chatId } = params;
@@ -73,6 +75,9 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const [messageToDelete, setMessageToDelete] = useState<ChatMessage | null>(null);
   const [isDeletingMessage, setIsDeletingMessage] = useState(false);
 
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentUserIsTypingRef = useRef(false);
+
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -80,7 +85,61 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
-  }, [messages]);
+  }, [messages, isPartnerTyping]); // Added isPartnerTyping to scroll when it appears/disappears
+
+
+  const updateSelfTypingStatus = useCallback(async (isTyping: boolean) => {
+    if (!user?.uid || !chatId) return;
+    currentUserIsTypingRef.current = isTyping;
+    const chatDocRef = doc(db, 'chats', chatId);
+    try {
+      // Ensure the typing field exists before trying to update a nested key
+      const chatSnap = await getDoc(chatDocRef);
+      if (chatSnap.exists()) {
+        const currentTypingData = chatSnap.data()?.typing || {};
+        await updateDoc(chatDocRef, {
+          [`typing.${user.uid}`]: isTyping,
+          updatedAt: serverTimestamp(), // Keep updatedAt fresh
+        });
+      } else {
+        // This case should ideally not happen if chat is already open
+        console.warn("Chat document not found when trying to update typing status.");
+      }
+    } catch (error) {
+      console.error("Error updating self typing status:", error);
+    }
+  }, [user?.uid, chatId]);
+
+  useEffect(() => {
+    if (!user?.uid || !chatId) return;
+
+    if (newMessage.trim() !== '') {
+      if (!currentUserIsTypingRef.current) {
+        updateSelfTypingStatus(true);
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      typingTimeoutRef.current = setTimeout(() => {
+        updateSelfTypingStatus(false);
+      }, TYPING_TIMEOUT_MS);
+    } else {
+      if (currentUserIsTypingRef.current) {
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        updateSelfTypingStatus(false);
+      }
+    }
+    // Cleanup timeout on unmount or when dependencies change
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      // Optionally, set typing to false on unmount/chat change if user was typing
+      // This might be too aggressive if user quickly switches back
+    };
+  }, [newMessage, user?.uid, chatId, updateSelfTypingStatus]);
 
 
   useEffect(() => {
@@ -97,9 +156,11 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
         const chatData = chatSnap.data() as ChatSessionDocument;
         const otherUserId = chatData.userIds.find(uid => uid !== user.uid);
         setChatPartnerId(otherUserId || null);
+
         if (otherUserId && chatData.userDetails && chatData.userDetails[otherUserId]) {
           setChatPartnerProfile(chatData.userDetails[otherUserId]);
         } else if (otherUserId) {
+          // Fallback if userDetails not fully populated yet (should be rare with NewChatDialog logic)
           getDoc(doc(db, 'profiles', otherUserId)).then(profileDoc => {
             if (profileDoc.exists()) {
               const profileData = profileDoc.data();
@@ -115,15 +176,25 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
            setChatPartnerProfile({ displayName: 'Chat Details Error', photoURL: `https://placehold.co/40x40.png?text=E` });
            console.warn("ChatPage: Could not determine chat partner from chat document:", chatData);
         }
+
+        // Handle partner typing status
+        if (otherUserId && chatData.typing && chatData.typing[otherUserId]) {
+          setIsPartnerTyping(true);
+        } else {
+          setIsPartnerTyping(false);
+        }
+
       } else {
         console.error("Chat session not found for ID:", chatId);
         setChatPartnerProfile({ displayName: 'Chat Not Found', photoURL: `https://placehold.co/40x40.png?text=E` });
         setChatPartnerId(null);
+        setIsPartnerTyping(false);
       }
     }, (error) => {
         console.error("Error fetching chat details:", error);
         setChatPartnerProfile({ displayName: 'Error Loading', photoURL: `https://placehold.co/40x40.png?text=E` });
         setChatPartnerId(null);
+        setIsPartnerTyping(false);
     });
 
     const messagesCollection = collection(db, 'chats', chatId, 'messages');
@@ -180,6 +251,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
 
     setSendingMessage(true);
     setUploadProgress(null);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); // Clear typing timeout
+    updateSelfTypingStatus(false); // Ensure self typing status is false
 
     const batch = writeBatch(db);
     const messagesCollectionRef = collection(db, 'chats', chatId, 'messages');
@@ -232,12 +305,16 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       }
 
       batch.set(newMessageRef, messageData);
-      batch.update(chatDocRef, {
+      // When sending a message, ensure own typing status is false in the chat document
+      const updatePayload: Partial<ChatSessionDocument> & { updatedAt: FieldValue, [key: string]: any } = {
         lastMessageText: messageData.imageUrl ? (messageData.text ? messageData.text : "📷 Image") : lastMessageText,
         lastMessageSenderId: user.uid,
         lastMessageTimestamp: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+        [`typing.${user.uid}`]: false, // Explicitly set own typing status to false
+      };
+      batch.update(chatDocRef, updatePayload);
+
 
       await batch.commit();
       setNewMessage('');
@@ -352,12 +429,14 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                     </Avatar>
                     <div className="min-w-0"> 
                       <p className="font-semibold text-foreground truncate">{chatPartnerProfile.displayName}</p> 
+                      {/* Last seen placeholder below */}
+                      {/* <p className="text-xs text-muted-foreground truncate">Last seen: ...</p> */}
                     </div>
                   </>
                 ) : (
                   <>
                     <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
-                    <div className="space-y-1 min-w-0"> <Skeleton className="h-4 w-24" /> </div>
+                    <div className="space-y-1 min-w-0"> <Skeleton className="h-4 w-24" /> <Skeleton className="h-3 w-20" /> </div>
                   </>
                 )}
               </div>
@@ -457,7 +536,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                     <div className="flex items-end space-x-2 justify-start">
                        <Avatar className="h-8 w-8 self-start flex-shrink-0">
                           {chatPartnerProfile.photoURL ? (
-                            <Image src={chatPartnerProfile.photoURL} alt="Sender" width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
+                            <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || "Sender"} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
                            ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
                         </Avatar>
                       <div className="bg-muted text-foreground rounded-lg p-2 shadow-md border border-border/10 rounded-tl-none"> 
@@ -541,3 +620,4 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     </MainLayout>
   );
 }
+
