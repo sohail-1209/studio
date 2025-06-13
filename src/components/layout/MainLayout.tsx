@@ -57,7 +57,7 @@ function LayoutContent({ children }: MainLayoutProps) {
       <SidebarInset className="overflow-y-scroll">
         <MobileHeader /> 
         <main className={cn(
-          "w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 pt-18 md:pt-4 lg:pt-6", // Changed pt-20 to pt-18
+          "w-full max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 pt-18 md:pt-4 lg:pt-6", // Changed max-w-5xl to max-w-6xl
           "min-w-0 overflow-x-hidden" 
         )}> 
           {children}
