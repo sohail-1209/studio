@@ -141,14 +141,26 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setExistingFollowDocId(null);
       }
     } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        console.warn(
+          `Firestore permission denied while checking follow status for profile ${paramsUserId}. ` +
+          `This usually means the Firestore security rules for '/followRequests/{followRequestId}' ` +
+          `do not allow the current user (${currentUser?.uid}) to read the document '${followDocId}'. ` +
+          `Please check your Firebase console's Firestore rules. Message: ${error.message}`
+        );
+        // Do not show a user-facing toast for permission denied, as it's a dev/config issue.
+      } else {
+        // For other errors, log them and show a generic toast.
         console.error("Error checking follow status:", error);
         console.error(`Error details - Code: ${error.code}, Name: ${error.name}, Message: ${error.message}`);
-        toast({ 
-            title: "Follow Status Check Failed", 
-            description: "Unable to determine follow status. Technical details logged to console.", 
-            variant: "default" 
+        toast({
+            title: "Follow Status Check Failed",
+            description: "Unable to determine follow status. Please try again later.",
+            variant: "default"
         });
-        setFollowStatus('not_following'); // Fallback
+      }
+      setFollowStatus('not_following'); // Fallback status
+      setExistingFollowDocId(null);     // Ensure this is also reset
     } finally {
         setIsProcessingFollow(false);
     }
