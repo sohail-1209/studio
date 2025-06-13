@@ -117,18 +117,14 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   const checkFollowStatus = useCallback(async () => {
     if (!currentUser || !currentUser.uid || !paramsUserId || paramsUserId === '' || isOwnProfile) {
-      console.log("checkFollowStatus: Pre-conditions not met (current user, target userId empty, or own profile). Skipping.", 
-        { currentUserUid: currentUser?.uid, targetUserId: paramsUserId, isOwnProfile });
+      console.log("checkFollowStatus: Pre-conditions not met. Skipping.", { currentUserUid: currentUser?.uid, targetUserId: paramsUserId, isOwnProfile });
       setFollowStatus('not_following');
       setExistingFollowDocId(null);
       setIsProcessingFollow(false);
       return;
     }
-
-    console.log(`checkFollowStatus: Attempting to check for currentUser ${currentUser.uid} and targetUser ${paramsUserId}`);
     setIsProcessingFollow(true);
     const followDocId = `${currentUser.uid}_${paramsUserId}`;
-    console.log(`checkFollowStatus: Constructed followDocId: '${followDocId}'`);
     const followRequestRef = doc(db, 'followRequests', followDocId);
 
     try {
@@ -144,23 +140,21 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       if (error.code === 'permission-denied') {
         console.warn(
           `Firestore permission denied while checking follow status for profile ${paramsUserId}. ` +
-          `This usually means the Firestore security rules for '/followRequests/{followRequestId}' ` +
-          `do not allow the current user (${currentUser?.uid}) to read the document '${followDocId}'. ` +
-          `Please check your Firebase console's Firestore rules. Message: ${error.message}`
+          `UID: ${currentUser?.uid} attempting to read 'followRequests/${followDocId}'. ` +
+          `Ensure Firestore rules allow this read (e.g., if request.auth.uid is part of followRequestId). Message: ${error.message}`
         );
-        // Do not show a user-facing toast for permission denied, as it's a dev/config issue.
+        // No toast for permission denied as it's a dev/config issue
       } else {
-        // For other errors, log them and show a generic toast.
         console.error("Error checking follow status:", error);
         console.error(`Error details - Code: ${error.code}, Name: ${error.name}, Message: ${error.message}`);
         toast({
             title: "Follow Status Check Failed",
-            description: "Unable to determine follow status. Please try again later.",
-            variant: "default"
+            description: "Unable to determine follow status. Technical details logged to console.",
+            variant: "default" // Changed from destructive
         });
       }
-      setFollowStatus('not_following'); // Fallback status
-      setExistingFollowDocId(null);     // Ensure this is also reset
+      setFollowStatus('not_following');
+      setExistingFollowDocId(null);
     } finally {
         setIsProcessingFollow(false);
     }
@@ -201,28 +195,45 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   const handleFollowToggle = async () => {
     if (!currentUser || !currentUser.uid || !profile || !profile.uid || isOwnProfile || isProcessingFollow) {
+      console.warn("handleFollowToggle: Pre-conditions not met or already processing.", {
+        currentUserUid: currentUser?.uid,
+        profileUid: profile?.uid,
+        isOwnProfile,
+        isProcessingFollow,
+      });
       return;
     }
 
     setIsProcessingFollow(true);
     const batch = writeBatch(db);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); // Not used for target's follower count update
 
     try {
       if (followStatus === 'following') {
+        // ---- UNFOLLOW ACTION ----
         if (existingFollowDocId) {
           const followRequestRef = doc(db, 'followRequests', existingFollowDocId);
+          console.log(`Attempting to DELETE: followRequests/${existingFollowDocId}`);
           batch.delete(followRequestRef);
+        } else {
+          console.warn("Cannot unfollow: existingFollowDocId is null. This might indicate a state inconsistency.");
+          setIsProcessingFollow(false);
+          toast({ title: "Unfollow Error", description: "Could not determine which follow record to remove.", variant: "destructive" });
+          return;
         }
+        
+        console.log(`Attempting to UPDATE: profiles/${currentUser.uid} with { followingCount: increment(-1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-        // Client no longer attempts to update target's followersCount
-        // batch.update(targetUserProfileRef, { followersCount: increment(-1) }); 
+        
+        console.log("Unfollow Batch Operations Prepared:", batch);
         await batch.commit();
+
         setFollowStatus('not_following');
         setExistingFollowDocId(null);
         toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName}.` });
+
       } else {
+        // ---- FOLLOW ACTION ----
         const newFollowDocId = `${currentUser.uid}_${profile.uid}`;
         const followRequestRef = doc(db, 'followRequests', newFollowDocId);
         const newRequestData: FollowRequestDocument = {
@@ -231,10 +242,11 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             status: 'accepted', 
             createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         };
+        console.log(`Attempting to SET: followRequests/${newFollowDocId} with data:`, newRequestData);
         batch.set(followRequestRef, newRequestData);
+
+        console.log(`Attempting to UPDATE: profiles/${currentUser.uid} with { followingCount: increment(1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
-        // Client no longer attempts to update target's followersCount
-        // batch.update(targetUserProfileRef, { followersCount: increment(1) }); 
 
         const notificationRef = doc(collection(db, 'notifications'));
         const notificationData = {
@@ -247,15 +259,18 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             isRead: false,
             createdAt: serverTimestamp()
         };
+        console.log(`Attempting to SET: notifications/${notificationRef.id} with data:`, notificationData);
         batch.set(notificationRef, notificationData);
-
+        
+        console.log("Follow Batch Operations Prepared:", batch);
         await batch.commit();
+
         setFollowStatus('following');
         setExistingFollowDocId(newFollowDocId);
         toast({ title: "Followed", description: `You are now following ${profile.displayName}.` });
       }
+
       await reloadUser(); 
-      // Fetch the target profile again to get its potentially updated follower count (if managed by backend)
       const targetUserProfileRef = doc(db, 'profiles', profile.uid);
       const updatedTargetProfileSnap = await getDoc(targetUserProfileRef);
       if (updatedTargetProfileSnap.exists()) {
@@ -263,9 +278,11 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       }
 
     } catch (error: any) {
-      console.error("Error in handleFollowToggle:", error);
-      toast({ title: "Operation Failed", description: error.message || "Could not perform follow/unfollow action.", variant: "destructive" });
-      await checkFollowStatus(); // Re-check status in case of failure
+      console.error("FirebaseError in handleFollowToggle:", error);
+      console.error(`Error details - Code: ${error.code}, Name: ${error.name}, Message: ${error.message}`);
+      toast({ title: "Operation Failed", description: `Error: ${error.message || "Could not perform follow/unfollow action."}. Check console for details.`, variant: "destructive" });
+      // It's important to re-check status in case of failure to ensure UI consistency.
+      await checkFollowStatus(); 
     } finally {
       setIsProcessingFollow(false);
     }
