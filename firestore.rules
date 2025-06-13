@@ -6,32 +6,25 @@ service cloud.firestore {
 
     // Helper Functions
     function isProfileEffectivelyPublic(userId) {
+      // A profile is effectively public if its 'isPrivate' field is false, or 'isPrivate' field doesn't exist.
       let profileData = get(/databases/$(database)/documents/profiles/$(userId)).data;
       return profileData.isPrivate == false || !('isPrivate' in profileData);
     }
 
     function isProfileActuallyPrivate(userId) {
+      // A profile is actually private if it exists AND its 'isPrivate' field is true.
       return exists(/databases/$(database)/documents/profiles/$(userId)) &&
              get(/databases/$(database)/documents/profiles/$(userId)).data.isPrivate == true;
     }
 
     function isAcceptedFollower(profileOwnerId, requesterId) {
+      // Correctly construct the followDocId
       let followDocId = requesterId + '_' + profileOwnerId;
-      return request.auth != null && requesterId == request.auth.uid &&
+      return request.auth != null && requesterId == request.auth.uid && 
              exists(/databases/$(database)/documents/followRequests/$(followDocId)) &&
              get(/databases/$(database)/documents/followRequests/$(followDocId)).data.status == 'accepted' &&
              get(/databases/$(database)/documents/followRequests/$(followDocId)).data.requesterId == requesterId &&
              get(/databases/$(database)/documents/followRequests/$(followDocId)).data.recipientId == profileOwnerId;
-    }
-
-    function isValidGroupUserDetails(userIds, userDetails) {
-      return userIds.size() == userDetails.keys().size() &&
-             userIds.all(uid => userDetails[uid].displayName != null);
-             // photoURL can be null, so not checking it here
-    }
-
-    function allMembersTypingFalse(userIds, typingMap) {
-      return userIds.all(uid => typingMap[uid] == false);
     }
     // End of Helper Functions
 
@@ -47,21 +40,28 @@ service cloud.firestore {
                          // 1-on-1 Chat
                          ( (request.resource.data.isGroupChat == false || !('isGroupChat' in request.resource.data)) &&
                            request.resource.data.userIds.size() == 2 &&
+                           // Ensure userDetails exist for both users and necessary fields are present
                            request.resource.data.userDetails[request.resource.data.userIds[0]].displayName != null &&
                            request.resource.data.userDetails[request.resource.data.userIds[1]].displayName != null &&
                            // Ensure typing field is initialized correctly for 1-on-1
-                           request.resource.data.typing.keys().hasOnly(request.resource.data.userIds) &&
+                           request.resource.data.typing.keys().size() == 2 && // Exactly two entries
+                           request.resource.data.typing.keys().hasOnly(request.resource.data.userIds) && // Only contains keys from userIds
                            request.resource.data.typing[request.resource.data.userIds[0]] == false &&
                            request.resource.data.typing[request.resource.data.userIds[1]] == false
+                           // photoURL can be null
                          ) ||
                          // Group Chat
                          ( request.resource.data.isGroupChat == true &&
                            request.resource.data.userIds.size() >= 2 && // Groups must have at least 2 members
                            request.resource.data.groupName != null && request.resource.data.groupName.size() > 0 &&
-                           isValidGroupUserDetails(request.resource.data.userIds, request.resource.data.userDetails) &&
-                           // Ensure typing field is initialized correctly for groups
-                           request.resource.data.typing.keys().hasOnly(request.resource.data.userIds) &&
-                           allMembersTypingFalse(request.resource.data.userIds, request.resource.data.typing)
+                           // Validate userDetails: all userIds must have an entry, and each entry must have a displayName
+                           request.resource.data.userDetails.keys().size() == request.resource.data.userIds.size() &&
+                           request.resource.data.userDetails.keys().hasAll(request.resource.data.userIds) && // Check if all userIds are keys
+                           request.resource.data.userIds.all(uid => request.resource.data.userDetails[uid].displayName != null) &&
+                           // Validate typing: all userIds must have an entry, and each must be false
+                           request.resource.data.typing.keys().size() == request.resource.data.userIds.size() &&
+                           request.resource.data.typing.keys().hasAll(request.resource.data.userIds) && // Check if all userIds are keys
+                           request.resource.data.userIds.all(uid => request.resource.data.typing[uid] == false)
                          )
                        );
 
@@ -72,6 +72,7 @@ service cloud.firestore {
         allow create: if request.auth != null &&
                          request.auth.uid == request.resource.data.senderId &&
                          get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]) &&
+                         // Ensure text or imageUrl is present, and senderId is provided
                          (request.resource.data.text != null || request.resource.data.imageUrl != null) &&
                          request.resource.data.senderId != null;
         allow delete: if request.auth != null &&
@@ -86,39 +87,48 @@ service cloud.firestore {
     // ================================================================================
     // == FOLLOW REQUESTS COLLECTION RULES ==
     // ================================================================================
-   match /followRequests/{requestId} {
+   match /followRequests/{requestId} { // Wildcard is 'requestId'
+    // --- CORRECTED allow read RULE ---
+      // Allow read if the authenticated user is either the requester or the recipient
+      // by checking the fields within the document. This works reliably with queries.
       allow read: if request.auth != null &&
                     (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);
 
+      // TEMPORARILY INSECURE - FOR DIAGNOSTICS ONLY for the create operation
       allow create: if request.auth != null &&
                      request.auth.uid == request.resource.data.requesterId &&
-                     request.resource.data.requesterId == requestId.split('_')[0] &&
-                     request.resource.data.recipientId == requestId.split('_')[1] &&
-                     request.resource.data.status == 'accepted' &&
+                     request.resource.data.requesterId == requestId.split('_')[0] && // Use 'requestId'
+                     request.resource.data.recipientId == requestId.split('_')[1] && // Use 'requestId'
+                     request.resource.data.status == 'accepted' && 
                      request.resource.data.requesterId != request.resource.data.recipientId;
 
       allow update: if request.auth != null &&
                      (
+                       // Recipient accepting/declining a pending request
                        (
                          request.auth.uid == resource.data.recipientId &&
                          resource.data.status == 'pending' &&
                          (request.resource.data.status == 'accepted' || request.resource.data.status == 'declined') &&
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
                        ) ||
+                       // Requester updating their own request to 'accepted' if target is public
                        (
                          request.auth.uid == resource.data.requesterId &&
-                         isProfileEffectivelyPublic(resource.data.recipientId) &&
+                         // Ensure isProfileEffectivelyPublic function is defined in your rules
+                         isProfileEffectivelyPublic(resource.data.recipientId) && 
                          request.resource.data.status == 'accepted' &&
-                         resource.data.status != 'accepted' &&
+                         resource.data.status != 'accepted' && 
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
                        )
                      );
 
       allow delete: if request.auth != null &&
                      (
+                       // Requester can delete their request
                        (request.auth.uid == resource.data.requesterId &&
                         (resource.data.status == 'pending' || resource.data.status == 'accepted'))
                        ||
+                       // Recipient can delete a request they've processed or an accepted one
                        (request.auth.uid == resource.data.recipientId &&
                         (resource.data.status == 'declined' || resource.data.status == 'accepted'))
                      );
@@ -129,40 +139,70 @@ service cloud.firestore {
 
     // Posts collection
     match /posts/{postId} {
-      allow read: if true; // TEMPORARY DIAGNOSTIC RULE
+      // TEMPORARY DIAGNOSTIC RULE for posts read
+      allow read: if true;
+      // Original more secure read rule:
+      // allow read: if
+      //   // Case 1: Post is explicitly marked public AND author's profile is effectively public
+      //   (
+      //     resource.data.authorIsPrivate == false && isProfileEffectivelyPublic(resource.data.userId)
+      //   ) ||
+      //   // Case 2: Current user is the author of the post
+      //   (
+      //     request.auth != null && request.auth.uid == resource.data.userId
+      //   ) ||
+      //   // Case 3: Post's author's profile is private, and current user is an accepted follower
+      //   (
+      //     resource.data.authorIsPrivate == true &&
+      //     isProfileActuallyPrivate(resource.data.userId) &&
+      //     request.auth != null &&
+      //     isAcceptedFollower(resource.data.userId, request.auth.uid)
+      //   );
 
       allow create: if request.auth != null &&
                        request.auth.uid == request.resource.data.userId &&
                        request.resource.data.userId != null &&
+                       // caption can be null if imageUrl is present for a story
                        (request.resource.data.caption != null || (request.resource.data.isStory == true && request.resource.data.imageUrl != null)) &&
                        request.resource.data.likesCount == 0 &&
                        request.resource.data.commentsCount == 0 &&
-                       request.resource.data.authorIsPrivate != null;
+                       request.resource.data.authorIsPrivate != null; // authorIsPrivate must be set
 
       allow update: if request.auth != null &&
                       (
+                        // Owner can update caption, image, etc., but NOT counters directly or sensitive fields
                         (request.auth.uid == resource.data.userId &&
                          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['likesCount', 'likedBy', 'commentsCount', 'userId', 'createdAt', 'authorIsPrivate'])) ||
+                        // Anyone authenticated can update like/comment counters (usually via increments)
                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'commentsCount']))
                       );
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
 
       match /comments/{commentId} {
-        allow read: if true; // TEMPORARY DIAGNOSTIC RULE
+        // TEMPORARY DIAGNOSTIC RULE for comments read
+        allow read: if true;
+        // allow read: if true; // Comments are public if the post is readable (implies post read rule passes)
 
         allow create: if request.auth != null &&
                          request.auth.uid == request.resource.data.userId &&
                          request.resource.data.text != null &&
                          request.resource.data.userId != null;
         allow delete: if request.auth != null &&
-                         (request.auth.uid == resource.data.userId ||
-                          request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId);
+                         (request.auth.uid == resource.data.userId || // Comment owner
+                          request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId); // Post owner
       }
     }
 
     // Profiles collection
     match /profiles/{userId} {
-      allow read: if true; // TEMPORARY DIAGNOSTIC RULE
+      // TEMPORARY DIAGNOSTIC RULE for profiles read
+      allow read: if true;
+      // Original more secure read rule:
+      // allow read: if
+      //   (isProfileEffectivelyPublic(userId)) || // Anyone can read a public profile
+      //   (request.auth != null && request.auth.uid == userId) || // Owner can read their own profile
+      //   (request.auth != null && isAcceptedFollower(userId, request.auth.uid) && isProfileActuallyPrivate(userId)) || // Followers can read private profile they follow
+      //   (request.auth != null); // Any auth user can read (e.g. for DM user details, if no other condition met) - consider if too broad
 
       allow create: if request.auth != null &&
                        request.auth.uid == userId &&
@@ -172,10 +212,14 @@ service cloud.firestore {
                        request.resource.data.username != null &&
                        request.resource.data.followersCount == 0 &&
                        request.resource.data.followingCount == 0 &&
-                       request.resource.data.isPrivate == false;
+                       request.resource.data.isPrivate == false; // Default to public on creation
 
       allow update: if request.auth != null && request.auth.uid == userId &&
+                       // Prevent changing UID, email
                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid', 'email']) &&
+                       // Allow owner to update their own followingCount (e.g., by increment(1))
+                       // OR their own followersCount (e.g., by increment(1) from a function or when accepting follow)
+                       // OR other allowed fields (bio, displayName, photoURL, coverPhotoURL, username, isPrivate)
                        (
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followingCount']) ||
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount']) ||
@@ -205,7 +249,7 @@ service cloud.firestore {
                          ) ||
                          ( request.resource.data.type == 'follow_request' &&
                            request.resource.data.followRequestId != null &&
-                           isProfileActuallyPrivate(request.resource.data.recipientId)
+                           isProfileActuallyPrivate(request.resource.data.recipientId) // Only send follow_request notif if target is private
                          ) ||
                          ( request.resource.data.type == 'follow_accept' &&
                            request.resource.data.originalFollowRequestId != null
