@@ -122,23 +122,21 @@ export default function ExplorePage() {
     }
 
     setIsSearchingUserExact(true);
-    setShowSuggestions(false); // Hide suggestions during exact search attempt
+    setShowSuggestions(false); 
     
     let userDocSnapshot: QuerySnapshot | null = null;
     let foundUserId: string | null = null;
     const profilesRef = collection(db, 'profiles');
 
     try {
-      // 1. Try exact case as entered by user
       const qExact = query(profilesRef, where('username', '==', trimmedUsername), limit(1));
       userDocSnapshot = await getDocs(qExact);
 
       if (!userDocSnapshot.empty) {
         foundUserId = userDocSnapshot.docs[0].id;
       } else {
-        // 2. Try all lowercase
         const lowerCaseTerm = trimmedUsername.toLowerCase();
-        if (lowerCaseTerm !== trimmedUsername) { // Only search if different from original
+        if (lowerCaseTerm !== trimmedUsername) { 
           const qLower = query(profilesRef, where('username', '==', lowerCaseTerm), limit(1));
           userDocSnapshot = await getDocs(qLower);
           if (!userDocSnapshot.empty) {
@@ -148,9 +146,7 @@ export default function ExplorePage() {
       }
 
       if (!foundUserId) {
-        // 3. Try capitalized (first letter upper, rest lower)
-        const capitalizedTerm = capitalize(trimmedUsername); // Using the helper
-        // Only search if different from original and lowercase version already tried
+        const capitalizedTerm = capitalize(trimmedUsername);
         if (capitalizedTerm !== trimmedUsername && capitalizedTerm !== trimmedUsername.toLowerCase()) { 
             const qCapitalized = query(profilesRef, where('username', '==', capitalizedTerm), limit(1));
             userDocSnapshot = await getDocs(qCapitalized);
@@ -192,10 +188,9 @@ export default function ExplorePage() {
     }
   };
 
-  const fetchUserSuggestions = useCallback(async (prefix: string) => {
-    const lowerCasePrefix = prefix.toLowerCase();
-    
-    if (lowerCasePrefix.length < 2) {
+  const fetchUserSuggestions = useCallback(async (currentSearchTerm: string) => {
+    const term = currentSearchTerm.trim();
+    if (term.length < 2) {
       setSuggestedUsers([]);
       setShowSuggestions(false);
       setLoadingSuggestions(false);
@@ -203,34 +198,70 @@ export default function ExplorePage() {
     }
 
     setLoadingSuggestions(true);
+    const profilesRef = collection(db, 'profiles');
+    const uniqueUserProfiles = new Map<string, UserProfile>();
+
+    // Generate distinct prefix variations to query
+    const prefixesSet = new Set<string>();
+    prefixesSet.add(term.toLowerCase()); // Full lowercase (e.g., "some")
+    prefixesSet.add(term); // As typed (e.g., "SoMe")
+    // First char upper, rest as typed (e.g., "soMe" -> "SoMe"; "some" -> "Some")
+    prefixesSet.add(term.charAt(0).toUpperCase() + term.slice(1));
+    // First char upper, rest lower (e.g., "soMe" -> "Some"; "some" -> "Some")
+    prefixesSet.add(term.charAt(0).toUpperCase() + term.slice(1).toLowerCase());
+
+    const distinctPrefixes = Array.from(prefixesSet).filter(p => p.length >= 1); // Firestore range queries work with 1 char
+
     try {
-      const profilesRef = collection(db, 'profiles');
-      // This query is inherently case-sensitive based on Firestore's behavior.
-      // For true case-insensitive prefix search, a 'username_lowercase' field would be needed.
-      const q = query(
-        profilesRef,
-        where('username', '>=', lowerCasePrefix), // Compares against stored 'username'
-        where('username', '<=', lowerCasePrefix + '\uf8ff'),
-        limit(10) // Increased limit from 5 to 10
+      for (const p of distinctPrefixes) {
+        const q = query(
+          profilesRef,
+          where('username', '>=', p),
+          where('username', '<=', p + '\uf8ff'),
+          limit(5) // Fetch a few for each prefix variation
+        );
+        const querySnapshot = await getDocs(q);
+        querySnapshot.docs.forEach(doc => {
+          if (!uniqueUserProfiles.has(doc.id)) {
+            // Ensure the uid is part of the UserProfile object stored in the map
+            uniqueUserProfiles.set(doc.id, { uid: doc.id, ...doc.data() } as UserProfile);
+          }
+        });
+      }
+
+      const fetchedUsers = Array.from(uniqueUserProfiles.values());
+      // Simple sort by username, case-insensitively, then take top 10
+      const sortedUsers = fetchedUsers.sort((a, b) => 
+        (a.username || '').toLowerCase().localeCompare((b.username || '').toLowerCase())
       );
-      const querySnapshot = await getDocs(q);
-      const fetchedUsers = querySnapshot.docs.map(doc => doc.data() as UserProfile);
+      const finalSuggestions = sortedUsers.slice(0, 10);
 
-      setSuggestedUsers(fetchedUsers);
+      setSuggestedUsers(finalSuggestions);
 
-      if (fetchedUsers.length > 0 && inputFocusedRef.current) {
+      if (finalSuggestions.length > 0 && inputFocusedRef.current) {
         setShowSuggestions(true);
       } else {
         setShowSuggestions(false);
       }
-    } catch (error) {
-      console.error("Error fetching user suggestions:", error);
-      setSuggestedUsers([]);
+    } catch (error: any) {
+      console.error("Error fetching user suggestions (multi-query):", error);
+      if (error.code === 'failed-precondition') {
+          toast({
+            title: "Search Suggestion Error",
+            description: "A database index might be required for username prefix suggestions. Please check Firebase console.",
+            variant: "destructive",
+            duration: 7000,
+          });
+        } else {
+            // Don't toast for other errors during suggestion fetching to avoid being too noisy
+            console.error("Generic error fetching suggestions:", error.message);
+        }
+      setSuggestedUsers([]); // Clear suggestions on error
       setShowSuggestions(false);
     } finally {
       setLoadingSuggestions(false);
     }
-  }, []); 
+  }, [toast]); 
 
   const debouncedFetchUserSuggestions = useMemo(() => {
     return debounce(fetchUserSuggestions, 300);
@@ -238,7 +269,8 @@ export default function ExplorePage() {
 
   useEffect(() => {
     const trimmedSearchTerm = searchTerm.trim();
-    if (trimmedSearchTerm.length >= 2) {
+    // Allow fetching suggestions even for 1 character for better UX, prefix filter in fetchUserSuggestions handles this
+    if (trimmedSearchTerm.length >= 1) { 
       debouncedFetchUserSuggestions(trimmedSearchTerm);
     } else {
       setSuggestedUsers([]);
@@ -283,7 +315,7 @@ export default function ExplorePage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onFocus={() => {
                       inputFocusedRef.current = true;
-                      if (suggestedUsers.length > 0 && searchTerm.length >= 2) {
+                      if (suggestedUsers.length > 0 && searchTerm.length >= 1) { // Show suggestions if term length >= 1
                          setShowSuggestions(true);
                       }
                     }}
@@ -291,7 +323,7 @@ export default function ExplorePage() {
                       setTimeout(() => {
                           inputFocusedRef.current = false;
                           setShowSuggestions(false);
-                      }, 200); // Delay to allow click on suggestion
+                      }, 200); 
                     }}
                     className="flex-grow"
                     disabled={isSearchingUserExact}
@@ -302,34 +334,34 @@ export default function ExplorePage() {
                      Search
                   </Button>
                 </form>
-                {showSuggestions && searchTerm.length >= 2 && (
+                {showSuggestions && searchTerm.trim().length >= 1 && ( // Show suggestions if term length >= 1
                    <div className="absolute z-10 w-full sm:w-[calc(100%-5rem)] mt-1 max-h-60 overflow-y-auto rounded-md border bg-background shadow-lg">
                     {loadingSuggestions && (
                       <div className="p-3 text-sm text-muted-foreground text-center">Loading suggestions...</div>
                     )}
-                    {!loadingSuggestions && suggestedUsers.length === 0 && searchTerm.length >= 2 && (
-                      <div className="p-3 text-sm text-muted-foreground">No users found starting with &quot;{searchTerm}&quot;. Try an exact match or different casing for suggestions.</div>
+                    {!loadingSuggestions && suggestedUsers.length === 0 && searchTerm.trim().length >= 1 && (
+                      <div className="p-3 text-sm text-muted-foreground">No users found matching &quot;{searchTerm}&quot;. Try an exact match or different casing.</div>
                     )}
                     {!loadingSuggestions && suggestedUsers.map((user) => (
                       <div
-                        key={user.uid}
+                        key={user.uid} // Ensure user.uid is present
                         className="flex items-center space-x-2 p-3 hover:bg-muted cursor-pointer"
-                        onMouseDown={() => handleSuggestionClick(user.uid)} // Use onMouseDown to fire before onBlur
+                        onMouseDown={() => handleSuggestionClick(user.uid)}
                       >
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
-                          <AvatarFallback>{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                          <AvatarFallback>{(user.displayName || user.username || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="text-sm font-medium text-foreground">{user.displayName}</p>
-                          <p className="text-xs text-muted-foreground">@{user.username}</p>
+                          <p className="text-sm font-medium text-foreground">{user.displayName || 'Unnamed User'}</p>
+                          <p className="text-xs text-muted-foreground">@{user.username || 'username_missing'}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Type to see username suggestions (prefix based). Press Enter or Search for a more forgiving exact match.
+                  Type for username suggestions (case-insensitive prefix matching). Press Enter or Search for a more forgiving exact match.
                 </p>
               </div>
               <Separator className="my-6" />
