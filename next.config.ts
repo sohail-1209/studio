@@ -3,10 +3,9 @@ import type {NextConfig} from 'next';
 
 const withPWA = require('next-pwa')({
   dest: 'public',
-  register: false, // Prevents auto-registration script, helping Firebase Auth init
+  register: true, // Changed to true for automatic service worker registration
   skipWaiting: true, // Recommended for better PWA update flow once installed
   disable: false, // Ensure PWA features are generated
-  // manifest object removed from here
 });
 
 const nextConfig: NextConfig = {
