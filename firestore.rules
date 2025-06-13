@@ -27,12 +27,13 @@ service cloud.firestore {
              get(/databases/$(database)/documents/followRequests/$(followDocId)).data.recipientId == profileOwnerId;
     }
 
-    function isValidGroupUserDetails(userDetails, userIds) {
-      // Checks if userDetails map contains keys for all userIds and each has a non-null displayName.
-      return userIds.size() == userDetails.keys().size() &&
-             userIds.every(uid =>
-               userDetails[uid].displayName != null
-               // photoURL can be null, so no explicit check needed here unless required for groups.
+    function isValidGroupUserDetails(userDetailsMap, userIdsList) {
+      // Ensures every userId in the list has a corresponding entry in userDetailsMap
+      // and that each entry has at least a displayName. photoURL can be null.
+      return userIdsList.size() == userDetailsMap.keys().size() &&
+             userIdsList.all(uid =>
+               uid in userDetailsMap &&
+               userDetailsMap[uid].displayName != null
              );
     }
     // End of Helper Functions
@@ -43,20 +44,24 @@ service cloud.firestore {
     match /chats/{chatId} {
       allow read: if request.auth != null && (resource == null || request.auth.uid in resource.data.userIds);
       allow create: if request.auth != null &&
-                       request.auth.uid in request.resource.data.userIds &&
+                       request.auth.uid in request.resource.data.userIds && // Creator must be in the chat
                        (
-                         // 1-on-1 chat
-                         ( (request.resource.data.isGroupChat == false || !('isGroupChat' in request.resource.data)) &&
+                         // 1-on-1 Chat
+                         (
+                           (request.resource.data.isGroupChat == false || !('isGroupChat' in request.resource.data)) &&
                            request.resource.data.userIds.size() == 2 &&
-                           request.resource.data.userDetails[request.resource.data.userIds[0]].displayName != null &&
-                           request.resource.data.userDetails[request.resource.data.userIds[1]].displayName != null
+                           // Ensure userDetails exist for both users and necessary fields are present
+                           isValidGroupUserDetails(request.resource.data.userDetails, request.resource.data.userIds)
                          ) ||
-                         // Group chat
-                         ( request.resource.data.isGroupChat == true &&
+                         // Group Chat
+                         (
+                           request.resource.data.isGroupChat == true &&
                            request.resource.data.groupName != null &&
                            request.resource.data.groupName.size() > 0 &&
-                           request.resource.data.userIds.size() >= 2 && // Min 2 for a group (creator + 1 member)
-                           isValidGroupUserDetails(request.resource.data.userDetails, request.resource.data.userIds)
+                           request.resource.data.userIds.size() >= 2 && // Min 2 for a group (creator + 1, or more)
+                           isValidGroupUserDetails(request.resource.data.userDetails, request.resource.data.userIds) &&
+                           // Ensure all members have a typing status initialized (important for groups)
+                           request.resource.data.typing.keys().hasAll(request.resource.data.userIds)
                          )
                        );
       allow update: if request.auth != null && request.auth.uid in resource.data.userIds;
@@ -66,6 +71,7 @@ service cloud.firestore {
         allow create: if request.auth != null &&
                          request.auth.uid == request.resource.data.senderId &&
                          get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]) &&
+                         // Ensure text or imageUrl is present, and senderId is provided
                          (request.resource.data.text != null || request.resource.data.imageUrl != null) &&
                          request.resource.data.senderId != null;
         allow delete: if request.auth != null &&
@@ -80,42 +86,46 @@ service cloud.firestore {
     // ================================================================================
     // == FOLLOW REQUESTS COLLECTION RULES ==
     // ================================================================================
-   match /followRequests/{requestId} { // Wildcard is 'requestId'
+   match /followRequests/{requestId} {
       allow read: if request.auth != null &&
                     (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);
 
-      // TEMPORARILY INSECURE - FOR DIAGNOSTICS ONLY for the create operation
       allow create: if request.auth != null &&
                      request.auth.uid == request.resource.data.requesterId &&
-                     request.resource.data.requesterId == requestId.split('_')[0] && // Use 'requestId'
-                     request.resource.data.recipientId == requestId.split('_')[1] && // Use 'requestId'
-                     request.resource.data.status == 'accepted' && 
-                     request.resource.data.requesterId != request.resource.data.recipientId;
+                     request.resource.data.requesterId == requestId.split('_')[0] &&
+                     request.resource.data.recipientId == requestId.split('_')[1] &&
+                     request.resource.data.status == 'accepted' &&  // This allows direct follow for public profiles
+                     request.resource.data.requesterId != request.resource.data.recipientId &&
+                     // Ensure relevant fields are present
+                     request.resource.data.requesterDisplayName != null &&
+                     request.resource.data.recipientDisplayName != null;
+
 
       allow update: if request.auth != null &&
                      (
+                       // Recipient accepting/declining a pending request
                        (
                          request.auth.uid == resource.data.recipientId &&
                          resource.data.status == 'pending' &&
                          (request.resource.data.status == 'accepted' || request.resource.data.status == 'declined') &&
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
                        ) ||
+                       // Requester updating their own request to 'accepted' if target is public
+                       // This case might be redundant if create allows 'accepted' status directly for public.
+                       // For now, keeping for potential explicit re-follow scenarios.
                        (
                          request.auth.uid == resource.data.requesterId &&
-                         isProfileEffectivelyPublic(resource.data.recipientId) && 
+                         isProfileEffectivelyPublic(resource.data.recipientId) &&
                          request.resource.data.status == 'accepted' &&
-                         resource.data.status != 'accepted' && 
+                         resource.data.status != 'accepted' &&
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
                        )
                      );
 
       allow delete: if request.auth != null &&
                      (
-                       (request.auth.uid == resource.data.requesterId &&
-                        (resource.data.status == 'pending' || resource.data.status == 'accepted'))
-                       ||
-                       (request.auth.uid == resource.data.recipientId &&
-                        (resource.data.status == 'declined' || resource.data.status == 'accepted'))
+                       (request.auth.uid == resource.data.requesterId && (resource.data.status == 'pending' || resource.data.status == 'accepted')) ||
+                       (request.auth.uid == resource.data.recipientId && (resource.data.status == 'declined' || resource.data.status == 'accepted'))
                      );
     }
     // ================================================================================
@@ -124,7 +134,10 @@ service cloud.firestore {
 
     // Posts collection
     match /posts/{postId} {
-      allow read: if true; // TEMPORARY DIAGNOSTIC RULE for posts read
+      allow read: if
+        (resource.data.authorIsPrivate == false && isProfileEffectivelyPublic(resource.data.userId)) ||
+        (request.auth != null && request.auth.uid == resource.data.userId) ||
+        (resource.data.authorIsPrivate == true && isProfileActuallyPrivate(resource.data.userId) && request.auth != null && isAcceptedFollower(resource.data.userId, request.auth.uid));
 
       allow create: if request.auth != null &&
                        request.auth.uid == request.resource.data.userId &&
@@ -143,21 +156,26 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
 
       match /comments/{commentId} {
-        allow read: if true; // TEMPORARY DIAGNOSTIC RULE for comments read
+        allow read: if true; // Comments are public if the post is readable
 
         allow create: if request.auth != null &&
                          request.auth.uid == request.resource.data.userId &&
                          request.resource.data.text != null &&
                          request.resource.data.userId != null;
         allow delete: if request.auth != null &&
-                         (request.auth.uid == resource.data.userId ||
-                          request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId);
+                         (request.auth.uid == resource.data.userId || // Comment owner
+                          request.auth.uid == get(/databases/$(database)/documents/posts/$(postId)).data.userId); // Post owner
       }
     }
 
     // Profiles collection
     match /profiles/{userId} {
-      allow read: if true; // TEMPORARY DIAGNOSTIC RULE for profiles read
+      allow read: if
+        (isProfileEffectivelyPublic(userId)) ||
+        (request.auth != null && request.auth.uid == userId) ||
+        (request.auth != null && isAcceptedFollower(userId, request.auth.uid) && isProfileActuallyPrivate(userId)) ||
+        (request.auth != null); // Fallback for things like user search, DM participant details
+
 
       allow create: if request.auth != null &&
                        request.auth.uid == userId &&
@@ -209,3 +227,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
