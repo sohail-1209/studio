@@ -26,7 +26,7 @@ import {
   PlusCircle,
   Moon,
   Sun,
-  PanelLeft, // Icon for desktop trigger
+  MoreVertical, // Changed from PanelLeft
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
@@ -110,7 +110,7 @@ export function AppSidebar() {
       <div className={cn("flex flex-col h-full p-2", isMobileSheetOpen && "pt-8")}>
         <SidebarHeader className="p-1 mb-1 flex items-center justify-between">
           <Logo iconSize={30} textSize="text-2xl" className={cn(isDesktopCollapsed && !isMobileSheetOpen ? "hidden" : "flex")} />
-          {!isMobileSheetOpen && <SidebarTrigger />}
+          {!isMobileSheetOpen && <SidebarTrigger><MoreVertical /></SidebarTrigger>}
         </SidebarHeader>
         <SidebarSeparator className="my-1" />
         <SidebarContent className="flex-1">
@@ -134,7 +134,7 @@ export function AppSidebar() {
       <SidebarHeader className={cn("p-1 mb-1 flex items-center", showText ? "justify-between" : "justify-center")}>
          <Logo iconSize={30} textSize="text-2xl" className={cn(!showText ? "hidden" : "flex")} />
          {!showText && <Logo iconSize={30} className="!gap-0" />} {/* Icon only for collapsed */}
-         {!isMobileSheetOpen && <SidebarTrigger />} {/* Desktop collapse trigger */}
+         {!isMobileSheetOpen && <SidebarTrigger><MoreVertical /></SidebarTrigger>} {/* Desktop collapse trigger with new icon */}
       </SidebarHeader>
       <SidebarSeparator className="my-1" />
 
