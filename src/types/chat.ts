@@ -4,18 +4,19 @@ import type { Timestamp, FieldValue } from 'firebase/firestore';
 
 export interface ChatMessageDocument {
   senderId: string;
-  text?: string | null; // Text is now optional
-  timestamp: FieldValue; // For writing new messages
+  text?: string | null;
+  timestamp: FieldValue;
   imageUrl?: string | null;
-  imagePath?: string | null; // To potentially delete from storage if message is deleted
-  fileType?: string | null; // e.g., 'image/jpeg'
-  dataAiHint?: string; // For images, if applicable
+  imagePath?: string | null;
+  fileType?: string | null;
+  dataAiHint?: string;
 }
 
 export interface ChatMessage extends Omit<ChatMessageDocument, 'timestamp'> {
   id: string;
-  timestamp: Date; // Converted for display
-  senderAvatar?: string; // Denormalized for convenience if needed, or fetched
+  timestamp: Date;
+  senderAvatar?: string; // Potentially useful for groups to always have this
+  senderDisplayName?: string; // Potentially useful for groups
 }
 
 export interface ChatSessionUserDetail {
@@ -24,26 +25,34 @@ export interface ChatSessionUserDetail {
 }
 
 export interface ChatSessionDocument {
-  userIds: string[]; // Array of two user UIDs
+  userIds: string[]; // Array of user UIDs (2 for 1:1, >2 for group)
   userDetails: {
     [key: string]: ChatSessionUserDetail; // key is userId
   };
   lastMessageText: string | null;
   lastMessageSenderId: string | null;
-  lastMessageTimestamp: FieldValue | null; // For updating with serverTimestamp
-  updatedAt: FieldValue; // For sorting chats, use serverTimestamp
-  typing?: { // Optional map to store typing status for each user in the chat
-    [userId: string]: boolean; // e.g., { "uid1": true, "uid2": false }
+  lastMessageTimestamp: FieldValue | null;
+  updatedAt: FieldValue;
+  typing?: {
+    [userId: string]: boolean;
   };
+  // Group chat specific fields
+  isGroupChat?: boolean;
+  groupName?: string;
+  groupAvatarUrl?: string | null; // URL for the group's custom avatar
+  groupAdminIds?: string[]; // Optional: for future admin features
 }
 
 export interface ChatSession extends Omit<ChatSessionDocument, 'lastMessageTimestamp' | 'updatedAt'> {
   id: string; // Firestore document ID
-  lastMessageTimestamp: Date | null; // Converted for display
-  updatedAt: Date; // Converted for display
-  otherUser?: ChatSessionUserDetail & { uid: string };
+  lastMessageTimestamp: Date | null;
+  updatedAt: Date;
+  otherUser?: ChatSessionUserDetail & { uid: string }; // Primarily for 1:1 chats
+  // Group chat specific fields are directly available if isGroupChat is true
+  isGroupChat?: boolean;
+  groupName?: string;
+  groupAvatarUrl?: string | null;
   typing?: {
     [userId: string]: boolean;
   };
 }
-
