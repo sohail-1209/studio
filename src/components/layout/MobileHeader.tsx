@@ -5,7 +5,7 @@
 import { useSidebar } from '@/components/ui/sidebar'; // Import useSidebar
 import { Logo } from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button'; 
-import { PanelLeft } from 'lucide-react';
+import { MoreVertical } from 'lucide-react'; // Changed from PanelLeft to MoreVertical
 
 export function MobileHeader() {
   const { setIsMobileSheetOpen } = useSidebar(); // Get setter for mobile sheet
@@ -21,7 +21,7 @@ export function MobileHeader() {
             onClick={() => setIsMobileSheetOpen(true)}
             aria-label="Open sidebar"
         >
-          <PanelLeft className="h-6 w-6" />
+          <MoreVertical className="h-6 w-6" /> {/* Changed icon here */}
           <span className="sr-only">Open Sidebar</span>
         </Button>
       </div>
