@@ -1,10 +1,11 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // ================================================================================
+    // == HELPER FUNCTIONS ==
+    // ================================================================================
     function isProfileEffectivelyPublic(userId) {
       let profile = get(/databases/$(database)/documents/profiles/$(userId)).data;
       return profile.isPrivate == false || !('isPrivate' in profile);
@@ -15,30 +16,31 @@ service cloud.firestore {
              get(/databases/$(database)/documents/profiles/$(userId)).data.isPrivate == true;
     }
 
-    function isAcceptedFollower(profileOwnerId, requesterId) {
-      let followDocId = requesterId + '_' + profileOwnerId;
-      return request.auth != null && requesterId == request.auth.uid &&
-             exists(/databases/$(database)/documents/followRequests/$(followDocId)) &&
+    // Corrected: Takes authUid as a parameter
+    function isAcceptedFollower(profileOwnerId, authUid) {
+      let followDocId = authUid + '_' + profileOwnerId;
+      return exists(/databases/$(database)/documents/followRequests/$(followDocId)) &&
              get(/databases/$(database)/documents/followRequests/$(followDocId)).data.status == 'accepted' &&
-             get(/databases/$(database)/documents/followRequests/$(followDocId)).data.requesterId == requesterId &&
+             get(/databases/$(database)/documents/followRequests/$(followDocId)).data.requesterId == authUid &&
              get(/databases/$(database)/documents/followRequests/$(followDocId)).data.recipientId == profileOwnerId;
     }
 
-    // Helper for chat creation: Validates userDetails for group chats
     function isValidGroupUserDetails(userIds, userDetailsMap) {
       return userIds.all(uid =>
-        userDetailsMap[uid] != null && // User detail entry exists for each uid
-        userDetailsMap[uid].displayName != null // displayName is present and not null
+        uid in userDetailsMap &&
+        userDetailsMap[uid].displayName != null
+        // photoURL can be null, not strictly checking its presence for validity here
       );
     }
 
-    // Helper for chat creation: Validates initial typing status for all members
     function allMembersTypingFalse(userIds, typingMap) {
-      return userIds.all(uid =>
-        typingMap[uid] == false // Each member's typing status is false
-      ) && typingMap.keys().hasOnly(userIds); // Ensures typingMap only contains keys from userIds
+      return userIds.all(uid => uid in typingMap && typingMap[uid] == false) &&
+             typingMap.keys().hasOnly(userIds);
     }
-    // End of Helper Functions
+    // ================================================================================
+    // == END OF HELPER FUNCTIONS ==
+    // ================================================================================
+
 
     // ================================================================================
     // == CHATS COLLECTION RULES ==
@@ -58,13 +60,13 @@ service cloud.firestore {
                            request.resource.data.typing.keys().hasOnly(request.resource.data.userIds) &&
                            request.resource.data.typing[request.resource.data.userIds[0]] == false &&
                            request.resource.data.typing[request.resource.data.userIds[1]] == false
-                           // photoURL can be null
                          ) ||
                          // Group Chat
                          ( request.resource.data.isGroupChat == true &&
                            request.resource.data.userIds.size() >= 2 && // Groups must have at least 2 members
                            request.resource.data.groupName != null && request.resource.data.groupName.size() > 0 &&
                            isValidGroupUserDetails(request.resource.data.userIds, request.resource.data.userDetails) &&
+                           // Ensure typing field is initialized correctly for groups
                            allMembersTypingFalse(request.resource.data.userIds, request.resource.data.typing)
                          )
                        );
@@ -94,21 +96,24 @@ service cloud.firestore {
       allow read: if request.auth != null &&
                     (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);
 
+      // Consider tightening this rule once diagnostics are complete
       allow create: if request.auth != null &&
                      request.auth.uid == request.resource.data.requesterId &&
                      request.resource.data.requesterId == requestId.split('_')[0] &&
                      request.resource.data.recipientId == requestId.split('_')[1] &&
-                     request.resource.data.status == 'accepted' &&  // This is for direct follow of public profiles
+                     request.resource.data.status == 'accepted' &&  // This seems to imply auto-accepting on create
                      request.resource.data.requesterId != request.resource.data.recipientId;
 
       allow update: if request.auth != null &&
                      (
+                       // Recipient accepting/declining a pending request
                        (
                          request.auth.uid == resource.data.recipientId &&
                          resource.data.status == 'pending' &&
                          (request.resource.data.status == 'accepted' || request.resource.data.status == 'declined') &&
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
                        ) ||
+                       // Requester updating their own request (e.g. if target becomes public and auto-accepts, or other scenarios)
                        (
                          request.auth.uid == resource.data.requesterId &&
                          isProfileEffectivelyPublic(resource.data.recipientId) &&
@@ -134,6 +139,15 @@ service cloud.firestore {
     // Posts collection
     match /posts/{postId} {
       allow read: if true; // TEMPORARY DIAGNOSTIC RULE
+      // Original more secure read rule (uses isAcceptedFollower which is now corrected):
+      // allow read: if
+      //   ( resource.data.authorIsPrivate == false && isProfileEffectivelyPublic(resource.data.userId) ) ||
+      //   ( request.auth != null && request.auth.uid == resource.data.userId ) ||
+      //   ( resource.data.authorIsPrivate == true &&
+      //     isProfileActuallyPrivate(resource.data.userId) &&
+      //     request.auth != null &&
+      //     isAcceptedFollower(resource.data.userId, request.auth.uid) // Corrected call
+      //   );
 
       allow create: if request.auth != null &&
                        request.auth.uid == request.resource.data.userId &&
@@ -153,6 +167,7 @@ service cloud.firestore {
 
       match /comments/{commentId} {
         allow read: if true; // TEMPORARY DIAGNOSTIC RULE
+        // allow read: if true; // Comments are public if the post is readable
 
         allow create: if request.auth != null &&
                          request.auth.uid == request.resource.data.userId &&
@@ -167,6 +182,12 @@ service cloud.firestore {
     // Profiles collection
     match /profiles/{userId} {
       allow read: if true; // TEMPORARY DIAGNOSTIC RULE
+      // Original more secure read rule (uses isAcceptedFollower which is now corrected):
+      // allow read: if
+      //   (isProfileEffectivelyPublic(userId)) ||
+      //   (request.auth != null && request.auth.uid == userId) ||
+      //   (request.auth != null && isProfileActuallyPrivate(userId) && isAcceptedFollower(userId, request.auth.uid)) || // Corrected call
+      //   (request.auth != null); // Consider if this last 'any auth user' is too broad
 
       allow create: if request.auth != null &&
                        request.auth.uid == userId &&
@@ -218,5 +239,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
