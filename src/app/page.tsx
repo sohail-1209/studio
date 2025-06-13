@@ -241,39 +241,64 @@ export default function FeedPage() {
     const shareData = {
       title: `Check out this post on Synora by ${post.userDisplayName || 'a user'}!`,
       text: post.caption || 'An interesting post from Synora.',
-      url: window.location.origin + `/post/${post.id}`, // Assumes post detail pages exist at /post/:id
+      url: window.location.origin + `/post/${post.id}`,
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
+        console.log("Post shared successfully via navigator.share");
       } catch (error: any) {
-        console.warn('Warning sharing post via navigator.share:', error);
-        if (navigator.clipboard && navigator.clipboard.writeText) {
+        console.warn('navigator.share failed or was cancelled:', error);
+        if (error.name === 'AbortError') {
+          toast({
+            title: 'Sharing Cancelled',
+            description: 'You decided not to share the post.',
+          });
+        } else if (navigator.clipboard && navigator.clipboard.writeText) {
           try {
             await navigator.clipboard.writeText(shareData.url);
             toast({
-              title: 'Share Failed, Link Copied!',
-              description: 'Could not open share dialog. Post link copied to clipboard.',
+              title: 'Link Copied',
+              description: 'Sharing via dialog was not possible, but the post link has been copied to your clipboard.',
             });
           } catch (copyError) {
-            console.error('Error copying link to clipboard:', copyError);
-            toast({ title: 'Share Failed', description: 'Could not share or copy the post link.', variant: 'destructive' });
+            console.error('Error copying link to clipboard after share failed:', copyError);
+            toast({
+              title: 'Error',
+              description: 'Could not share the post or copy the link.',
+              variant: 'destructive',
+            });
           }
         } else {
-           toast({ title: 'Share Failed', description: 'Sharing is not supported or was blocked.', variant: 'destructive'});
+          toast({
+            title: 'Error Sharing',
+            description: 'Could not share the post, and clipboard access is also unavailable.',
+            variant: 'destructive',
+          });
         }
       }
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(shareData.url);
-        toast({ title: 'Link Copied!', description: 'Post link copied to clipboard.' });
+        toast({
+          title: 'Link Copied!',
+          description: 'Post link has been copied to your clipboard.',
+        });
       } catch (copyError) {
         console.error('Error copying link to clipboard:', copyError);
-        toast({ title: 'Share Unavailable', description: 'Could not copy the post link.', variant: 'destructive'});
+        toast({
+          title: 'Copy Failed',
+          description: 'Could not copy the post link.',
+          variant: 'destructive',
+        });
       }
     } else {
-      toast({ title: 'Share Unavailable', description: 'Sharing is not supported on this browser.', variant: 'destructive'});
+      toast({
+        title: 'Share Unavailable',
+        description: 'Sharing is not supported on this browser.',
+        variant: 'destructive',
+      });
     }
   };
 
