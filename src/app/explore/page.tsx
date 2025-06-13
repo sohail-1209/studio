@@ -9,7 +9,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState, FormEvent, useCallback, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, limit, Timestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, Timestamp, getDocs, QuerySnapshot } from 'firebase/firestore';
 import type { Post } from '@/types/post';
 import type { UserProfile } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/hooks/useAuth';
 
 // Standard debounce function
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
@@ -37,6 +37,11 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   return debounced as (...args: Parameters<F>) => void;
 }
 
+const capitalize = (s: string): string => {
+  if (typeof s !== 'string' || s.length === 0) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+};
+
 
 export default function ExplorePage() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -45,7 +50,7 @@ export default function ExplorePage() {
   const [isSearchingUserExact, setIsSearchingUserExact] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const { user: currentUser } = useAuth(); // Get current user for potential filtering
+  const { user: currentUser } = useAuth();
 
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -55,14 +60,13 @@ export default function ExplorePage() {
 
   useEffect(() => {
     const fetchExplorePosts = async () => {
-      console.log("ExplorePage: Fetching recent posts.");
       setLoadingRecentPosts(true);
       try {
         const postsColRef = collection(db, 'posts');
         const q = query(
           postsColRef,
           where('isStory', '!=', true),
-          where('authorIsPrivate', '==', false), 
+          where('authorIsPrivate', '==', false),
           orderBy('createdAt', 'desc'),
           limit(24)
         );
@@ -80,7 +84,6 @@ export default function ExplorePage() {
           .filter(post => post.imageUrl); 
 
         setPosts(fetchedPosts);
-        console.log("ExplorePage: Fetched recent posts (public only):", fetchedPosts.length);
       } catch (error: any) {
         console.error("Error fetching explore posts:", error);
         if (error.code === 'failed-precondition') {
@@ -108,8 +111,7 @@ export default function ExplorePage() {
   const handleExactUsernameSearch = async (e?: FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
     const trimmedUsername = searchTerm.trim();
-    console.log("ExplorePage: handleExactUsernameSearch triggered for:", trimmedUsername);
-
+    
     if (!trimmedUsername) {
       toast({
         title: "Empty Username",
@@ -120,26 +122,54 @@ export default function ExplorePage() {
     }
 
     setIsSearchingUserExact(true);
-    setShowSuggestions(false);
-    try {
-      const profilesRef = collection(db, 'profiles');
-      const q = query(profilesRef, where('username', '==', trimmedUsername), limit(1));
-      const querySnapshot = await getDocs(q);
+    setShowSuggestions(false); // Hide suggestions during exact search attempt
+    
+    let userDocSnapshot: QuerySnapshot | null = null;
+    let foundUserId: string | null = null;
+    const profilesRef = collection(db, 'profiles');
 
-      if (querySnapshot.empty) {
-        console.log("ExplorePage: No user found for exact username:", trimmedUsername);
-        toast({
-          title: "User Not Found",
-          description: `No user found with the username "${trimmedUsername}".`,
-          variant: "default",
-        });
+    try {
+      // 1. Try exact case as entered by user
+      const qExact = query(profilesRef, where('username', '==', trimmedUsername), limit(1));
+      userDocSnapshot = await getDocs(qExact);
+
+      if (!userDocSnapshot.empty) {
+        foundUserId = userDocSnapshot.docs[0].id;
       } else {
-        const userDoc = querySnapshot.docs[0];
-        const userId = userDoc.id;
-        console.log("ExplorePage: User found for exact username, navigating to profile:", userId);
-        router.push(`/profile/${userId}`);
+        // 2. Try all lowercase
+        const lowerCaseTerm = trimmedUsername.toLowerCase();
+        if (lowerCaseTerm !== trimmedUsername) { // Only search if different from original
+          const qLower = query(profilesRef, where('username', '==', lowerCaseTerm), limit(1));
+          userDocSnapshot = await getDocs(qLower);
+          if (!userDocSnapshot.empty) {
+            foundUserId = userDocSnapshot.docs[0].id;
+          }
+        }
+      }
+
+      if (!foundUserId) {
+        // 3. Try capitalized (first letter upper, rest lower)
+        const capitalizedTerm = capitalize(trimmedUsername); // Using the helper
+        // Only search if different from original and lowercase version already tried
+        if (capitalizedTerm !== trimmedUsername && capitalizedTerm !== trimmedUsername.toLowerCase()) { 
+            const qCapitalized = query(profilesRef, where('username', '==', capitalizedTerm), limit(1));
+            userDocSnapshot = await getDocs(qCapitalized);
+            if (!userDocSnapshot.empty) {
+                foundUserId = userDocSnapshot.docs[0].id;
+            }
+        }
+      }
+
+      if (foundUserId) {
+        router.push(`/profile/${foundUserId}`);
         setSearchTerm('');
         setSuggestedUsers([]);
+      } else {
+        toast({
+          title: "User Not Found",
+          description: `No user found with the username "${trimmedUsername}" (tried common casings).`,
+          variant: "default",
+        });
       }
     } catch (error: any) {
       console.error("Error searching for user by username:", error);
@@ -164,37 +194,34 @@ export default function ExplorePage() {
 
   const fetchUserSuggestions = useCallback(async (prefix: string) => {
     const lowerCasePrefix = prefix.toLowerCase();
-    console.log("ExplorePage: fetchUserSuggestions called with prefix:", lowerCasePrefix);
-
+    
     if (lowerCasePrefix.length < 2) {
       setSuggestedUsers([]);
       setShowSuggestions(false);
       setLoadingSuggestions(false);
-      console.log("ExplorePage: Prefix too short, clearing suggestions.");
       return;
     }
 
     setLoadingSuggestions(true);
     try {
       const profilesRef = collection(db, 'profiles');
+      // This query is inherently case-sensitive based on Firestore's behavior.
+      // For true case-insensitive prefix search, a 'username_lowercase' field would be needed.
       const q = query(
         profilesRef,
-        where('username', '>=', lowerCasePrefix),
+        where('username', '>=', lowerCasePrefix), // Compares against stored 'username'
         where('username', '<=', lowerCasePrefix + '\uf8ff'),
-        limit(5)
+        limit(10) // Increased limit from 5 to 10
       );
       const querySnapshot = await getDocs(q);
       const fetchedUsers = querySnapshot.docs.map(doc => doc.data() as UserProfile);
 
-      console.log("ExplorePage: Fetched suggestions:", fetchedUsers.length, fetchedUsers);
       setSuggestedUsers(fetchedUsers);
 
       if (fetchedUsers.length > 0 && inputFocusedRef.current) {
         setShowSuggestions(true);
-        console.log("ExplorePage: Setting showSuggestions to true");
       } else {
         setShowSuggestions(false);
-        console.log("ExplorePage: Setting showSuggestions to false (no users or not focused)");
       }
     } catch (error) {
       console.error("Error fetching user suggestions:", error);
@@ -206,26 +233,21 @@ export default function ExplorePage() {
   }, []); 
 
   const debouncedFetchUserSuggestions = useMemo(() => {
-    console.log("ExplorePage: Creating new debouncedFetchUserSuggestions function.");
     return debounce(fetchUserSuggestions, 300);
   }, [fetchUserSuggestions]);
 
   useEffect(() => {
     const trimmedSearchTerm = searchTerm.trim();
-    console.log("ExplorePage: searchTerm useEffect, current term:", trimmedSearchTerm);
-
     if (trimmedSearchTerm.length >= 2) {
       debouncedFetchUserSuggestions(trimmedSearchTerm);
     } else {
       setSuggestedUsers([]);
       setShowSuggestions(false);
       setLoadingSuggestions(false);
-      console.log("ExplorePage: searchTerm too short in useEffect, clearing suggestions.");
     }
   }, [searchTerm, debouncedFetchUserSuggestions]);
 
   const handleSuggestionClick = (userId: string) => {
-    console.log("ExplorePage: Suggestion clicked, navigating to profile:", userId);
     router.push(`/profile/${userId}`);
     setSearchTerm('');
     setSuggestedUsers([]);
@@ -239,8 +261,6 @@ export default function ExplorePage() {
       ))}
     </div>
   );
-
-  console.log("ExplorePage Render: showSuggestions:", showSuggestions, "suggestedUsers:", suggestedUsers.length, "searchTerm:", searchTerm.length, "inputFocusedRef.current:", inputFocusedRef.current, "loadingSuggestions:", loadingSuggestions);
 
   return (
     <MainLayout>
@@ -265,17 +285,13 @@ export default function ExplorePage() {
                       inputFocusedRef.current = true;
                       if (suggestedUsers.length > 0 && searchTerm.length >= 2) {
                          setShowSuggestions(true);
-                         console.log("ExplorePage: Input focused, showing suggestions.");
-                      } else {
-                         console.log("ExplorePage: Input focused, but no suggestions or term too short.");
                       }
                     }}
                     onBlur={() => {
                       setTimeout(() => {
                           inputFocusedRef.current = false;
                           setShowSuggestions(false);
-                          console.log("ExplorePage: Input blurred, hiding suggestions after delay.");
-                      }, 200);
+                      }, 200); // Delay to allow click on suggestion
                     }}
                     className="flex-grow"
                     disabled={isSearchingUserExact}
@@ -292,13 +308,13 @@ export default function ExplorePage() {
                       <div className="p-3 text-sm text-muted-foreground text-center">Loading suggestions...</div>
                     )}
                     {!loadingSuggestions && suggestedUsers.length === 0 && searchTerm.length >= 2 && (
-                      <div className="p-3 text-sm text-muted-foreground">No users found matching &quot;{searchTerm}&quot;.</div>
+                      <div className="p-3 text-sm text-muted-foreground">No users found starting with &quot;{searchTerm}&quot;. Try an exact match or different casing for suggestions.</div>
                     )}
                     {!loadingSuggestions && suggestedUsers.map((user) => (
                       <div
                         key={user.uid}
                         className="flex items-center space-x-2 p-3 hover:bg-muted cursor-pointer"
-                        onMouseDown={() => handleSuggestionClick(user.uid)}
+                        onMouseDown={() => handleSuggestionClick(user.uid)} // Use onMouseDown to fire before onBlur
                       >
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
@@ -313,7 +329,7 @@ export default function ExplorePage() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  Start typing a username to see suggestions, or press Enter/Search for an exact match.
+                  Type to see username suggestions (prefix based). Press Enter or Search for a more forgiving exact match.
                 </p>
               </div>
               <Separator className="my-6" />
