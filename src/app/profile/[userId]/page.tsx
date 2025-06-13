@@ -7,12 +7,13 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card'; // Import Card
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserPlus, MessageCircle, MoreVertical, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus, ShieldAlert, Users, Lock } from 'lucide-react'; // Changed MoreHorizontal to MoreVertical
+import { UserPlus, MessageCircle, MoreVertical, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus, ShieldAlert, Users, Lock } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment, FieldValue } from 'firebase/firestore';
 import { ref as storageRefDb, deleteObject } from 'firebase/storage';
 import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext';
 import type { Post } from '@/types/post';
@@ -54,7 +55,7 @@ type FollowStatus = 'not_following' | 'following';
 const LoadingPostsPlaceholder = () => (
   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full min-w-0">
     {[...Array(6)].map((_, i) => (
-      <Skeleton key={`post-skel-${i}`} className="aspect-square rounded-md min-w-0" />
+      <Skeleton key={`post-skel-${i}`} className="aspect-square rounded-md min-w-0 bg-muted/50" />
     ))}
   </div>
  );
@@ -98,6 +99,46 @@ const LoadingPostsPlaceholder = () => (
         </p>
     </div>
  );
+
+const ProfileSkeleton = () => (
+    <Card className="w-full shadow-lg overflow-hidden">
+      <div className="relative">
+        <Skeleton className="h-48 md:h-64 w-full bg-muted/30" /> {/* Cover area */}
+        <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
+          <Skeleton className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-card shadow-lg bg-muted" /> {/* Avatar area, border-card */}
+        </div>
+      </div>
+      <div className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6"> {/* Info area */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
+          <div className="mb-3 sm:mb-0">
+            <Skeleton className="h-8 w-40 mb-1.5 bg-muted/50" />
+            <Skeleton className="h-4 w-28 bg-muted/50" />
+          </div>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+            <Skeleton className="h-10 w-full sm:w-24 bg-muted/50" />
+            <Skeleton className="h-10 w-full sm:w-28 bg-muted/50" />
+          </div>
+        </div>
+        <Skeleton className="h-5 w-3/4 mb-2 bg-muted/50" />
+        <Skeleton className="h-5 w-1/2 mb-6 bg-muted/50" />
+        <div className="flex space-x-6 text-sm text-muted-foreground mb-8">
+          <Skeleton className="h-5 w-16 bg-muted/50" />
+          <Skeleton className="h-5 w-20 bg-muted/50" />
+          <Skeleton className="h-5 w-20 bg-muted/50" />
+        </div>
+      </div>
+      <div className="px-0 sm:px-0 border-t border-border"> {/* Tabs skeleton area */}
+        <div className="flex w-full justify-around p-0 border-b border-border">
+            <Skeleton className="h-12 flex-1 bg-muted/30" /> {/* Tab trigger skeleton */}
+            <Skeleton className="h-12 flex-1 bg-muted/30" />
+            <Skeleton className="h-12 flex-1 bg-muted/30" />
+        </div>
+        <div className="mt-0 p-4 sm:p-6"> {/* Tab content skeleton area */}
+             <LoadingPostsPlaceholder />
+        </div>
+      </div>
+    </Card>
+  );
 
 
 export default function UserProfilePage({ params: paramsPromise }: { params: { userId: string } }) {
@@ -164,11 +205,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         console.warn(
           `Firestore permission denied (Code: ${errorCode}) while checking follow status for profile ${paramsUserId}. ` +
           `Current User UID: ${currentUser?.uid}, Target Profile UID: ${paramsUserId}, Attempted Path: 'followRequests/${followDocId}'. ` +
-          `Message: ${errorMessage}. This usually means your Firestore security rules for 'followRequests' do not allow this read. ` +
-          `Rule might be: 'allow read: if request.auth != null && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);'. ` +
-          `Or for ID-based: 'allow read: if request.auth != null && (request.auth.uid == followRequestId.split('_')[0] || request.auth.uid == followRequestId.split('_')[1]);'.`
+          `Message: ${errorMessage}. This usually means your Firestore security rules for 'followRequests' do not allow this read.`
         );
-        // No user-facing toast for permission denied if it's about reading status.
       } else {
         console.error("Error checking follow status (non-permission related):", error);
         console.error(`Error details - Code: ${errorCode}, Name: ${error.name}, Message: ${errorMessage}`);
@@ -241,7 +279,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     const q = query(
       postsColRef,
       where('userId', '==', profile.uid),
-      where('isStory', '!=', true), 
+      // where('isStory', '!=', true), // No longer needed here, will filter in display
       orderBy('createdAt', 'desc')
     );
 
@@ -250,6 +288,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         id: docSnapshot.id,
         ...docSnapshot.data(),
         createdAt: (docSnapshot.data().createdAt as Timestamp).toDate(),
+        isStory: docSnapshot.data().isStory || false,
       } as Post));
       setUserPosts(fetchedPosts);
       setLoadingUserPosts(false);
@@ -287,14 +326,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     
     const batch = writeBatch(db);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); // Removed client-side update of target's followersCount
 
     const actionType = followStatus === 'following' ? 'UNFOLLOW' : 'FOLLOW';
     console.log(`handleFollowToggle: Preparing batch for action: ${actionType}`);
     
     let followRequestDocPath: string;
     let newRequestData: FollowRequestDocument | null = null;
-    let notificationData: Omit<AuthContextUserProfile, 'uid'> & { type: 'follow_accept', originalFollowRequestId: string, isRead: boolean, createdAt: FieldValue, recipientId: string, actorId: string } | null = null;
+    let notificationData: Omit<AuthContextUserProfile, 'uid' | 'isPrivate' | 'coverPhotoURL'> & { type: 'follow_accept', originalFollowRequestId: string, isRead: boolean, createdAt: FieldValue, recipientId: string, actorId: string } | null = null;
 
 
     try {
@@ -313,14 +351,13 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         
         console.log(`Batch: UPDATE on path: profiles/${currentUser.uid}, data: { followingCount: increment(-1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-        // No update to target user's followersCount from client
 
       } else { // 'FOLLOW' action
         const newFollowDocId = `${currentUser.uid}_${profile.uid}`;
         followRequestDocPath = `followRequests/${newFollowDocId}`;
         const followRequestRef = doc(db, followRequestDocPath);
         
-        newRequestData = { // Assign to the outer scope variable
+        newRequestData = { 
             requesterId: currentUser.uid,
             requesterDisplayName: currentUser.displayName || 'User',
             requesterAvatarUrl: currentUser.photoURL || null,
@@ -336,10 +373,8 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
         console.log(`Batch: UPDATE on path: profiles/${currentUser.uid}, data: { followingCount: increment(1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
-        // No update to target user's followersCount from client
 
         const notificationRef = doc(collection(db, 'notifications'));
-        // Cast is complex; ensure type compatibility if using a more specific NotificationDocument type
         notificationData = {
             recipientId: profile.uid, 
             actorId: currentUser.uid, 
@@ -349,9 +384,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             originalFollowRequestId: newFollowDocId, 
             isRead: false,
             createdAt: serverTimestamp(),
-            // Ensure all required fields from NotificationDocument are present if stricter types are used.
-            // Potentially missing: postId, postContentPreview, commentText, followRequestId - but these are optional for 'follow_accept'
-        } as any; // Using 'as any' for now to bypass complex type casting for the log. Refine if NotificationDocument becomes stricter.
+        } as any; 
         console.log(`Batch: SET on path: notifications/${notificationRef.id}, data:`, JSON.stringify(notificationData, null, 2));
         batch.set(notificationRef, notificationData);
       }
@@ -384,7 +417,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       };
       console.log("Attempted batch operations that might have failed:", JSON.stringify(attemptedPathsAndData, null, 2));
 
-
       if (errorCode === 'permission-denied' || errorCode === 'auth/permission-denied') {
         console.warn(
           `A 'permission-denied' error (Code: ${errorCode}) occurred while trying to commit the follow/unfollow batch. ` +
@@ -392,7 +424,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           `Message: "${errorMessage}". ` +
           `Review the 'Attempted batch operations' logged above and compare with your Firestore security rules for 'followRequests', 'profiles', and 'notifications'.`
         );
-        // No user-facing toast for permission denied, console warning is primary.
       } else {
         toast({ title: "Operation Failed", description: `Error: ${errorMessage}. Check console for details.`, variant: "destructive" });
       }
@@ -525,45 +556,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     }
   };
 
-  const ProfileSkeleton = () => (
-    <div className="w-full">
-      <div className="bg-muted/30 p-0 relative border-b border-border">
-        <Skeleton className="h-48 md:h-64 w-full" />
-        <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
-          <Skeleton className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-background shadow-lg" />
-        </div>
-      </div>
-      <div className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6 bg-background">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
-          <div className="mb-3 sm:mb-0">
-            <Skeleton className="h-8 w-40 mb-1.5" />
-            <Skeleton className="h-4 w-28" />
-          </div>
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-            <Skeleton className="h-10 w-full sm:w-24" />
-            <Skeleton className="h-10 w-full sm:w-28" />
-          </div>
-        </div>
-        <Skeleton className="h-5 w-3/4 mb-2" />
-        <Skeleton className="h-5 w-1/2 mb-6" />
-        <div className="flex space-x-6 text-sm text-muted-foreground mb-8">
-          <Skeleton className="h-5 w-16" />
-          <Skeleton className="h-5 w-20" />
-          <Skeleton className="h-5 w-20" />
-        </div>
-         <Tabs defaultValue="posts" className="w-full">
-          <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
-            <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
-            <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
-            <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
-          </TabsList>
-          <TabsContent value="posts" className="mt-6 w-full min-w-0 overflow-y-auto">
-             <LoadingPostsPlaceholder />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
 
   if (loadingProfile || !paramsUserId) return <MainLayout><ProfileSkeleton /></MainLayout>;
   if (!profile) return <MainLayout><div className="text-center p-12">Profile not found.</div></MainLayout>;
@@ -582,22 +574,35 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   };
   const canMessage = !isOwnProfile; 
   const canViewContent = isOwnProfile || !profile.isPrivate || (profile.isPrivate && followStatus === 'following');
+  const displayPosts = userPosts.filter(p => !p.isStory);
+  const displayMedia = userPosts.filter(p => !p.isStory && p.imageUrl);
+
 
   return (
     <MainLayout>
       <div className="w-full">
-          <div className="bg-muted/20 p-0 relative border-b border-border">
-            <div className="relative h-48 w-full md:h-64">
-              <Image src={profile.coverPhotoURL || "https://placehold.co/1200x400.png"} alt={`${profile.displayName || 'User'}'s cover photo`} fill style={{objectFit: 'cover'}} data-ai-hint="abstract background landscape" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority />
-              <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
-                <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-background shadow-lg">
-                  <AvatarImage src={profile.photoURL || `https://placehold.co/128x128.png?text=${(profile.displayName || 'U').charAt(0)}`} alt={profile.displayName || 'User'} data-ai-hint="profile picture" />
-                  <AvatarFallback className="text-4xl sm:text-5xl">{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
-              </div>
+        <Card className="w-full shadow-lg overflow-hidden">
+          <div className="relative">
+            <div className="relative h-48 w-full md:h-64 bg-muted">
+              <Image
+                src={profile.coverPhotoURL || "https://placehold.co/1200x400.png"}
+                alt={`${profile.displayName || 'User'}'s cover photo`}
+                fill
+                style={{objectFit: 'cover'}}
+                data-ai-hint="abstract background landscape"
+                sizes="(max-width: 768px) 100vw, 1200px"
+                priority
+              />
+            </div>
+            <div className="absolute -bottom-12 sm:-bottom-16 left-4 sm:left-6 z-10">
+              <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-card shadow-lg">
+                <AvatarImage src={profile.photoURL || `https://placehold.co/128x128.png?text=${(profile.displayName || 'U').charAt(0)}`} alt={profile.displayName || 'User'} data-ai-hint="profile picture" />
+                <AvatarFallback className="text-4xl sm:text-5xl">{(profile.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
             </div>
           </div>
-          <div className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6 bg-background">
+
+          <div className="pt-16 sm:pt-20 px-4 sm:px-6 pb-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4">
               <div className="mb-3 sm:mb-0">
                 <h1 className="font-headline text-2xl sm:text-3xl font-bold text-foreground">{profile.displayName || 'Unnamed User'}</h1>
@@ -612,88 +617,101 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             </div>
             <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
-              <span className="text-foreground font-medium"><strong>{userPosts.length}</strong> Posts</span> 
-              {isOwnProfile ? ( <button onClick={() => fetchFollowList('followers')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5"> <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers </button> ) : ( <span> <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers </span> )}
-              {isOwnProfile ? ( <button onClick={() => fetchFollowList('following')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5"> <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following </button> ) : ( <span> <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following </span> )}
+              <span className="text-foreground font-medium"><strong>{displayPosts.length}</strong> Posts</span>
+              {isOwnProfile || !profile.isPrivate || (profile.isPrivate && followStatus === 'following') ? (
+                <>
+                  <button onClick={() => fetchFollowList('followers')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5"> <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers </button>
+                  <button onClick={() => fetchFollowList('following')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5"> <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following </button>
+                </>
+              ) : (
+                 <>
+                  <span> <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers </span>
+                  <span> <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following </span>
+                 </>
+              )}
             </div>
           </div>
-          <Tabs defaultValue="posts" className="w-full px-4 sm:px-6 pb-6 bg-background">
-            <TabsList className="flex w-full bg-muted/60 p-1 rounded-md">
-              <TabsTrigger value="posts" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Posts</TabsTrigger>
-              <TabsTrigger value="media" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Media</TabsTrigger>
-              <TabsTrigger value="likes" className={cn("flex-1 data-[state=active]:bg-background data-[state=active]:shadow-sm")}>Likes</TabsTrigger>
-            </TabsList>
-            <TabsContent value="posts" className="mt-6 w-full min-w-0 overflow-y-auto">
-              {loadingUserPosts && <LoadingPostsPlaceholder />}
-              {!loadingUserPosts && !canViewContent && <PrivateAccountPlaceholder />}
-              {!loadingUserPosts && canViewContent && userPosts.length === 0 && <NoPostsPlaceholder />}
-              {!loadingUserPosts && canViewContent && userPosts.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
-                  {userPosts.map((post) => (
-                    <div key={post.id} className="group relative aspect-square block w-full overflow-hidden rounded-md">
-                      <Link href={`/post/${post.id}`}> {/* Placeholder link, assuming /post/:id exists */}
-                        {post.imageUrl ? (
-                          <Image src={post.imageUrl} alt={post.caption || 'User post'} fill sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw" style={{objectFit: 'cover'}} className="transition-transform duration-300 group-hover:scale-105" data-ai-hint={post.dataAiHint || "photo content"} />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
-                            <span className="text-xs p-2 text-center">{post.caption?.substring(0,50) || "Text Post"}</span>
-                          </div>
-                        )}
-                      </Link>
-                      {isOwnProfile && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 bg-black/30 hover:bg-black/60 text-white hover:text-white rounded-full z-10">
-                              <MoreVertical className="h-4 w-4" /> <span className="sr-only">More options</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete Post
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="media" className="mt-6 w-full min-w-0 overflow-y-auto">
+
+          <div className="px-0 sm:px-0 border-t border-border">
+            <Tabs defaultValue="posts" className="w-full">
+              <TabsList className="flex w-full justify-around bg-card p-0 border-b border-border rounded-none">
+                <TabsTrigger value="posts" className="flex-1 py-3 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none">Posts</TabsTrigger>
+                <TabsTrigger value="media" className="flex-1 py-3 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none">Media</TabsTrigger>
+                <TabsTrigger value="likes" className="flex-1 py-3 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary rounded-none">Likes</TabsTrigger>
+              </TabsList>
+              <TabsContent value="posts" className="mt-0 p-4 sm:p-6">
                 {loadingUserPosts && <LoadingPostsPlaceholder />}
                 {!loadingUserPosts && !canViewContent && <PrivateAccountPlaceholder />}
-                {!loadingUserPosts && canViewContent && userPosts.filter(p => p.imageUrl).length === 0 && <NoMediaPlaceholder />}
-                {!loadingUserPosts && canViewContent && userPosts.filter(p => p.imageUrl).length > 0 && (
-                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
-                        {userPosts.filter(p => p.imageUrl).map((post) => (
-                             <div key={post.id} className="group relative aspect-square block w-full overflow-hidden rounded-md">
-                                <Link href={`/post/${post.id}`}>
-                                <Image src={post.imageUrl!} alt={post.caption || 'User media'} fill sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw" style={{objectFit: 'cover'}} className="transition-transform duration-300 group-hover:scale-105" data-ai-hint={post.dataAiHint || "photo content"} />
-                                </Link>
-                                {isOwnProfile && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 bg-black/30 hover:bg-black/60 text-white hover:text-white rounded-full z-10">
-                                      <MoreVertical className="h-4 w-4" /> <span className="sr-only">More options</span>
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                      <Trash2 className="mr-2 h-4 w-4" /> Delete Media
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                                )}
+                {!loadingUserPosts && canViewContent && displayPosts.length === 0 && <NoPostsPlaceholder />}
+                {!loadingUserPosts && canViewContent && displayPosts.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
+                    {displayPosts.map((post) => (
+                      <div key={post.id} className="group relative aspect-square block w-full overflow-hidden rounded-md">
+                        <Link href={`/post/${post.id}`}>
+                          {post.imageUrl ? (
+                            <Image src={post.imageUrl} alt={post.caption || 'User post'} fill sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw" style={{objectFit: 'cover'}} className="transition-transform duration-300 group-hover:scale-105" data-ai-hint={post.dataAiHint || "photo content"} />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground p-2">
+                              <span className="text-xs text-center line-clamp-6">{post.caption || "Text Post"}</span>
                             </div>
-                        ))}
-                    </div>
+                          )}
+                        </Link>
+                        {isOwnProfile && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 bg-black/30 hover:bg-black/60 text-white hover:text-white rounded-full z-10">
+                                <MoreVertical className="h-4 w-4" /> <span className="sr-only">More options</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete Post
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
-            </TabsContent>
-            <TabsContent value="likes" className="mt-6 w-full min-w-0 overflow-y-auto">
-                {!loadingUserPosts && !canViewContent && <PrivateAccountPlaceholder />}
-                {!loadingUserPosts && canViewContent && <NoLikesPlaceholder />}
-            </TabsContent>
-          </Tabs>
+              </TabsContent>
+              <TabsContent value="media" className="mt-0 p-4 sm:p-6">
+                  {loadingUserPosts && <LoadingPostsPlaceholder />}
+                  {!loadingUserPosts && !canViewContent && <PrivateAccountPlaceholder />}
+                  {!loadingUserPosts && canViewContent && displayMedia.length === 0 && <NoMediaPlaceholder />}
+                  {!loadingUserPosts && canViewContent && displayMedia.length > 0 && (
+                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
+                          {displayMedia.map((post) => (
+                               <div key={post.id} className="group relative aspect-square block w-full overflow-hidden rounded-md">
+                                  <Link href={`/post/${post.id}`}>
+                                  <Image src={post.imageUrl!} alt={post.caption || 'User media'} fill sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw" style={{objectFit: 'cover'}} className="transition-transform duration-300 group-hover:scale-105" data-ai-hint={post.dataAiHint || "photo content"} />
+                                  </Link>
+                                  {isOwnProfile && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 bg-black/30 hover:bg-black/60 text-white hover:text-white rounded-full z-10">
+                                        <MoreVertical className="h-4 w-4" /> <span className="sr-only">More options</span>
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleDeleteRequest(post)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Media
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                  )}
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </TabsContent>
+              <TabsContent value="likes" className="mt-0 p-4 sm:p-6">
+                  {!loadingUserPosts && !canViewContent && <PrivateAccountPlaceholder />}
+                  {!loadingUserPosts && canViewContent && <NoLikesPlaceholder />}
+              </TabsContent>
+            </Tabs>
+          </div>
+        </Card>
         {isOwnProfile && profile && ( <EditProfileDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} userProfile={profile} onProfileUpdate={handleProfileUpdate} /> )}
         <FollowListDialog open={isFollowListDialogOpen} onOpenChange={setIsFollowListDialogOpen} title={followListTitle} users={followListUsers} loading={loadingFollowList} />
          {postToDelete && (
@@ -714,8 +732,3 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     </MainLayout>
   );
 }
-    
-
-    
-
-
