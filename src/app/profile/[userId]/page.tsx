@@ -133,7 +133,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     if (!currentUser || !currentUser.uid || !paramsUserId || paramsUserId === '' || isOwnProfile) {
       setFollowStatus('not_following');
       setExistingFollowDocId(null);
-      setIsProcessingFollow(false);
+      setIsProcessingFollow(false); // Ensure this is reset
       return;
     }
     setIsProcessingFollow(true);
@@ -150,18 +150,19 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         setExistingFollowDocId(null);
       }
     } catch (error: any) {
-      if (error.code === 'permission-denied' || error.code === 'auth/permission-denied') {
+      const errorCode = error.code;
+      if (errorCode === 'permission-denied' || errorCode === 'auth/permission-denied') {
         console.warn(
           `Firestore permission denied while checking follow status for profile ${paramsUserId}. ` +
           `Current User UID: ${currentUser?.uid}, Target Profile UID: ${paramsUserId}, Attempted Path: 'followRequests/${followDocId}'. ` +
           `Message: ${error.message}. This usually means your Firestore security rules for the 'followRequests' collection ` +
-          `do not allow the current user to read this specific document or query this collection in this way. ` +
-          `Please verify your Firestore rules. Expected rule for read: 'allow read: if request.auth != null && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);' ` +
-          `or for ID-based check: 'allow read: if request.auth != null && (request.auth.uid == followRequestId.split('_')[0] || request.auth.uid == followRequestId.split('_')[1]);'.`
+          `do not allow the current user to read this specific document based on its ID, or query by fields. ` +
+          `Rule for read might be: 'allow read: if request.auth != null && (request.auth.uid == resource.data.requesterId || request.auth.uid == resource.data.recipientId);'.`
         );
+        // No user-facing toast for permission denied if it's about reading status.
       } else {
         console.error("Error checking follow status (non-permission related):", error);
-        console.error(`Error details - Code: ${error.code}, Name: ${error.name}, Message: ${error.message}`);
+        console.error(`Error details - Code: ${errorCode}, Name: ${error.name}, Message: ${error.message}`);
         toast({
             title: "Follow Status Check Failed",
             description: "Unable to determine follow status. Technical details logged to console.",
@@ -274,43 +275,42 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         return;
     }
     setIsProcessingFollow(true);
+    console.log(`handleFollowToggle: Initiating. Current followStatus: ${followStatus}, isProcessingFollow: true`);
     const batch = writeBatch(db);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-    const targetUserProfileRef = doc(db, 'profiles', profile.uid);
+    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); // We will NOT update target's followersCount from client
 
-    let actionType = followStatus === 'following' ? 'UNFOLLOW' : 'FOLLOW';
-    console.log(`handleFollowToggle: Starting batch operation. Action: ${actionType}`);
-    console.log("Current User UID:", currentUser.uid);
-    console.log("Target Profile UID:", profile.uid);
+    const actionType = followStatus === 'following' ? 'UNFOLLOW' : 'FOLLOW';
+    console.log(`handleFollowToggle: Preparing batch for action: ${actionType}`);
+    console.log("Current User UID:", currentUser.uid, "DisplayName:", currentUser.displayName);
+    console.log("Target Profile UID:", profile.uid, "DisplayName:", profile.displayName);
     
-    let newFollowDocIdForLog: string | null = null;
-    let newRequestDataForLog: FollowRequestDocument | null = null;
-    let notificationDataForLog: any = null;
+    let followRequestDocPath: string;
+    let notificationData: any = null;
 
     try {
-      if (followStatus === 'following') {
+      if (actionType === 'UNFOLLOW') {
         if (existingFollowDocId) {
-          const followRequestRef = doc(db, 'followRequests', existingFollowDocId);
-          console.log(`Batch: DELETE on path: followRequests/${existingFollowDocId}`);
+          followRequestDocPath = `followRequests/${existingFollowDocId}`;
+          const followRequestRef = doc(db, followRequestDocPath);
+          console.log(`Batch: DELETE on path: ${followRequestDocPath}`);
           batch.delete(followRequestRef);
         } else {
-          console.warn("Cannot unfollow: existingFollowDocId is null. This might indicate a state inconsistency.");
+          console.warn("Cannot unfollow: existingFollowDocId is null. This might indicate a state inconsistency or an issue with checkFollowStatus.");
           setIsProcessingFollow(false);
-          toast({ title: "Unfollow Error", description: "Could not determine which follow record to remove.", variant: "destructive" });
+          await checkFollowStatus(); // Re-check to ensure status is accurate
           return;
         }
         
-        console.log(`Batch: UPDATE on path: profiles/${currentUser.uid}, data: { followingCount: increment(-1) }`);
+        const currentUserFollowingUpdatePath = `profiles/${currentUser.uid}`;
+        console.log(`Batch: UPDATE on path: ${currentUserFollowingUpdatePath}, data: { followingCount: increment(-1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-        
-        console.log(`Batch: UPDATE on path: profiles/${profile.uid}, data: { followersCount: increment(-1) }`);
-        batch.update(targetUserProfileRef, { followersCount: increment(-1) });
 
-        console.log("Unfollow Batch Operations Prepared. Attempting commit...");
-      } else { // 'not_following'
-        newFollowDocIdForLog = `${currentUser.uid}_${profile.uid}`;
-        const followRequestRef = doc(db, 'followRequests', newFollowDocIdForLog);
-        newRequestDataForLog = {
+      } else { // 'FOLLOW' action
+        const newFollowDocId = `${currentUser.uid}_${profile.uid}`;
+        followRequestDocPath = `followRequests/${newFollowDocId}`;
+        const followRequestRef = doc(db, followRequestDocPath);
+        const newRequestData: FollowRequestDocument = {
             requesterId: currentUser.uid,
             requesterDisplayName: currentUser.displayName || 'User',
             requesterAvatarUrl: currentUser.photoURL || null,
@@ -321,74 +321,62 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
-        console.log(`Batch: SET on path: followRequests/${newFollowDocIdForLog}, data:`, JSON.stringify(newRequestDataForLog, null, 2));
-        batch.set(followRequestRef, newRequestDataForLog);
+        console.log(`Batch: SET on path: ${followRequestDocPath}, data:`, JSON.stringify(newRequestData, null, 2));
+        batch.set(followRequestRef, newRequestData);
 
-        console.log(`Batch: UPDATE on path: profiles/${currentUser.uid}, data: { followingCount: increment(1) }`);
+        const currentUserFollowingUpdatePath = `profiles/${currentUser.uid}`;
+        console.log(`Batch: UPDATE on path: ${currentUserFollowingUpdatePath}, data: { followingCount: increment(1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
-        
-        console.log(`Batch: UPDATE on path: profiles/${profile.uid}, data: { followersCount: increment(1) }`);
-        batch.update(targetUserProfileRef, { followersCount: increment(1) });
 
         const notificationRef = doc(collection(db, 'notifications'));
-        notificationDataForLog = {
+        notificationData = {
             recipientId: profile.uid, 
             actorId: currentUser.uid, 
             actorDisplayName: currentUser.displayName || 'User',
             actorAvatarUrl: currentUser.photoURL || null,
-            type: 'follow_accept' as 'follow_accept',
-            originalFollowRequestId: newFollowDocIdForLog, 
+            type: 'follow_accept' as 'follow_accept', // Assuming direct follow for public profiles creates 'follow_accept'
+            originalFollowRequestId: newFollowDocId, 
             isRead: false,
             createdAt: serverTimestamp()
         };
-        console.log(`Batch: SET on path: notifications/${notificationRef.id}, data:`, JSON.stringify(notificationDataForLog, null, 2));
-        batch.set(notificationRef, notificationDataForLog);
-        
-        console.log("Follow Batch Operations Prepared. Attempting commit...");
+        console.log(`Batch: SET on path: notifications/${notificationRef.id}, data:`, JSON.stringify(notificationData, null, 2));
+        batch.set(notificationRef, notificationData);
       }
 
+      console.log("Follow/Unfollow Batch Operations Prepared. Attempting commit...");
       await batch.commit();
-      console.log("Batch commit successful.");
+      console.log(`Batch commit SUCCESSFUL for action: ${actionType}.`);
 
-      if (followStatus === 'following') {
-        setFollowStatus('not_following');
-        setExistingFollowDocId(null);
-        toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName}.` });
+      if (actionType === 'UNFOLLOW') {
+        toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName || 'this user'}.` });
       } else {
-        setFollowStatus('following');
-        setExistingFollowDocId(newFollowDocIdForLog || `${currentUser.uid}_${profile.uid}`);
-        toast({ title: "Followed", description: `You are now following ${profile.displayName}.` });
+        toast({ title: "Followed", description: `You are now following ${profile.displayName || 'this user'}.` });
       }
 
     } catch (error: any) {
       const errorCode = error.code;
       const errorMessage = error.message || "Could not perform follow/unfollow action.";
       
+      console.error(`FirebaseError in handleFollowToggle (Action: ${actionType}):`, error);
+      console.error(`Error details - Code: ${errorCode}, Name: ${error.name}, Message: ${errorMessage}`);
+
       if (errorCode === 'permission-denied' || errorCode === 'auth/permission-denied') {
-        console.warn("FirebaseError in handleFollowToggle (PERMISSION DENIED):", error);
-        console.warn(`Error details - Code: ${errorCode}, Name: ${error.name}, Message: ${errorMessage}`);
-        console.warn("A 'permission-denied' error occurred while trying to commit the follow/unfollow batch. " +
-                     "This means your Firestore security rules are preventing one or more of the following operations:");
-        if (actionType === 'UNFOLLOW' && existingFollowDocId) {
-          console.warn(`  - DELETING 'followRequests/${existingFollowDocId}'`);
-          console.warn(`  - UPDATING 'profiles/${currentUser.uid}' with { followingCount: decrement }`);
-          console.warn(`  - UPDATING 'profiles/${profile.uid}' with { followersCount: decrement }`);
-        } else if (actionType === 'FOLLOW' && newFollowDocIdForLog && newRequestDataForLog && notificationDataForLog) {
-          console.warn(`  - CREATING 'followRequests/${newFollowDocIdForLog}' with data:`, JSON.stringify(newRequestDataForLog));
-          console.warn(`  - UPDATING 'profiles/${currentUser.uid}' with { followingCount: increment }`);
-          console.warn(`  - UPDATING 'profiles/${profile.uid}' with { followersCount: increment }`);
-          console.warn(`  - CREATING 'notifications/(new_id)' with data:`, JSON.stringify(notificationDataForLog));
-        }
-        console.warn("Please check your Firestore security rules to ensure these operations are allowed for the authenticated user.");
-        // No user-facing toast for permission denied, console warning is primary.
+        console.warn(
+          "A 'permission-denied' error occurred while trying to commit the follow/unfollow batch. " +
+          "This means your Firestore security rules are preventing one or more of the batched operations. " +
+          "Please CHECK YOUR BROWSER'S DEVELOPER CONSOLE for the detailed paths and data that were attempted (logged just before this error). " +
+          "Compare these logs with your Firestore security rules for 'followRequests', 'profiles', and 'notifications' collections to identify the mismatch."
+        );
+        // Suppress user-facing toast for permission denied, console warning is primary for dev.
       } else {
-        console.error("FirebaseError in handleFollowToggle (OTHER ERROR):", error);
-        console.error(`Error details - Code: ${errorCode}, Name: ${error.name}, Message: ${errorMessage}`);
         toast({ title: "Operation Failed", description: `Error: ${errorMessage}. Check console for details.`, variant: "destructive" });
       }
-      await checkFollowStatus(); 
     } finally {
-      setIsProcessingFollow(false);
+      console.log("handleFollowToggle: finally block reached. Re-checking follow status.");
+      // Always re-check status to ensure UI reflects the actual backend state.
+      await checkFollowStatus(); 
+      setIsProcessingFollow(false); // Ensure this is always reset
+      console.log(`handleFollowToggle: Processing finished. isProcessingFollow: false`);
     }
   };
 
@@ -705,3 +693,4 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     
 
     
+
