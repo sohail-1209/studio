@@ -7,13 +7,13 @@ import { useParams, useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card'; // Import Card
+import { Card } from '@/components/ui/card'; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserPlus, MessageCircle, MoreVertical, Edit3, Image as ImageIcon, Loader2, Trash2, UserCheck, Clock, UserMinus, ShieldAlert, Users, Lock } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { db, storage } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment, FieldValue } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, orderBy, serverTimestamp, setDoc, Timestamp, deleteDoc, writeBatch, onSnapshot, addDoc, limit, updateDoc, increment, type FieldValue } from 'firebase/firestore';
 import { ref as storageRefDb, deleteObject } from 'firebase/storage';
 import type { UserProfile as AuthContextUserProfile } from '@/contexts/AuthContext';
 import type { Post } from '@/types/post';
@@ -279,7 +279,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
     const q = query(
       postsColRef,
       where('userId', '==', profile.uid),
-      // where('isStory', '!=', true), // No longer needed here, will filter in display
       orderBy('createdAt', 'desc')
     );
 
@@ -312,20 +311,21 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
   }, [profile?.uid, profile?.isPrivate, isOwnProfile, followStatus, toast]);
 
 
-  const handleFollowToggle = async () => {
+ const handleFollowToggle = async () => {
     if (!currentUser || !currentUser.uid || !profile || !profile.uid || isOwnProfile) {
       console.warn("handleFollowToggle: Pre-conditions not met.", {currentUserUid: currentUser?.uid, profileUid: profile?.uid, isOwnProfile});
       return;
     }
-     if (isProcessingFollow) {
+    if (isProcessingFollow) {
         console.log("handleFollowToggle: Already processing, returning early.");
         return;
     }
-    setIsProcessingFollow(true);
-    console.log(`handleFollowToggle: Initiating. Current followStatus: ${followStatus}. Current User: ${currentUser.displayName} (UID: ${currentUser.uid}), Target Profile: ${profile.displayName} (UID: ${profile.uid})`);
+    setIsProcessingFollow(true); // Moved to the very beginning
+    console.log(`handleFollowToggle: Initiating for ${currentUser.displayName} (UID: ${currentUser.uid}) targeting ${profile.displayName} (UID: ${profile.uid}). Current followStatus: ${followStatus}.`);
     
     const batch = writeBatch(db);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
+    // const targetUserProfileRef = doc(db, 'profiles', profile.uid); // Not updating target's followersCount here
 
     const actionType = followStatus === 'following' ? 'UNFOLLOW' : 'FOLLOW';
     console.log(`handleFollowToggle: Preparing batch for action: ${actionType}`);
@@ -342,16 +342,15 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           const followRequestRef = doc(db, followRequestDocPath);
           console.log(`Batch: DELETE on path: ${followRequestDocPath}`);
           batch.delete(followRequestRef);
+          batch.update(currentUserProfileRef, { followingCount: increment(-1) });
+          // Do NOT update target user's followersCount here
         } else {
-          console.warn("Cannot unfollow: existingFollowDocId is null. This might indicate a state inconsistency or an issue with checkFollowStatus. Re-checking status.");
+          console.warn("Cannot unfollow: existingFollowDocId is null. Re-checking status.");
           await checkFollowStatus();
           setIsProcessingFollow(false);
           return;
         }
         
-        console.log(`Batch: UPDATE on path: profiles/${currentUser.uid}, data: { followingCount: increment(-1) }`);
-        batch.update(currentUserProfileRef, { followingCount: increment(-1) });
-
       } else { // 'FOLLOW' action
         const newFollowDocId = `${currentUser.uid}_${profile.uid}`;
         followRequestDocPath = `followRequests/${newFollowDocId}`;
@@ -368,11 +367,9 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
-        console.log(`Batch: SET on path: ${followRequestDocPath}, data:`, JSON.stringify(newRequestData, null, 2));
         batch.set(followRequestRef, newRequestData);
-
-        console.log(`Batch: UPDATE on path: profiles/${currentUser.uid}, data: { followingCount: increment(1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
+        // Do NOT update target user's followersCount here
 
         const notificationRef = doc(collection(db, 'notifications'));
         notificationData = {
@@ -385,11 +382,20 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             isRead: false,
             createdAt: serverTimestamp(),
         } as any; 
-        console.log(`Batch: SET on path: notifications/${notificationRef.id}, data:`, JSON.stringify(notificationData, null, 2));
         batch.set(notificationRef, notificationData);
       }
-
-      console.log("Follow/Unfollow Batch Operations Prepared. Attempting commit...");
+      
+      const attemptedPathsAndDataForLog = {
+          action: actionType,
+          followRequestPath: followRequestDocPath,
+          followRequestData: actionType === 'FOLLOW' ? newRequestData : 'DELETE operation',
+          currentUserProfileUpdatePath: `profiles/${currentUser.uid}`,
+          currentUserProfileUpdateData: actionType === 'FOLLOW' ? '{ followingCount: increment(1) }' : '{ followingCount: increment(-1) }',
+          notificationPath: actionType === 'FOLLOW' ? `notifications/${(notificationData as any)?.id || 'generatedId'}` : 'N/A', // Use optional chaining if notificationData is used
+          notificationData: actionType === 'FOLLOW' ? notificationData : 'N/A',
+      };
+      console.log("Follow/Unfollow Batch Operations Prepared. Attempting commit with data:", JSON.stringify(attemptedPathsAndDataForLog, null, 2));
+      
       await batch.commit();
       console.log(`Batch commit SUCCESSFUL for action: ${actionType}.`);
 
@@ -403,7 +409,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       const errorCode = error.code;
       const errorMessage = error.message || "Could not perform follow/unfollow action.";
       
-      console.error("FirebaseError in handleFollowToggle:", error);
+      console.error("FirebaseError in handleFollowToggle:", error); // Keep this for general errors
       console.error(`Error details - Code: ${errorCode}, Name: ${error.name}, Message: ${errorMessage}`);
 
       const attemptedPathsAndData = {
@@ -412,18 +418,20 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           followRequestData: actionType === 'FOLLOW' ? newRequestData : 'DELETE operation',
           currentUserProfileUpdatePath: `profiles/${currentUser.uid}`,
           currentUserProfileUpdateData: actionType === 'FOLLOW' ? '{ followingCount: increment(1) }' : '{ followingCount: increment(-1) }',
-          notificationPath: actionType === 'FOLLOW' ? `notifications/someGeneratedId` : 'N/A',
+          notificationPath: actionType === 'FOLLOW' ? `notifications/${(notificationData as any)?.id || 'generatedId'}` : 'N/A',
           notificationData: actionType === 'FOLLOW' ? notificationData : 'N/A',
       };
-      console.log("Attempted batch operations that might have failed:", JSON.stringify(attemptedPathsAndData, null, 2));
+      
 
       if (errorCode === 'permission-denied' || errorCode === 'auth/permission-denied') {
-        console.warn(
+        console.warn( // Changed to console.warn for permission errors
           `A 'permission-denied' error (Code: ${errorCode}) occurred while trying to commit the follow/unfollow batch. ` +
-          `This means your Firestore security rules are preventing one or more of the batched operations. ` +
           `Message: "${errorMessage}". ` +
-          `Review the 'Attempted batch operations' logged above and compare with your Firestore security rules for 'followRequests', 'profiles', and 'notifications'.`
+          `This means your Firestore security rules are preventing one or more of the batched operations. ` +
+          `Review the 'Attempted batch operations' logged below and compare with your Firestore security rules for 'followRequests', 'profiles', and 'notifications'.`
         );
+        console.warn("Attempted batch operations that might have failed:", JSON.stringify(attemptedPathsAndData, null, 2));
+        // No toast for permission denied, as it's a backend config issue for the dev
       } else {
         toast({ title: "Operation Failed", description: `Error: ${errorMessage}. Check console for details.`, variant: "destructive" });
       }
@@ -580,8 +588,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
 
   return (
     <MainLayout>
-      <div className="w-full">
-        <Card className="w-full shadow-lg overflow-hidden">
+      <Card className="w-full shadow-lg overflow-hidden">
           <div className="relative">
             <div className="relative h-48 w-full md:h-64 bg-muted">
               <Image
@@ -617,16 +624,32 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             </div>
             <p className="text-sm text-foreground mb-6 whitespace-pre-wrap leading-relaxed">{profile.bio || "No bio yet."}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-2 sm:gap-x-6 text-sm text-muted-foreground mb-8">
-              <span className="text-foreground font-medium"><strong>{displayPosts.length}</strong> Posts</span>
-              {isOwnProfile || !profile.isPrivate || (profile.isPrivate && followStatus === 'following') ? (
+              <span className="p-0.5 -m-0.5"><strong className="text-foreground font-medium">{displayPosts.length}</strong> Posts</span>
+              {isOwnProfile ? (
                 <>
-                  <button onClick={() => fetchFollowList('followers')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5"> <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers </button>
-                  <button onClick={() => fetchFollowList('following')} className="hover:underline focus:outline-none focus:ring-2 focus:ring-ring rounded-sm p-0.5 -m-0.5"> <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following </button>
+                  <button 
+                    onClick={() => fetchFollowList('followers')} 
+                    className="hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded-sm p-0.5 -m-0.5 cursor-pointer"
+                    aria-label={`View ${profile.displayName || 'user'}'s followers`}
+                  >
+                    <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers
+                  </button>
+                  <button 
+                    onClick={() => fetchFollowList('following')} 
+                    className="hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded-sm p-0.5 -m-0.5 cursor-pointer"
+                    aria-label={`View users ${profile.displayName || 'user'} is following`}
+                  >
+                    <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following
+                  </button>
                 </>
               ) : (
                  <>
-                  <span> <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers </span>
-                  <span> <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following </span>
+                  <span className="p-0.5 -m-0.5">
+                    <strong className="text-foreground font-medium">{profile.followersCount || 0}</strong> Followers
+                  </span>
+                  <span className="p-0.5 -m-0.5">
+                    <strong className="text-foreground font-medium">{profile.followingCount || 0}</strong> Following
+                  </span>
                  </>
               )}
             </div>
@@ -708,6 +731,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
               <TabsContent value="likes" className="mt-0 p-4 sm:p-6">
                   {!loadingUserPosts && !canViewContent && <PrivateAccountPlaceholder />}
                   {!loadingUserPosts && canViewContent && <NoLikesPlaceholder />}
+                  {/* Implement Liked Posts Grid Here if functionality is added */}
               </TabsContent>
             </Tabs>
           </div>
@@ -728,7 +752,6 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
             </AlertDialogContent>
           </AlertDialog>
         )}
-      </div>
     </MainLayout>
   );
 }
