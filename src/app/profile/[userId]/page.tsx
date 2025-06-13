@@ -141,7 +141,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         console.warn(
           `Firestore permission denied while checking follow status for profile ${paramsUserId}. ` +
           `UID: ${currentUser?.uid} attempting to read 'followRequests/${followDocId}'. ` +
-          `Ensure Firestore rules allow this read (e.g., if request.auth.uid is part of followRequestId). Message: ${error.message}`
+          `Ensure Firestore rules allow this read. Message: ${error.message}`
         );
         // No toast for permission denied as it's a dev/config issue
       } else {
@@ -150,7 +150,7 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
         toast({
             title: "Follow Status Check Failed",
             description: "Unable to determine follow status. Technical details logged to console.",
-            variant: "default" // Changed from destructive
+            variant: "default"
         });
       }
       setFollowStatus('not_following');
@@ -204,16 +204,27 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       return;
     }
 
+    // Final defensive check for UIDs
+    if (typeof currentUser.uid !== 'string' || currentUser.uid === '' || typeof profile.uid !== 'string' || profile.uid === '') {
+        console.error("handleFollowToggle: Critical error - UIDs are invalid just before batch creation.", { currentUserUid: currentUser.uid, profileUid: profile.uid });
+        toast({ title: "Internal Error", description: "User identifiers are invalid. Cannot proceed.", variant: "destructive" });
+        return;
+    }
+
     setIsProcessingFollow(true);
     const batch = writeBatch(db);
     const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
+
+    console.log("handleFollowToggle: Starting batch operation. Action:", followStatus === 'following' ? 'UNFOLLOW' : 'FOLLOW');
+    console.log("Current User UID:", currentUser.uid);
+    console.log("Target Profile UID:", profile.uid);
 
     try {
       if (followStatus === 'following') {
         // ---- UNFOLLOW ACTION ----
         if (existingFollowDocId) {
           const followRequestRef = doc(db, 'followRequests', existingFollowDocId);
-          console.log(`Attempting to DELETE: followRequests/${existingFollowDocId}`);
+          console.log(`Batch: DELETE on path: followRequests/${existingFollowDocId}`);
           batch.delete(followRequestRef);
         } else {
           console.warn("Cannot unfollow: existingFollowDocId is null. This might indicate a state inconsistency.");
@@ -222,51 +233,60 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
           return;
         }
         
-        console.log(`Attempting to UPDATE: profiles/${currentUser.uid} with { followingCount: increment(-1) }`);
+        console.log(`Batch: UPDATE on path: profiles/${currentUser.uid}, data: { followingCount: increment(-1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(-1) });
         
-        console.log("Unfollow Batch Operations Prepared:", batch);
-        await batch.commit();
-
-        setFollowStatus('not_following');
-        setExistingFollowDocId(null);
-        toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName}.` });
+        console.log("Unfollow Batch Operations Prepared. Attempting commit...");
 
       } else {
         // ---- FOLLOW ACTION ----
         const newFollowDocId = `${currentUser.uid}_${profile.uid}`;
         const followRequestRef = doc(db, 'followRequests', newFollowDocId);
         const newRequestData: FollowRequestDocument = {
-            requesterId: currentUser.uid, requesterDisplayName: currentUser.displayName, requesterAvatarUrl: currentUser.photoURL,
-            recipientId: profile.uid, recipientDisplayName: profile.displayName, recipientAvatarUrl: profile.photoURL,
+            requesterId: currentUser.uid,
+            requesterDisplayName: currentUser.displayName || 'User',
+            requesterAvatarUrl: currentUser.photoURL || null,
+            recipientId: profile.uid,
+            recipientDisplayName: profile.displayName || 'User',
+            recipientAvatarUrl: profile.photoURL || null,
             status: 'accepted', 
-            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
         };
-        console.log(`Attempting to SET: followRequests/${newFollowDocId} with data:`, newRequestData);
+        console.log(`Batch: SET on path: followRequests/${newFollowDocId}, data:`, JSON.stringify(newRequestData, null, 2));
         batch.set(followRequestRef, newRequestData);
 
-        console.log(`Attempting to UPDATE: profiles/${currentUser.uid} with { followingCount: increment(1) }`);
+        console.log(`Batch: UPDATE on path: profiles/${currentUser.uid}, data: { followingCount: increment(1) }`);
         batch.update(currentUserProfileRef, { followingCount: increment(1) });
 
         const notificationRef = doc(collection(db, 'notifications'));
         const notificationData = {
             recipientId: profile.uid, 
             actorId: currentUser.uid, 
-            actorDisplayName: currentUser.displayName,
-            actorAvatarUrl: currentUser.photoURL,
-            type: 'follow_accept', 
+            actorDisplayName: currentUser.displayName || 'User',
+            actorAvatarUrl: currentUser.photoURL || null,
+            type: 'follow_accept' as 'follow_accept', // Type assertion for clarity
             originalFollowRequestId: newFollowDocId, 
             isRead: false,
             createdAt: serverTimestamp()
         };
-        console.log(`Attempting to SET: notifications/${notificationRef.id} with data:`, notificationData);
+        console.log(`Batch: SET on path: notifications/${notificationRef.id}, data:`, JSON.stringify(notificationData, null, 2));
         batch.set(notificationRef, notificationData);
         
-        console.log("Follow Batch Operations Prepared:", batch);
-        await batch.commit();
+        console.log("Follow Batch Operations Prepared. Attempting commit...");
+      }
 
+      await batch.commit();
+      console.log("Batch commit successful.");
+
+      // Update local state after successful commit
+      if (followStatus === 'following') { // Was unfollowing
+        setFollowStatus('not_following');
+        setExistingFollowDocId(null);
+        toast({ title: "Unfollowed", description: `You are no longer following ${profile.displayName}.` });
+      } else { // Was following
         setFollowStatus('following');
-        setExistingFollowDocId(newFollowDocId);
+        setExistingFollowDocId(`${currentUser.uid}_${profile.uid}`);
         toast({ title: "Followed", description: `You are now following ${profile.displayName}.` });
       }
 
@@ -278,10 +298,10 @@ export default function UserProfilePage({ params: paramsPromise }: { params: { u
       }
 
     } catch (error: any) {
-      console.error("FirebaseError in handleFollowToggle:", error);
+      console.error("FirebaseError in handleFollowToggle (during batch.commit):", error);
       console.error(`Error details - Code: ${error.code}, Name: ${error.name}, Message: ${error.message}`);
       toast({ title: "Operation Failed", description: `Error: ${error.message || "Could not perform follow/unfollow action."}. Check console for details.`, variant: "destructive" });
-      // It's important to re-check status in case of failure to ensure UI consistency.
+      // Re-check status in case of failure to ensure UI consistency.
       await checkFollowStatus(); 
     } finally {
       setIsProcessingFollow(false);
