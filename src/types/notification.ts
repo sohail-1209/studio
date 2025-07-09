@@ -7,15 +7,17 @@ export interface NotificationDocument {
   actorId: string;
   actorDisplayName: string | null;
   actorAvatarUrl: string | null;
-  type: 'like' | 'comment' | 'follow_request' | 'follow_accept';
-  postId?: string;
-  postContentPreview?: string;
-  commentText?: string;
-  followRequestId?: string; // ID of the FollowRequest document
+  type: 'like' | 'comment' | 'follow_request' | 'follow_accept' | 'message';
+  postId?: string; // For like, comment
+  postContentPreview?: string; // For like, comment
+  commentText?: string; // For comment
+  followRequestId?: string; // For follow_request
+  originalFollowRequestId?: string; // For follow_accept
+  chatId?: string; // For message
+  messagePreview?: string; // For message
   createdAt: FieldValue;
   isRead: boolean;
-  actionTaken?: 'accepted' | 'declined' | null; // For follow_request notifications
-  originalFollowRequestId?: string; // Not typically needed for 'follow_request' itself, but for 'follow_accept'
+  actionTaken?: 'accepted' | 'declined' | null; // For follow_request
 }
 
 export interface Notification extends Omit<NotificationDocument, 'createdAt'> {

@@ -26,9 +26,11 @@ import {
   Timestamp,
   writeBatch,
   deleteDoc,
+  type FieldValue,
 } from 'firebase/firestore';
 import { ref as storageRefFirebase, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import type { ChatMessage, ChatMessageDocument, ChatSessionDocument, ChatSessionUserDetail } from '@/types/chat';
+import type { NotificationDocument } from '@/types/notification';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/shared/Spinner';
@@ -64,7 +66,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
   const [newMessage, setNewMessage] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [isPartnerTyping, setIsPartnerTyping] = useState(false); 
+  const [isPartnerTyping, setIsPartnerTyping] = useState(false);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -93,16 +95,14 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     currentUserIsTypingRef.current = isTyping;
     const chatDocRef = doc(db, 'chats', chatId);
     try {
-      // Ensure the typing field exists before trying to update a nested key
       const chatSnap = await getDoc(chatDocRef);
       if (chatSnap.exists()) {
         const currentTypingData = chatSnap.data()?.typing || {};
         await updateDoc(chatDocRef, {
           [`typing.${user.uid}`]: isTyping,
-          updatedAt: serverTimestamp(), // Keep updatedAt fresh
+          updatedAt: serverTimestamp(),
         });
       } else {
-        // This case should ideally not happen if chat is already open
         console.warn("Chat document not found when trying to update typing status.");
       }
     } catch (error) {
@@ -131,13 +131,10 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
         updateSelfTypingStatus(false);
       }
     }
-    // Cleanup timeout on unmount or when dependencies change
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      // Optionally, set typing to false on unmount/chat change if user was typing
-      // This might be too aggressive if user quickly switches back
     };
   }, [newMessage, user?.uid, chatId, updateSelfTypingStatus]);
 
@@ -160,7 +157,6 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
         if (otherUserId && chatData.userDetails && chatData.userDetails[otherUserId]) {
           setChatPartnerProfile(chatData.userDetails[otherUserId]);
         } else if (otherUserId) {
-          // Fallback if userDetails not fully populated yet (should be rare with NewChatDialog logic)
           getDoc(doc(db, 'profiles', otherUserId)).then(profileDoc => {
             if (profileDoc.exists()) {
               const profileData = profileDoc.data();
@@ -177,7 +173,6 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
            console.warn("ChatPage: Could not determine chat partner from chat document:", chatData);
         }
 
-        // Handle partner typing status
         if (otherUserId && chatData.typing && chatData.typing[otherUserId]) {
           setIsPartnerTyping(true);
         } else {
@@ -229,7 +224,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       }
       setSelectedFile(file);
       setFilePreviewUrl(URL.createObjectURL(file));
-      setNewMessage(''); 
+      setNewMessage('');
     }
   };
 
@@ -237,7 +232,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     setSelectedFile(null);
     setFilePreviewUrl(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; 
+      fileInputRef.current.value = "";
     }
   };
 
@@ -251,8 +246,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
 
     setSendingMessage(true);
     setUploadProgress(null);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); // Clear typing timeout
-    updateSelfTypingStatus(false); // Ensure self typing status is false
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    updateSelfTypingStatus(false);
 
     const batch = writeBatch(db);
     const messagesCollectionRef = collection(db, 'chats', chatId, 'messages');
@@ -278,10 +273,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
         await new Promise<void>((resolve, reject) => {
           uploadTask.on(
             'state_changed',
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
-            },
+            (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
             (error) => {
               console.error('Upload failed:', error);
               toast({ title: 'Image Upload Failed', description: error.message, variant: 'destructive' });
@@ -293,7 +285,7 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                 messageData.imageUrl = downloadURL;
                 messageData.imagePath = filePath;
                 messageData.fileType = selectedFile.type;
-                messageData.text = newMessage.trim() || null; 
+                messageData.text = newMessage.trim() || null;
                 messageData.dataAiHint = "chat image";
                 resolve();
               } catch (urlError) {
@@ -305,18 +297,35 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       }
 
       batch.set(newMessageRef, messageData);
-      // When sending a message, ensure own typing status is false in the chat document
+      
       const updatePayload: Partial<ChatSessionDocument> & { updatedAt: FieldValue, [key: string]: any } = {
         lastMessageText: messageData.imageUrl ? (messageData.text ? messageData.text : "📷 Image") : lastMessageText,
         lastMessageSenderId: user.uid,
         lastMessageTimestamp: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        [`typing.${user.uid}`]: false, // Explicitly set own typing status to false
+        [`typing.${user.uid}`]: false,
       };
       batch.update(chatDocRef, updatePayload);
 
 
       await batch.commit();
+
+      if (chatPartnerId) {
+        const notificationsColRef = collection(db, 'notifications');
+        const notifPreview = messageData.imageUrl ? "Sent you an image" : (lastMessageText.substring(0, 50) + (lastMessageText.length > 50 ? '...' : ''));
+        const notificationData: Omit<NotificationDocument, 'createdAt' | 'id'> = {
+          recipientId: chatPartnerId,
+          actorId: user.uid,
+          actorDisplayName: user.displayName || 'Someone',
+          actorAvatarUrl: user.photoURL || null,
+          type: 'message',
+          isRead: false,
+          chatId: chatId,
+          messagePreview: notifPreview,
+        };
+        await addDoc(notificationsColRef, { ...notificationData, createdAt: serverTimestamp() });
+      }
+
       setNewMessage('');
       clearFileSelection();
 
@@ -359,16 +368,16 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
       const currentMessages = messages.filter(m => m.id !== messageToDelete.id);
       if (currentMessages.length > 0) {
         const lastMsgInUI = currentMessages[currentMessages.length - 1];
-        if (messageToDelete.timestamp >= (lastMsgInUI.timestamp || new Date(0))) { 
+        if (messageToDelete.timestamp >= (lastMsgInUI.timestamp || new Date(0))) {
              const chatDocRef = doc(db, 'chats', chatId);
              await updateDoc(chatDocRef, {
                 lastMessageText: lastMsgInUI.imageUrl ? (lastMsgInUI.text ? lastMsgInUI.text : "📷 Image") : lastMsgInUI.text,
                 lastMessageSenderId: lastMsgInUI.senderId,
-                lastMessageTimestamp: serverTimestamp(), 
+                lastMessageTimestamp: serverTimestamp(),
                 updatedAt: serverTimestamp(),
              });
         }
-      } else { 
+      } else {
          const chatDocRef = doc(db, 'chats', chatId);
          await updateDoc(chatDocRef, {
             lastMessageText: "🗑️ Message deleted",
@@ -427,10 +436,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                         <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || 'User'} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
                       ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || 'U').charAt(0)}</AvatarFallback> )}
                     </Avatar>
-                    <div className="min-w-0"> 
-                      <p className="font-semibold text-foreground truncate">{chatPartnerProfile.displayName}</p> 
-                      {/* Last seen placeholder below */}
-                      {/* <p className="text-xs text-muted-foreground truncate">Last seen: ...</p> */}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground truncate">{chatPartnerProfile.displayName}</p>
                     </div>
                   </>
                 ) : (
@@ -465,23 +472,23 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                           ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
                         </Avatar>
                       )}
-                      <div 
+                      <div
                         className={cn(
-                          "max-w-xs rounded-lg p-2 lg:max-w-md shadow-md relative", 
-                          msg.senderId === user?.uid 
-                            ? "bg-primary text-primary-foreground rounded-tr-none" 
+                          "max-w-xs rounded-lg p-2 lg:max-w-md shadow-md relative",
+                          msg.senderId === user?.uid
+                            ? "bg-primary text-primary-foreground rounded-tr-none"
                             : "bg-muted text-foreground rounded-tl-none border border-border/10"
                         )}
                       >
                         {msg.imageUrl ? (
                           <div className="space-y-1">
-                            <Image 
-                              src={msg.imageUrl} 
-                              alt="Sent image" 
-                              width={250} 
-                              height={250} 
-                              className="rounded max-w-full h-auto object-contain border border-border/5" 
-                              data-ai-hint={msg.dataAiHint || "chat image"} 
+                            <Image
+                              src={msg.imageUrl}
+                              alt="Sent image"
+                              width={250}
+                              height={250}
+                              className="rounded max-w-full h-auto object-contain border border-border/5"
+                              data-ai-hint={msg.dataAiHint || "chat image"}
                             />
                              {msg.text ? (
                                 <p className="text-sm whitespace-pre-wrap px-0.5">
@@ -494,9 +501,9 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                                   </span>
                                 </p>
                               ) : (
-                                <p 
+                                <p
                                   className={cn(
-                                    "mt-1 text-xs text-right", 
+                                    "mt-1 text-xs text-right",
                                     msg.senderId === user?.uid ? "text-primary-foreground/80" : "text-muted-foreground"
                                   )}
                                 >
@@ -539,8 +546,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                             <Image src={chatPartnerProfile.photoURL} alt={chatPartnerProfile.displayName || "Sender"} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
                            ) : ( <AvatarFallback>{(chatPartnerProfile.displayName || "U").charAt(0)}</AvatarFallback> )}
                         </Avatar>
-                      <div className="bg-muted text-foreground rounded-lg p-2 shadow-md border border-border/10 rounded-tl-none"> 
-                        <p className="text-sm italic">typing...</p> 
+                      <div className="bg-muted text-foreground rounded-lg p-2 shadow-md border border-border/10 rounded-tl-none">
+                        <p className="text-sm italic">typing...</p>
                       </div>
                     </div>
                   )}
@@ -569,8 +576,8 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 border-0">
-                    <EmojiPicker 
-                      onEmojiClick={handleEmojiClick} 
+                    <EmojiPicker
+                      onEmojiClick={handleEmojiClick}
                       autoFocusSearch={false}
                       height={350}
                       width="100%"
@@ -620,4 +627,3 @@ export default function ChatPage({ params: paramsPromise }: { params: { chatId: 
     </MainLayout>
   );
 }
-

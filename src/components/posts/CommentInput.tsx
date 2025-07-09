@@ -1,3 +1,4 @@
+
 // src/components/posts/CommentInput.tsx
 'use client';
 
@@ -15,6 +16,7 @@ import type { CommentDocument } from '@/types/post';
 import type { NotificationDocument } from '@/types/notification'; // Import notification type
 import { Spinner } from '@/components/shared/Spinner';
 import { Send } from 'lucide-react';
+import { moderateContent } from '@/ai/flows/moderate-content';
 
 const commentSchema = z.object({
   text: z.string().min(1, { message: "Comment cannot be empty" }).max(500, { message: "Comment too long" }),
@@ -55,6 +57,23 @@ export function CommentInput({ postId, postOwnerId, postContentPreview, onCommen
 
     setIsSubmitting(true);
     try {
+      const moderationResult = await moderateContent({
+        content: data.text,
+        contentType: 'text',
+        ruleset: 'No hate speech, no harassment, no explicit content, no illegal activities.',
+      });
+
+      if (!moderationResult.isSafe) {
+        toast({
+          title: 'Content Moderation Failed',
+          description: `Your comment was blocked for the following reason: ${moderationResult.reason}`,
+          variant: 'destructive',
+          duration: 7000,
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const commentData: CommentDocument = {
         userId: user.uid,
         userDisplayName: user.displayName || 'Anonymous',
@@ -65,17 +84,17 @@ export function CommentInput({ postId, postOwnerId, postContentPreview, onCommen
 
       const postRef = doc(db, 'posts', postId);
       const commentsCollectionRef = collection(postRef, 'comments');
-      
+
       await addDoc(commentsCollectionRef, commentData);
       await updateDoc(postRef, {
         commentsCount: increment(1),
       });
-      
+
       // Create notification if commenter is not the post owner
       if (user.uid !== postOwnerId) {
         const notificationsColRef = collection(db, 'notifications');
         const commentTextPreview = data.text.substring(0, 70) + (data.text.length > 70 ? '...' : '');
-        const notificationData: Omit<NotificationDocument, 'createdAt'> = {
+        const notificationData: Omit<NotificationDocument, 'createdAt' | 'id'> = {
           recipientId: postOwnerId,
           actorId: user.uid,
           actorDisplayName: user.displayName || 'Someone',

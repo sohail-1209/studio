@@ -12,7 +12,7 @@ import {
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarSeparator,
-  SidebarTrigger, // For DESKTOP collapse/expand
+  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import {
@@ -23,10 +23,9 @@ import {
   UserCircle,
   Settings,
   LogOut,
-  PlusCircle,
   Moon,
   Sun,
-  MoreVertical, // Changed from PanelLeft
+  MoreVertical,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
@@ -40,7 +39,7 @@ export function AppSidebar() {
   const { user, logout, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const [currentTheme, setCurrentTheme] = useState('light');
-  const { isDesktopCollapsed, isMobileSheetOpen } = useSidebar(); // Get sidebar state
+  const { isDesktopCollapsed, isMobileSheetOpen, setIsMobileSheetOpen } = useSidebar();
 
   useEffect(() => {
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -48,45 +47,22 @@ export function AppSidebar() {
 
     if (storedTheme) {
       setCurrentTheme(storedTheme);
-      if (typeof document !== 'undefined') {
-        document.documentElement.classList.toggle('dark', storedTheme === 'dark');
-      }
     } else if (systemPrefersDark) {
       setCurrentTheme('dark');
-      if (typeof document !== 'undefined') {
-        document.documentElement.classList.add('dark');
-      }
     } else {
       setCurrentTheme('light');
-      if (typeof document !== 'undefined') {
-        document.documentElement.classList.remove('dark');
-      }
-    }
-
-    let mediaQuery: MediaQueryList | undefined;
-    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-        mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleChange = (e: MediaQueryListEvent) => {
-          if (!localStorage.getItem('theme')) {
-            const newSystemTheme = e.matches ? 'dark' : 'light';
-            setCurrentTheme(newSystemTheme);
-            if (typeof document !== 'undefined') {
-              document.documentElement.classList.toggle('dark', newSystemTheme === 'dark');
-            }
-          }
-        };
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery?.removeEventListener('change', handleChange);
     }
   }, []);
 
-  const toggleTheme = () => {
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    setCurrentTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
+  useEffect(() => {
     if (typeof document !== 'undefined') {
-        document.documentElement.classList.toggle('dark', newTheme === 'dark');
+      document.documentElement.classList.toggle('dark', currentTheme === 'dark');
+      localStorage.setItem('theme', currentTheme);
     }
+  }, [currentTheme]);
+
+  const toggleTheme = () => {
+    setCurrentTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
   const navItems = [
@@ -94,18 +70,12 @@ export function AppSidebar() {
     { href: '/explore', label: 'Explore', icon: Compass },
     { href: '/messages', label: 'Messages', icon: MessageSquare },
     { href: '/notifications', label: 'Notifications', icon: Bell },
-    // Create button is now part of MobileHeader or a main page button, not duplicated in sidebar for mobile
     { href: `/profile/${user?.uid || ''}`, label: 'Profile', icon: UserCircle, requiresAuth: true },
   ];
-  
-  // For mobile sheet, we always want labels. For desktop, respect isDesktopCollapsed.
-  // However, this component is used for BOTH desktop and mobile sheet content.
-  // So, isCollapsed will refer to the *desktop* collapsed state.
-  // The mobile sheet is either open (full) or closed (not visible).
+
   const showText = !isDesktopCollapsed || isMobileSheetOpen;
 
-
-  if (authLoading && !isMobileSheetOpen) { // Avoid skeleton in open mobile sheet initially
+  if (authLoading && !isMobileSheetOpen) {
     return (
       <div className={cn("flex flex-col h-full p-2", isMobileSheetOpen && "pt-8")}>
         <SidebarHeader className="p-1 mb-1 flex items-center justify-between">
@@ -132,9 +102,9 @@ export function AppSidebar() {
   return (
     <div className={cn("flex flex-col h-full p-2", isMobileSheetOpen && "pt-8")}>
       <SidebarHeader className={cn("p-1 mb-1 flex items-center", showText ? "justify-between" : "justify-center")}>
-         <Logo iconSize={30} textSize="text-2xl" className={cn(!showText ? "hidden" : "flex")} />
-         {!showText && <Logo iconSize={30} className="!gap-0" />} {/* Icon only for collapsed */}
-         {!isMobileSheetOpen && <SidebarTrigger><MoreVertical /></SidebarTrigger>} {/* Desktop collapse trigger with new icon */}
+         <Logo iconSize={30} textSize="text-3xl" className={cn(!showText ? "hidden" : "flex")} />
+         {!showText && <Logo iconSize={30} className="!gap-0" />}
+         {!isMobileSheetOpen && <SidebarTrigger><MoreVertical /></SidebarTrigger>}
       </SidebarHeader>
       <SidebarSeparator className="my-1" />
 
@@ -143,12 +113,12 @@ export function AppSidebar() {
           {navItems.filter(item => !(item.requiresAuth && !user)).map((item) => {
             const href = item.label === 'Profile' && user ? `/profile/${user.uid}` : item.href;
             const isActive = pathname === href || (item.label === 'Profile' && user && pathname.startsWith(`/profile/${user.uid}`));
-            
+
             if (item.label === 'Profile' && !user) return null;
 
             return (
               <SidebarMenuItem key={item.label}>
-                <Link href={href} onClick={item.label === 'Create' && isMobileSheetOpen ? () => useSidebar().setIsMobileSheetOpen(false) : undefined}>
+                <Link href={href} onClick={() => { if (isMobileSheetOpen) setIsMobileSheetOpen(false); }}>
                   <SidebarMenuButton
                     isActive={isActive}
                     tooltip={!showText ? item.label : undefined}
@@ -174,21 +144,18 @@ export function AppSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <Link href="/settings">
-              <SidebarMenuButton isActive={pathname === '/settings'} className={cn(!showText && "justify-center")} tooltip={!showText ? "Settings" : undefined}>
+              <SidebarMenuButton isActive={pathname === '/settings'} className={cn(!showText && "justify-center")} tooltip={!showText ? "Settings" : undefined} onClick={() => { if (isMobileSheetOpen) setIsMobileSheetOpen(false); }}>
                 <Settings />
                 {showText && <span>Settings</span>}
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
           {user && showText && (
-            <SidebarMenuItem> 
-              <Link href={`/profile/${user.uid}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sidebar-hover cursor-pointer w-full text-sidebar-foreground hover:text-sidebar-hover-foreground">
+            <SidebarMenuItem>
+              <Link href={`/profile/${user.uid}`} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sidebar-hover cursor-pointer w-full text-sidebar-foreground hover:text-sidebar-hover-foreground" onClick={() => { if (isMobileSheetOpen) setIsMobileSheetOpen(false); }}>
                 <Avatar className="h-8 w-8">
-                  {user.photoURL ? (
-                    <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
-                  ) : (
-                    <AvatarFallback className="bg-muted text-muted-foreground">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                  )}
+                  <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
+                  <AvatarFallback>{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="text-xs overflow-hidden">
                   <p className="font-semibold truncate">{user.displayName || 'User'}</p>
@@ -197,16 +164,13 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuItem>
           )}
-          {user && !showText && ( 
+          {user && !showText && (
             <SidebarMenuItem>
-               <Link href={`/profile/${user.uid}`}>
+               <Link href={`/profile/${user.uid}`} onClick={() => { if (isMobileSheetOpen) setIsMobileSheetOpen(false); }}>
                 <SidebarMenuButton className={cn("justify-center h-auto py-1.5")} tooltip="Profile">
                     <Avatar className="h-8 w-8">
-                        {user.photoURL ? (
-                            <Image src={user.photoURL} alt={user.displayName || 'User'} width={32} height={32} className="rounded-full" data-ai-hint="user avatar" />
-                        ) : (
-                            <AvatarFallback className="bg-muted text-muted-foreground">{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                        )}
+                      <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
+                      <AvatarFallback>{(user.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
                 </SidebarMenuButton>
               </Link>

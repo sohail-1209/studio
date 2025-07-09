@@ -4,8 +4,7 @@
 
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bell, Heart, MessageCircle, UserPlus, UserCheck, Loader2 } from 'lucide-react'; // Added UserPlus, UserCheck, Loader2
-import type { Metadata } from 'next';
+import { Bell, Heart, MessageCircle, UserPlus, UserCheck, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
@@ -17,14 +16,12 @@ import {
   onSnapshot,
   Timestamp,
   doc,
-  updateDoc,
   writeBatch,
   addDoc,
   serverTimestamp,
   increment,
 } from 'firebase/firestore';
-import type { Notification, NotificationDocument } from '@/types/notification'; // Ensure this path is correct
-import type { FollowRequestDocument } from '@/types/follow';
+import type { Notification, NotificationDocument } from '@/types/notification';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
@@ -108,29 +105,19 @@ export default function NotificationsPage() {
 
     const batch = writeBatch(db);
     const followRequestRef = doc(db, 'followRequests', notification.followRequestId);
-    const recipientProfileRef = doc(db, 'profiles', notification.recipientId); // Current user's profile (who is accepting)
-    // const requesterProfileRef = doc(db, 'profiles', notification.actorId);    // Profile of the user who sent the request
+    const recipientProfileRef = doc(db, 'profiles', notification.recipientId);
+    const requesterProfileRef = doc(db, 'profiles', notification.actorId);
     const originalNotificationRef = doc(db, 'notifications', notification.id);
 
     try {
-      // 1. Update the follow request status
       batch.update(followRequestRef, { status: 'accepted', updatedAt: serverTimestamp() });
-
-      // 2. Increment current user's (recipient's) followersCount
       batch.update(recipientProfileRef, { followersCount: increment(1) });
-
-      // 3. Increment requester's followingCount - THIS WILL LIKELY FAIL with strict profile rules
-      // For now, we remove this client-side attempt by the recipient.
-      // This count should ideally be updated by a Cloud Function or by the requester's client.
-      // batch.update(requesterProfileRef, { followingCount: increment(1) });
-
-      // 4. Update the original 'follow_request' notification
+      batch.update(requesterProfileRef, { followingCount: increment(1) });
       batch.update(originalNotificationRef, { isRead: true, actionTaken: 'accepted' });
 
-      // 5. Create a new 'follow_accept' notification for the original requester
-      const acceptNotificationData: Omit<NotificationDocument, 'createdAt'> = {
-        recipientId: notification.actorId, // The one who sent the request
-        actorId: user.uid, // The one who accepted the request
+      const acceptNotificationData: Omit<NotificationDocument, 'createdAt' | 'id'> = {
+        recipientId: notification.actorId,
+        actorId: user.uid,
         actorDisplayName: user.displayName,
         actorAvatarUrl: user.photoURL,
         type: 'follow_accept',
@@ -145,7 +132,6 @@ export default function NotificationsPage() {
     } catch (error: any) {
       console.error("Error accepting follow request:", error);
       toast({ title: "Error Accepting Request", description: error.message || "Could not accept follow request.", variant: "destructive" });
-      // Revert optimistic update if batch commit fails
       setNotifications(prev => prev.map(n => n.id === notification.id ? {...n, actionTaken: null, isRead: notification.isRead } : n));
     } finally {
       setProcessingRequestId(null);
@@ -193,7 +179,7 @@ export default function NotificationsPage() {
             <CardHeader className="flex flex-row items-center justify-between border-b">
               <div className="flex items-center space-x-3">
                 <Bell className="h-6 w-6 text-primary" />
-                <CardTitle className="font-headline text-2xl">Notifications</CardTitle>
+                <CardTitle>Notifications</CardTitle>
               </div>
               {notifications.some(n => !n.isRead && !n.actionTaken) && (
                    <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>Mark all as read</Button>
@@ -253,6 +239,20 @@ export default function NotificationsPage() {
                                 )}
                               </>
                             )}
+                             {notif.type === 'message' && (
+                              <>
+                                <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
+                                {' sent you a '}
+                                <Link href={`/messages/${notif.chatId}`} className="text-primary hover:underline cursor-pointer">
+                                  message
+                                </Link>
+                                {notif.messagePreview && (
+                                  <span className="text-muted-foreground block mt-1 italic">
+                                    &ldquo;{notif.messagePreview}&rdquo;
+                                  </span>
+                                )}
+                              </>
+                            )}
                             {notif.type === 'follow_request' && (
                               <>
                                  <Link href={`/profile/${notif.actorId}`} className="font-semibold text-foreground hover:underline">{notif.actorDisplayName || 'Someone'}</Link>
@@ -298,6 +298,7 @@ export default function NotificationsPage() {
                           )}
                           {notif.type === 'follow_request' && notif.actionTaken === 'declined' && (
                             <p className="text-sm text-red-600 mt-1 italic">You declined this request.</p>
+
                           )}
                         </div>
                         {!notif.isRead && !notif.actionTaken && (

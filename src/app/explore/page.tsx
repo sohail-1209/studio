@@ -122,7 +122,7 @@ export default function ExplorePage() {
     }
 
     setIsSearchingUserExact(true);
-    setShowSuggestions(false); 
+    setShowSuggestions(false);
     
     let userDocSnapshot: QuerySnapshot | null = null;
     let foundUserId: string | null = null;
@@ -136,7 +136,7 @@ export default function ExplorePage() {
         foundUserId = userDocSnapshot.docs[0].id;
       } else {
         const lowerCaseTerm = trimmedUsername.toLowerCase();
-        if (lowerCaseTerm !== trimmedUsername) { 
+        if (lowerCaseTerm !== trimmedUsername) {
           const qLower = query(profilesRef, where('username', '==', lowerCaseTerm), limit(1));
           userDocSnapshot = await getDocs(qLower);
           if (!userDocSnapshot.empty) {
@@ -147,7 +147,7 @@ export default function ExplorePage() {
 
       if (!foundUserId) {
         const capitalizedTerm = capitalize(trimmedUsername);
-        if (capitalizedTerm !== trimmedUsername && capitalizedTerm !== trimmedUsername.toLowerCase()) { 
+        if (capitalizedTerm !== trimmedUsername && capitalizedTerm !== trimmedUsername.toLowerCase()) {
             const qCapitalized = query(profilesRef, where('username', '==', capitalizedTerm), limit(1));
             userDocSnapshot = await getDocs(qCapitalized);
             if (!userDocSnapshot.empty) {
@@ -201,16 +201,13 @@ export default function ExplorePage() {
     const profilesRef = collection(db, 'profiles');
     const uniqueUserProfiles = new Map<string, UserProfile>();
 
-    // Generate distinct prefix variations to query
     const prefixesSet = new Set<string>();
-    prefixesSet.add(term.toLowerCase()); // Full lowercase (e.g., "some")
-    prefixesSet.add(term); // As typed (e.g., "SoMe")
-    // First char upper, rest as typed (e.g., "soMe" -> "SoMe"; "some" -> "Some")
+    prefixesSet.add(term.toLowerCase());
+    prefixesSet.add(term);
     prefixesSet.add(term.charAt(0).toUpperCase() + term.slice(1));
-    // First char upper, rest lower (e.g., "soMe" -> "Some"; "some" -> "Some")
     prefixesSet.add(term.charAt(0).toUpperCase() + term.slice(1).toLowerCase());
 
-    const distinctPrefixes = Array.from(prefixesSet).filter(p => p.length >= 1); // Firestore range queries work with 1 char
+    const distinctPrefixes = Array.from(prefixesSet).filter(p => p.length >= 1);
 
     try {
       for (const p of distinctPrefixes) {
@@ -218,20 +215,18 @@ export default function ExplorePage() {
           profilesRef,
           where('username', '>=', p),
           where('username', '<=', p + '\uf8ff'),
-          limit(5) // Fetch a few for each prefix variation
+          limit(5)
         );
         const querySnapshot = await getDocs(q);
         querySnapshot.docs.forEach(doc => {
           if (!uniqueUserProfiles.has(doc.id)) {
-            // Ensure the uid is part of the UserProfile object stored in the map
             uniqueUserProfiles.set(doc.id, { uid: doc.id, ...doc.data() } as UserProfile);
           }
         });
       }
 
       const fetchedUsers = Array.from(uniqueUserProfiles.values());
-      // Simple sort by username, case-insensitively, then take top 10
-      const sortedUsers = fetchedUsers.sort((a, b) => 
+      const sortedUsers = fetchedUsers.sort((a, b) =>
         (a.username || '').toLowerCase().localeCompare((b.username || '').toLowerCase())
       );
       const finalSuggestions = sortedUsers.slice(0, 10);
@@ -253,15 +248,14 @@ export default function ExplorePage() {
             duration: 7000,
           });
         } else {
-            // Don't toast for other errors during suggestion fetching to avoid being too noisy
             console.error("Generic error fetching suggestions:", error.message);
         }
-      setSuggestedUsers([]); // Clear suggestions on error
+      setSuggestedUsers([]);
       setShowSuggestions(false);
     } finally {
       setLoadingSuggestions(false);
     }
-  }, [toast]); 
+  }, [toast]);
 
   const debouncedFetchUserSuggestions = useMemo(() => {
     return debounce(fetchUserSuggestions, 300);
@@ -269,8 +263,7 @@ export default function ExplorePage() {
 
   useEffect(() => {
     const trimmedSearchTerm = searchTerm.trim();
-    // Allow fetching suggestions even for 1 character for better UX, prefix filter in fetchUserSuggestions handles this
-    if (trimmedSearchTerm.length >= 1) { 
+    if (trimmedSearchTerm.length >= 1) {
       debouncedFetchUserSuggestions(trimmedSearchTerm);
     } else {
       setSuggestedUsers([]);
@@ -301,7 +294,7 @@ export default function ExplorePage() {
             <CardHeader>
               <div className="flex items-center space-x-3">
                 <Compass className="h-6 w-6 text-primary" />
-                <CardTitle className="font-headline text-2xl">Explore</CardTitle>
+                <CardTitle>Explore</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
@@ -315,7 +308,7 @@ export default function ExplorePage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onFocus={() => {
                       inputFocusedRef.current = true;
-                      if (suggestedUsers.length > 0 && searchTerm.length >= 1) { // Show suggestions if term length >= 1
+                      if (suggestedUsers.length > 0 && searchTerm.length >= 1) {
                          setShowSuggestions(true);
                       }
                     }}
@@ -323,7 +316,7 @@ export default function ExplorePage() {
                       setTimeout(() => {
                           inputFocusedRef.current = false;
                           setShowSuggestions(false);
-                      }, 200); 
+                      }, 200);
                     }}
                     className="flex-grow"
                     disabled={isSearchingUserExact}
@@ -334,7 +327,7 @@ export default function ExplorePage() {
                      Search
                   </Button>
                 </form>
-                {showSuggestions && searchTerm.trim().length >= 1 && ( // Show suggestions if term length >= 1
+                {showSuggestions && searchTerm.trim().length >= 1 && (
                    <div className="absolute z-10 w-full sm:w-[calc(100%-5rem)] mt-1 max-h-60 overflow-y-auto rounded-md border bg-background shadow-lg">
                     {loadingSuggestions && (
                       <div className="p-3 text-sm text-muted-foreground text-center">Loading suggestions...</div>
@@ -344,12 +337,12 @@ export default function ExplorePage() {
                     )}
                     {!loadingSuggestions && suggestedUsers.map((user) => (
                       <div
-                        key={user.uid} // Ensure user.uid is present
+                        key={user.uid}
                         className="flex items-center space-x-2 p-3 hover:bg-muted cursor-pointer"
                         onMouseDown={() => handleSuggestionClick(user.uid)}
                       >
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} data-ai-hint="user avatar" />
+                          <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
                           <AvatarFallback>{(user.displayName || user.username || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <div>
@@ -399,7 +392,7 @@ export default function ExplorePage() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-2 flex flex-col justify-end">
                           <div className="flex items-center space-x-2">
                               <Avatar className="h-6 w-6 border-2 border-background">
-                                  <AvatarImage src={post.userAvatarUrl || undefined} alt={post.userDisplayName || 'User'} data-ai-hint="user avatar" />
+                                  <AvatarImage src={post.userAvatarUrl || undefined} alt={post.userDisplayName || 'User'} />
                                   <AvatarFallback>{(post.userDisplayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                               </Avatar>
                               <p className="text-xs font-medium text-white truncate">

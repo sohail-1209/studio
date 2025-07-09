@@ -24,11 +24,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import type { PostDocument } from '@/types/post';
 import { Spinner } from '@/components/shared/Spinner';
 import { UploadCloud } from 'lucide-react';
 import Image from 'next/image';
+import { moderateContent } from '@/ai/flows/moderate-content';
 
 const postSchema = z.object({
   caption: z.string().min(1, { message: 'Caption cannot be empty' }).max(1000, {message: 'Caption too long'}),
@@ -63,6 +64,10 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast({ title: "File Too Large", description: "Please select a file smaller than 10MB.", variant: "destructive" });
+        return;
+      }
       setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -101,65 +106,114 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
     }
 
     setLoading(true);
-    setUploadProgress(0);
-
+    
+    // 1. Moderate caption text
     try {
-      let imageUrl: string | null = null;
-      let imagePath: string | null = null;
+      const textModerationResult = await moderateContent({
+        content: data.caption,
+        contentType: 'text',
+        ruleset: 'No hate speech, no harassment, no explicit content, no illegal activities.',
+      });
 
-      if (selectedFile) {
+      if (!textModerationResult.isSafe) {
+        toast({
+          title: 'Content Moderation Failed',
+          description: `Your post was blocked for the following reason: ${textModerationResult.reason}`,
+          variant: 'destructive',
+          duration: 7000,
+        });
+        setLoading(false);
+        return;
+      }
+    } catch (error: any) {
+        console.error("Error during text moderation:", error);
+        toast({ title: "Moderation Error", description: "Could not check post content. Please try again.", variant: "destructive" });
+        setLoading(false);
+        return;
+    }
+
+
+    // 2. Upload image (if any) and then moderate it
+    let imageUrl: string | null = null;
+    let imagePath: string | null = null;
+    let fileRef: any = null;
+
+    if (selectedFile) {
+        setUploadProgress(0);
         const uniqueFileName = `${Date.now()}-${selectedFile.name}`;
         const filePath = `post_images/${user.uid}/${uniqueFileName}`;
-        const fileRef = storageRef(storage, filePath);
-        imagePath = filePath; // Store the path for deletion
+        fileRef = storageRef(storage, filePath);
+        imagePath = filePath;
         const uploadTask = uploadBytesResumable(fileRef, selectedFile);
 
-        await new Promise<void>((resolve, reject) => {
-          uploadTask.on(
-            'state_changed',
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
-            },
-            (error) => {
-              console.error('Upload failed:', error);
-              toast({
-                title: 'Image Upload Failed',
-                description: error.message || 'Could not upload image. Please try again.',
-                variant: 'destructive',
-              });
-              setLoading(false);
-              setUploadProgress(null);
-              reject(error);
-            },
-            async () => {
-              imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
-              resolve();
-            }
-          );
-        });
-        if (!imageUrl && selectedFile) { 
-          throw new Error("Image upload completed but failed to get URL.");
-        }
-      }
-      
-      setUploadProgress(selectedFile ? 100 : null);
+        try {
+            await new Promise<void>((resolve, reject) => {
+              uploadTask.on(
+                'state_changed',
+                (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+                (error) => reject(error),
+                async () => {
+                  try {
+                    imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                    resolve();
+                  } catch (urlError) {
+                    reject(urlError);
+                  }
+                }
+              );
+            });
 
+            if (!imageUrl) throw new Error("Image upload completed but failed to get URL.");
+            
+            // 2a. Moderate the uploaded image URL
+            const imageModerationResult = await moderateContent({
+                content: imageUrl,
+                contentType: 'image',
+                ruleset: 'No explicit, violent, or hateful imagery.',
+            });
+
+            if (!imageModerationResult.isSafe) {
+                toast({
+                  title: 'Image Moderation Failed',
+                  description: `Your image was blocked: ${imageModerationResult.reason}`,
+                  variant: 'destructive',
+                  duration: 7000,
+                });
+                await deleteObject(fileRef); // Clean up the rejected image
+                setLoading(false);
+                return;
+            }
+
+        } catch (error: any) {
+            console.error('Upload or image moderation failed:', error);
+            toast({
+              title: 'Image Upload Failed',
+              description: error.message || 'Could not upload or moderate image. Please try again.',
+              variant: 'destructive',
+            });
+            setLoading(false);
+            setUploadProgress(null);
+            return;
+        }
+    }
+
+    // 3. If all moderation passes, create the post
+    try {
       const postData: PostDocument = {
         userId: user.uid,
         userDisplayName: user.displayName || 'Anonymous',
         userAvatarUrl: user.photoURL || null,
         caption: data.caption,
-        imageUrl: imageUrl,
-        imagePath: imagePath, // Save the imagePath
-        videoUrl: null, 
+        imageUrl,
+        imagePath,
+        videoUrl: null,
         likesCount: 0,
-        likedBy: [], 
+        likedBy: [],
         commentsCount: 0,
         createdAt: serverTimestamp(),
         dataAiHint: selectedFile ? 'user uploaded content' : undefined,
-        isStory: isStory,
-        authorIsPrivate: user.isPrivate || false, // Add author's privacy status
+        isStory,
+        authorIsPrivate: user.isPrivate || false,
       };
 
       await addDoc(collection(db, 'posts'), postData);
@@ -171,10 +225,10 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
       resetFormStates();
       onOpenChange(false);
     } catch (error: any) {
-      console.error('Error creating post/story:', error);
+      console.error('Error creating post document:', error);
       toast({
-        title: isStory ? 'Error Creating Story' : 'Error Creating Post',
-        description: error.message || 'Could not create content. Please try again.',
+        title: 'Error Creating Post',
+        description: 'Could not save the post after upload. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -217,12 +271,12 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                 >
                     {previewUrl ? (
                         <div className="relative w-full h-full">
-                           <Image 
-                             src={previewUrl} 
-                             alt="Preview" 
-                             fill 
-                             style={{objectFit: 'contain'}} 
-                             className="rounded-md" 
+                           <Image
+                             src={previewUrl}
+                             alt="Preview"
+                             fill
+                             style={{objectFit: 'contain'}}
+                             className="rounded-md"
                            />
                         </div>
                     ) : (
@@ -239,7 +293,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
             </div>
             {selectedFile && <p className="text-xs text-muted-foreground">Selected: {selectedFile.name}</p>}
           </div>
-          
+
           {uploadProgress !== null && loading && selectedFile && (
             <div className="space-y-1">
               <Label className="text-xs">Upload progress: {Math.round(uploadProgress)}%</Label>
@@ -266,7 +320,7 @@ export function CreatePostDialog({ open, onOpenChange }: CreatePostDialogProps) 
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={loading || (selectedFile && uploadProgress !== null && uploadProgress < 100)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button type="submit" disabled={loading || (selectedFile !== null && uploadProgress !== null && uploadProgress < 100)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               {loading && <Spinner className="mr-2 h-4 w-4" />}
               {loading ? (selectedFile && uploadProgress !== null ? 'Uploading...' : 'Sharing...') : (isStory ? 'Share Story' : 'Post')}
             </Button>

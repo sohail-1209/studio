@@ -18,9 +18,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['PT Sans', 'sans-serif'],
+        body: ['"PT Sans"', 'sans-serif'],
         headline: ['Poppins', 'sans-serif'],
-        logo: ['Tangerine', 'cursive'], // Added Tangerine for the logo
+        logo: ['Tangerine', 'cursive'],
         code: ['monospace'],
       },
       colors: {
@@ -73,7 +73,7 @@ export default {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
-        logoText: 'hsl(var(--logo-text-color))', 
+        logoText: 'hsl(var(--logo-text-color))',
       },
       borderRadius: {
         lg: 'var(--radius)',

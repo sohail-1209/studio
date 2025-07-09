@@ -1,13 +1,13 @@
-# **App Name**: NExCHAT
+# **App Name**: SYNORA
 
 ## Core Features:
 
 - Secure Auth: User authentication: secure signup and login using Firebase Auth.
 - Real-Time Feed: Real-time feed: display posts with images/videos and captions, updated in real-time.
 - Direct Messaging: Messaging: enable direct, one-to-one text and image messaging.
-- User Profiles: Profile Management: Allow users to create and customize their profile. Profiles must allow other users to find and follow each other.
+- User Profiles: Allow users to create and customize their profile. Profiles must allow other users to find and follow each other.
 - Firebase Backend: Firebase Integration: Use Firebase for auth, data storage, and hosting.
-- Content Creation: Media Upload: Users can upload different types of files when creating content, with a max size of 10MB.
+- Content Creation: Users can upload different types of files when creating content, with a max size of 10MB.
 - AI Moderation: Use an AI tool to moderate content in the forms of Images, Videos, or Text based on specified rule-sets.
 - Stories: Users can upload temporary stories (image/video with optional caption). Stories auto-expire after 24 hours. Viewable by followers or all users (based on setting)
 - Typing indicator: One-to-one messaging using Firestore. Support for text, image, and file attachments. Timestamp, sender info, read status per message.

@@ -13,12 +13,12 @@ import { Separator } from '@/components/ui/separator';
 import { SettingsIcon, Edit3, Palette, ShieldCheck, LogOut, AlertTriangle, Moon, Sun, Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/contexts/AuthContext';
-import { db, storage, auth } from '@/lib/firebase'; // Ensure auth is imported
-import { doc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { db, storage, auth } from '@/lib/firebase';
+import { doc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, updateDoc, increment } from 'firebase/firestore';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
-import { sendPasswordResetEmail, deleteUser as deleteAuthUser } from 'firebase/auth'; // Import deleteUser
+import { sendPasswordResetEmail, deleteUser as deleteAuthUser } from 'firebase/auth';
 import { EditProfileDialog } from '@/components/profile/EditProfileDialog';
-import { ReauthenticateDialog } from '@/components/auth/ReauthenticateDialog'; // Import ReauthenticateDialog
+import { ReauthenticateDialog } from '@/components/auth/ReauthenticateDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -57,8 +57,9 @@ export default function SettingsPage() {
       setCurrentTheme(storedTheme);
       document.documentElement.classList.toggle('dark', storedTheme === 'dark');
     } else {
-      setCurrentTheme('light');
-      document.documentElement.classList.remove('dark');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setCurrentTheme(prefersDark ? 'dark' : 'light');
+        document.documentElement.classList.toggle('dark', prefersDark);
     }
   }, []);
 
@@ -70,6 +71,7 @@ export default function SettingsPage() {
     toast({
       title: `Theme Changed`,
       description: `Switched to ${newTheme} mode.`,
+      duration: 2000,
     });
   };
 
@@ -102,10 +104,10 @@ export default function SettingsPage() {
 
   const handleProfileUpdate = async (updatedProfile: UserProfile) => {
     setUserProfileData(updatedProfile);
-    await reloadUser(); 
+    await reloadUser();
     toast({ title: "Profile Updated", description: "Your settings page reflects the latest changes." });
   };
-  
+
 
   const handleChangePassword = async () => {
     if (!firebaseUser || !firebaseUser.email) {
@@ -147,12 +149,10 @@ export default function SettingsPage() {
       const postsSnapshot = await getDocs(postsQuery);
       for (const postDoc of postsSnapshot.docs) {
         const postData = postDoc.data();
-        
+
         const commentsRef = collection(postDoc.ref, 'comments');
         const commentsSnapshot = await getDocs(commentsRef);
-        commentsSnapshot.docs.forEach(commentDoc => {
-          batch.delete(commentDoc.ref);
-        });
+        commentsSnapshot.docs.forEach(commentDoc => batch.delete(commentDoc.ref));
 
         if (postData.imagePath) {
           try {
@@ -165,21 +165,22 @@ export default function SettingsPage() {
         batch.delete(postDoc.ref);
       }
 
-      const notificationsQuery = query(collection(db, 'notifications'), where('recipientId', '==', userId));
-      const notificationsSnapshot = await getDocs(notificationsQuery);
-      notificationsSnapshot.forEach(doc => batch.delete(doc.ref));
-      const actorNotificationsQuery = query(collection(db, 'notifications'), where('actorId', '==', userId));
-      const actorNotificationsSnapshot = await getDocs(actorNotificationsQuery);
-      actorNotificationsSnapshot.forEach(doc => batch.delete(doc.ref));
+      // Decrement followers/following counts on other profiles (best effort)
+      const followingQuery = query(collection(db, 'followRequests'), where('requesterId', '==', userId), where('status', '==', 'accepted'));
+      const followingSnapshot = await getDocs(followingQuery);
+      followingSnapshot.forEach(docSnap => {
+          const followedUserId = docSnap.data().recipientId;
+          batch.update(doc(db, 'profiles', followedUserId), { followersCount: increment(-1) });
+          batch.delete(docSnap.ref);
+      });
 
-
-      const followRequestsSentQuery = query(collection(db, 'followRequests'), where('requesterId', '==', userId));
-      const followRequestsSentSnapshot = await getDocs(followRequestsSentQuery);
-      followRequestsSentSnapshot.forEach(doc => batch.delete(doc.ref));
-
-      const followRequestsReceivedQuery = query(collection(db, 'followRequests'), where('recipientId', '==', userId));
-      const followRequestsReceivedSnapshot = await getDocs(followRequestsReceivedQuery);
-      followRequestsReceivedSnapshot.forEach(doc => batch.delete(doc.ref));
+      const followersQuery = query(collection(db, 'followRequests'), where('recipientId', '==', userId), where('status', '==', 'accepted'));
+      const followersSnapshot = await getDocs(followersQuery);
+      followersSnapshot.forEach(docSnap => {
+          const followerUserId = docSnap.data().requesterId;
+          batch.update(doc(db, 'profiles', followerUserId), { followingCount: increment(-1) });
+          batch.delete(docSnap.ref);
+      });
       
       const profileRef = doc(db, 'profiles', userId);
       batch.delete(profileRef);
@@ -218,24 +219,21 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center space-x-3">
                 <SettingsIcon className="h-7 w-7 text-primary" />
-                <CardTitle className="font-headline text-3xl">Settings</CardTitle>
+                <CardTitle>Settings</CardTitle>
               </div>
               <CardDescription>Manage your account, profile, and appearance settings.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
               <section>
-                <h2 className="text-xl font-semibold text-foreground mb-3">Profile Settings</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-3 font-headline">Profile Settings</h2>
                 {loadingProfile ? (
                   <ProfileInfoSkeleton />
                 ) : userProfileData ? (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-lg border p-4 bg-muted/30 space-y-3 sm:space-y-0 sm:gap-4">
                     <div className="flex items-center space-x-4">
                       <Avatar className="h-16 w-16">
-                        {userProfileData.photoURL ? (
-                          <Image src={userProfileData.photoURL} alt={userProfileData.displayName || 'User'} width={64} height={64} className="rounded-full" data-ai-hint="user avatar" />
-                        ) : (
-                          <AvatarFallback>{(userProfileData.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
-                        )}
+                        <AvatarImage src={userProfileData.photoURL || undefined} alt={userProfileData.displayName || 'User'} />
+                        <AvatarFallback>{(userProfileData.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="text-lg font-medium text-foreground">{userProfileData.displayName}</p>
@@ -254,7 +252,7 @@ export default function SettingsPage() {
               <Separator />
 
               <section>
-                <h2 className="text-xl font-semibold text-foreground mb-3">Appearance</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-3 font-headline">Appearance</h2>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
                     <Label htmlFor="theme-toggle" className="text-base">Dark Mode</Label>
@@ -278,7 +276,7 @@ export default function SettingsPage() {
               <Separator />
 
               <section>
-                <h2 className="text-xl font-semibold text-foreground mb-3">Account Management</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-3 font-headline">Account Management</h2>
                 <div className="space-y-4">
                   <div className="rounded-lg border p-4">
                     <Label className="text-base">Change Password</Label>
@@ -307,7 +305,7 @@ export default function SettingsPage() {
                       <LogOut className="mr-2 h-4 w-4" /> Log Out
                     </Button>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Securely log out of your Synora account.
+                      Securely log out of your SYNORA account.
                     </p>
                   </div>
                 </div>
@@ -334,7 +332,7 @@ export default function SettingsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your account and remove all your data from our servers. This includes your profile, posts, comments on your posts, notifications, and follow relationships.
+                This action cannot be undone. This will permanently delete your account and remove all your data from our servers. This includes your profile, posts, comments, notifications, and follow relationships.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

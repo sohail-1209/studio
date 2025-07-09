@@ -7,12 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Heart, MessageCircle as MessageIcon, Share2, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState, useEffect, useCallback } from 'react';
 import { CreatePostDialog } from '@/components/posts/CreatePostDialog';
 import { db, storage } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, arrayUnion, arrayRemove, increment, limit as firestoreLimit, where, getDocs, addDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
-import { ref as storageRefDb, deleteObject } from 'firebase/storage'; // Renamed to avoid conflict
+import { ref as storageRefDb, deleteObject } from 'firebase/storage';
 import type { Post, PostDocument } from '@/types/post';
 import type { NotificationDocument } from '@/types/notification';
 import { formatDistanceToNow, subHours } from 'date-fns';
@@ -66,7 +66,6 @@ export default function FeedPage() {
   const [currentUserStories, setCurrentUserStories] = useState<Post[]>([]);
   const [loadingCurrentUserStories, setLoadingCurrentUserStories] = useState(false);
 
-  // State for delete confirmation
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
@@ -74,11 +73,10 @@ export default function FeedPage() {
 
   useEffect(() => {
     const postsCollectionRef = collection(db, 'posts');
-    // Fetch only non-story posts from public accounts for the main feed
     const qPosts = query(
       postsCollectionRef,
       where('isStory', '!=', true),
-      where('authorIsPrivate', '==', false), // Only show posts from public accounts
+      where('authorIsPrivate', '==', false),
       orderBy('createdAt', 'desc')
     );
 
@@ -138,7 +136,7 @@ export default function FeedPage() {
       const uniqueUsersMap = new Map<string, StoryUserData>();
       snapshot.docs.forEach(docSnapshot => {
         const post = docSnapshot.data() as PostDocument;
-        if (post.userId && !uniqueUsersMap.has(post.userId) && (post.authorIsPrivate === false || post.userId === user?.uid)) { // Show public stories or own stories
+        if (post.userId && !uniqueUsersMap.has(post.userId) && (post.authorIsPrivate === false || post.userId === user?.uid)) {
           uniqueUsersMap.set(post.userId, {
             userId: post.userId,
             displayName: post.userDisplayName,
@@ -198,13 +196,13 @@ export default function FeedPage() {
           likesCount: increment(1),
         });
 
-        if (user.uid !== currentPost.userId && !currentPost.isStory) { // Only notify for non-story posts
+        if (user.uid !== currentPost.userId && !currentPost.isStory) {
           const notificationsColRef = collection(db, 'notifications');
           let contentPreview = currentPost.caption
             ? (currentPost.caption.substring(0, 50) + (currentPost.caption.length > 50 ? '...' : ''))
             : (currentPost.imageUrl ? 'your image' : (currentPost.videoUrl ? 'your video' : 'your post'));
 
-          const notificationData: Omit<NotificationDocument, 'createdAt'> = {
+          const notificationData: Omit<NotificationDocument, 'createdAt' | 'id'> = {
             recipientId: currentPost.userId,
             actorId: user.uid,
             actorDisplayName: user.displayName || 'Someone',
@@ -239,66 +237,27 @@ export default function FeedPage() {
       return;
     }
     const shareData = {
-      title: `Check out this post on Synora by ${post.userDisplayName || 'a user'}!`,
-      text: post.caption || 'An interesting post from Synora.',
+      title: `Check out this post on SYNORA by ${post.userDisplayName || 'a user'}!`,
+      text: post.caption || 'An interesting post from SYNORA.',
       url: window.location.origin + `/post/${post.id}`,
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-        console.log("Post shared successfully via navigator.share");
       } catch (error: any) {
-        console.warn('navigator.share failed or was cancelled:', error);
-        if (error.name === 'AbortError') {
-          toast({
-            title: 'Sharing Cancelled',
-            description: 'You decided not to share the post.',
-          });
-        } else if (navigator.clipboard && navigator.clipboard.writeText) {
-          try {
-            await navigator.clipboard.writeText(shareData.url);
-            toast({
-              title: 'Link Copied',
-              description: 'Sharing via dialog was not possible, but the post link has been copied to your clipboard.',
-            });
-          } catch (copyError) {
-            console.error('Error copying link to clipboard after share failed:', copyError);
-            toast({
-              title: 'Error',
-              description: 'Could not share the post or copy the link.',
-              variant: 'destructive',
-            });
-          }
-        } else {
-          toast({
-            title: 'Error Sharing',
-            description: 'Could not share the post, and clipboard access is also unavailable.',
-            variant: 'destructive',
-          });
+        if (error.name !== 'AbortError') {
+          console.error('Error sharing post:', error);
+          toast({ title: 'Error Sharing', description: 'Could not share post.', variant: 'destructive' });
         }
       }
-    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    } else {
       try {
         await navigator.clipboard.writeText(shareData.url);
-        toast({
-          title: 'Link Copied!',
-          description: 'Post link has been copied to your clipboard.',
-        });
-      } catch (copyError) {
-        console.error('Error copying link to clipboard:', copyError);
-        toast({
-          title: 'Copy Failed',
-          description: 'Could not copy the post link.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Link Copied!', description: 'Post link copied to clipboard.' });
+      } catch (err) {
+        toast({ title: 'Error', description: 'Could not copy link.', variant: 'destructive' });
       }
-    } else {
-      toast({
-        title: 'Share Unavailable',
-        description: 'Sharing is not supported on this browser.',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -356,7 +315,6 @@ export default function FeedPage() {
     try {
       const postRef = doc(db, 'posts', postToDelete.id);
 
-      // 1. Delete comments subcollection
       const commentsRef = collection(postRef, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
       const commentBatch = writeBatch(db);
@@ -365,7 +323,6 @@ export default function FeedPage() {
       });
       await commentBatch.commit();
 
-      // 2. Delete image from storage (if exists)
       if (postToDelete.imagePath) {
         const imageFileRef = storageRefDb(storage, postToDelete.imagePath);
         await deleteObject(imageFileRef).catch(storageError => {
@@ -374,7 +331,6 @@ export default function FeedPage() {
         });
       }
 
-      // 3. Delete the post document
       await deleteDoc(postRef);
 
       toast({ title: "Post Deleted", description: "Your post has been successfully deleted." });
@@ -444,7 +400,7 @@ export default function FeedPage() {
 
         <Card className="w-full shadow-lg mb-6 md:mb-8">
           <CardHeader className="pb-3 pt-5">
-            <CardTitle className="font-headline text-xl">Stories</CardTitle>
+            <CardTitle>Stories</CardTitle>
           </CardHeader>
           <CardContent className="flex space-x-4 overflow-x-auto p-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
             {loadingStoriesReel && (
@@ -468,19 +424,9 @@ export default function FeedPage() {
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && handleStoryClick(storyUser)}
                 >
-                  <Avatar className="h-16 w-16 rounded-full border-2 border-pink-500 p-0.5 group-hover:border-pink-400 transition-colors">
-                    {storyAvatarUrl ? (
-                      <Image
-                        src={storyAvatarUrl}
-                        alt={`${storyDisplayName || 'User'}'s story`}
-                        width={64}
-                        height={64}
-                        className="rounded-full"
-                        data-ai-hint={storyUser.dataAiHint || "portrait person"}
-                      />
-                    ) : (
-                      <AvatarFallback>{storyAvatarFallback}</AvatarFallback>
-                    )}
+                  <Avatar className="h-16 w-16 rounded-full border-2 border-accent p-0.5 group-hover:border-accent/80 transition-colors">
+                    <AvatarImage src={storyAvatarUrl || undefined} alt={`${storyDisplayName || 'User'}'s story`} data-ai-hint="portrait person" />
+                    <AvatarFallback>{storyAvatarFallback}</AvatarFallback>
                   </Avatar>
                   <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors truncate w-16 text-center">
                     {storyDisplayName || 'User'}
@@ -531,11 +477,8 @@ export default function FeedPage() {
                 <CardHeader className="p-4">
                   <div className="flex items-center space-x-3">
                     <Avatar>
-                      {avatarUrl ? (
-                        <Image src={avatarUrl} alt={avatarAlt} width={40} height={40} className="rounded-full" data-ai-hint="user avatar" />
-                      ) : (
-                        <AvatarFallback>{avatarFallbackInitial}</AvatarFallback>
-                      )}
+                      <AvatarImage src={avatarUrl || undefined} alt={avatarAlt} data-ai-hint="user avatar" />
+                      <AvatarFallback>{avatarFallbackInitial}</AvatarFallback>
                     </Avatar>
                     <div className="flex-grow">
                       <p className="font-semibold text-foreground">{postAuthorDisplayName}</p>
@@ -578,7 +521,7 @@ export default function FeedPage() {
                   {post.videoUrl && (
                     <div className="relative aspect-[16/10] w-full bg-black flex items-center justify-center overflow-hidden">
                        <Image
-                         src={post.videoUrl} // This will use the placeholder if videoUrl is a placeholder
+                         src={post.videoUrl}
                          alt={post.caption || "Post video placeholder"}
                          fill
                          style={{objectFit: 'contain'}}
@@ -593,13 +536,13 @@ export default function FeedPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="flex-1 py-2.5 hover:bg-accent/50"
+                        className="flex-1 py-2.5 hover:bg-accent/10"
                         onClick={() => handleLikePost(post.id, post)}
                         disabled={isLiking[post.id]}
                       >
                         {isLiking[post.id] ? <Spinner size={16} className="mr-2" /> :
                           <Heart
-                            className={`mr-2 h-4 w-4 ${isLikedByCurrentUser ? 'text-red-500' : 'text-muted-foreground'}`}
+                            className={`mr-2 h-4 w-4 ${isLikedByCurrentUser ? 'text-accent' : 'text-muted-foreground'}`}
                             fill={isLikedByCurrentUser ? 'currentColor' : 'none'}
                           />
                         }
@@ -608,13 +551,13 @@ export default function FeedPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="flex-1 py-2.5 hover:bg-accent/50"
+                        className="flex-1 py-2.5 hover:bg-accent/10"
                         onClick={() => toggleCommentSection(post.id)}
                       >
                         <MessageIcon className="mr-2 h-4 w-4" />
                         Comments ({post.commentsCount || 0})
                       </Button>
-                      <Button variant="ghost" size="sm" className="flex-1 py-2.5 hover:bg-accent/50" onClick={() => handleSharePost(post)}>
+                      <Button variant="ghost" size="sm" className="flex-1 py-2.5 hover:bg-accent/10" onClick={() => handleSharePost(post)}>
                         <Share2 className="mr-2 h-4 w-4" /> Share
                       </Button>
                     </div>
